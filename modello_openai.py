@@ -8,21 +8,32 @@ from pathlib import Path
 from openai import (
     APIConnectionError,
     APIStatusError,
+    APITimeoutError,
     AuthenticationError,
     OpenAI,
     OpenAIError,
 )
 
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+MODELLO_NVIDIA_DEFAULT = "meta/llama-3.1-8b-instruct"
 MODELLI_NVIDIA_RISERVA = [
+    "meta/llama-3.1-8b-instruct",
+    "meta/llama-3.3-70b-instruct",
+    "nvidia/llama-3.1-nemotron-70b-instruct",
     "nvidia/nemotron-3.5-lightning-30b-a3b",
     "nvidia/llama-3.1-nemotron-51b-instruct",
     "nvidia/nemotron-3-super-120b-a12b",
-    "nvidia/llama-3.1-nemotron-70b-instruct",
     "nvidia/nemotron-4-340b-instruct",
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia/nemotron-3-ultra-550b-a55b",
 ]
 STATI_RIPROVABILI = {404, 408, 429, 500, 502, 503, 504}
+TIMEOUT_SECONDI = 12.0
+MAX_TOKENS_RISPOSTA = 220
+
+_client_cache: dict[tuple[str, str | None, int], OpenAI] = {}
+_ultimo_modello_nvidia_valido: str | None = None
+ULTIMO_MODELLO_USATO: str | None = None
 BASE_DIR = Path(__file__).resolve().parent
 ENV_PATH = BASE_DIR / ".env"
 DATA_DIR = BASE_DIR / "dati" if (BASE_DIR / "dati").is_dir() else BASE_DIR / "data"
@@ -56,6 +67,20 @@ def _valore_env_file(nome: str) -> str | None:
     return None
 
 
+def _ottieni_client(api_key: str, base_url: str | None, max_retries: int) -> OpenAI:
+    chiave_cache = (api_key, base_url, max_retries)
+    client = _client_cache.get(chiave_cache)
+    if client is None:
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            max_retries=max_retries,
+            timeout=TIMEOUT_SECONDI,
+        )
+        _client_cache[chiave_cache] = client
+    return client
+
+
 def genera_risposta(
     domanda: str,
     fonti: Sequence[tuple[str, str]],
@@ -63,6 +88,8 @@ def genera_risposta(
     api_key: str | None = None,
     modello: str | None = None,
 ) -> str:
+    global _ultimo_modello_nvidia_valido, ULTIMO_MODELLO_USATO
+
     domanda = domanda.strip()
     if not domanda:
         raise ValueError("La domanda non può essere vuota.")
@@ -76,7 +103,9 @@ def genera_risposta(
         "OPENAI_API_KEY"
     )
 
-    usa_nvidia = api_key is None and bool(chiave_nvidia)
+    usa_nvidia = (api_key is not None and api_key.startswith("nvapi-")) or (
+        api_key is None and bool(chiave_nvidia)
+    )
     chiave = api_key or chiave_nvidia or chiave_openai
     if not chiave:
         raise ValueError(
@@ -93,10 +122,15 @@ def genera_risposta(
     elif api_key is None:
         base_url = os.environ.get("OPENAI_BASE_URL")
 
-    modello_principale = modello or (
-        os.environ.get("NVIDIA_MODEL") or "nvidia/nemotron-3-ultra-550b-a55b"
+    modello_env = (
+        os.environ.get("NVIDIA_MODEL") or _valore_env_file("NVIDIA_MODEL")
         if usa_nvidia
-        else os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+        else os.environ.get("OPENAI_MODEL") or _valore_env_file("OPENAI_MODEL")
+    )
+    modello_principale = modello or modello_env or (
+        (_ultimo_modello_nvidia_valido or MODELLO_NVIDIA_DEFAULT)
+        if usa_nvidia
+        else "gpt-4o-mini"
     )
     modelli = [modello_principale]
     if usa_nvidia:
@@ -106,10 +140,10 @@ def genera_risposta(
             if modello_riserva not in modelli
         )
 
-    client = OpenAI(
+    client = _ottieni_client(
         api_key=chiave.strip(),
         base_url=base_url,
-        max_retries=0 if usa_nvidia else 2,
+        max_retries=0 if usa_nvidia else 1,
     )
     messaggi = [
         {"role": "system", "content": ISTRUZIONI},
@@ -124,11 +158,15 @@ def genera_risposta(
                 model=modello_corrente,
                 messages=messaggi,
                 temperature=0,
+                max_tokens=MAX_TOKENS_RISPOSTA,
             )
+            ULTIMO_MODELLO_USATO = modello_corrente
+            if usa_nvidia and modello is None:
+                _ultimo_modello_nvidia_valido = modello_corrente
             break
         except AuthenticationError:
             raise
-        except APIConnectionError:
+        except (APIConnectionError, APITimeoutError):
             if not usa_nvidia or indice == len(modelli) - 1:
                 raise
         except APIStatusError as errore:

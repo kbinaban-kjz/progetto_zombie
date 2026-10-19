@@ -46,12 +46,13 @@ inizializza_db()
 MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"
 _tokenizer_locale = None
 _modello_locale = None
+_dispositivo_locale = "cpu"
 _modello_locale_tentato = False
 
 
 def carica_modello_locale() -> bool:
-    """Carica il modello locale Qwen/Qwen2.5-0.5B-Instruct su CPU (Cella 3 di Investigatore.ipynb)."""
-    global _tokenizer_locale, _modello_locale, _modello_locale_tentato
+    """Carica il modello locale Qwen/Qwen2.5-0.5B-Instruct (GPU MPS/CUDA se disponibile, altrimenti CPU)."""
+    global _tokenizer_locale, _modello_locale, _dispositivo_locale, _modello_locale_tentato
     if _modello_locale_tentato:
         return _modello_locale is not None
     _modello_locale_tentato = True
@@ -59,11 +60,25 @@ def carica_modello_locale() -> bool:
         import torch
         from transformers import AutoTokenizer, AutoModelForCausalLM
 
-        print(f"[Locale] Caricamento modello {MODELLO_LOCALE} su CPU...")
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            _dispositivo_locale = "mps"
+            dtype = torch.float16
+        elif torch.cuda.is_available():
+            _dispositivo_locale = "cuda"
+            dtype = torch.float16
+        else:
+            _dispositivo_locale = "cpu"
+            dtype = torch.float32
+
+        print(f"[Locale] Caricamento modello {MODELLO_LOCALE} su {_dispositivo_locale.upper()}...")
         _tokenizer_locale = AutoTokenizer.from_pretrained(MODELLO_LOCALE)
-        _modello_locale = AutoModelForCausalLM.from_pretrained(MODELLO_LOCALE).to("cpu")
+        _modello_locale = AutoModelForCausalLM.from_pretrained(
+            MODELLO_LOCALE,
+            torch_dtype=dtype,
+            low_cpu_mem_usage=True,
+        ).to(_dispositivo_locale)
         _modello_locale.eval()
-        print(f"[Locale] Modello {MODELLO_LOCALE} pronto.")
+        print(f"[Locale] Modello {MODELLO_LOCALE} pronto su {_dispositivo_locale.upper()}.")
         return True
     except Exception as exc:
         print(f"[Locale] Impossibile caricare {MODELLO_LOCALE} con transformers/torch ({exc}).")
@@ -120,7 +135,7 @@ def _risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) ->
     return "Non documentato nelle fonti disponibili."
 
 
-def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 220) -> str:
+def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 110) -> str:
     """Esegue la generazione sul modello locale di Investigatore.py (Qwen/Qwen2.5-0.5B-Instruct)."""
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
@@ -144,7 +159,7 @@ def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_t
         testo = _tokenizer_locale.apply_chat_template(
             messaggi, tokenize=False, add_generation_prompt=True
         )
-        dati = _tokenizer_locale(testo, return_tensors="pt")
+        dati = _tokenizer_locale(testo, return_tensors="pt").to(_dispositivo_locale)
         if dati["input_ids"].shape[1] > 6000:
             raise ValueError("Troppi documenti: seleziona le fonti con il RAG.")
         with torch.inference_mode():
@@ -152,6 +167,7 @@ def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_t
                 **dati,
                 max_new_tokens=max_tokens,
                 do_sample=False,
+                use_cache=True,
                 pad_token_id=_tokenizer_locale.eos_token_id,
             )
         risposta = _tokenizer_locale.decode(
@@ -290,11 +306,18 @@ def genera_risposta_ibrida(
         )
         _, provider = _ha_chiave_configurata()
         usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (not api_key and provider == "NVIDIA")
-        modello_cloud = modello or (
-            os.environ.get("NVIDIA_MODEL") or modello_openai._valore_env_file("NVIDIA_MODEL")
-            or "nvidia/nemotron-3-ultra-550b-a55b"
-            if usa_nvidia
-            else os.environ.get("OPENAI_MODEL") or modello_openai._valore_env_file("OPENAI_MODEL") or "gpt-4o-mini"
+        modello_cloud = (
+            modello_openai.ULTIMO_MODELLO_USATO
+            or modello
+            or (
+                os.environ.get("NVIDIA_MODEL")
+                or modello_openai._valore_env_file("NVIDIA_MODEL")
+                or modello_openai.MODELLO_NVIDIA_DEFAULT
+                if usa_nvidia
+                else os.environ.get("OPENAI_MODEL")
+                or modello_openai._valore_env_file("OPENAI_MODEL")
+                or "gpt-4o-mini"
+            )
         )
         esito = {
             "risposta": risposta,
@@ -394,6 +417,10 @@ def leggi_cronologia_con_instradamento() -> list[dict]:
 # ==============================================================================
 # 3. GESTIONE FONTI E STATO CHIAVI API
 # ==============================================================================
+_cache_fonti_chiave: tuple[tuple[str, int], ...] | None = None
+_cache_fonti_valore: list[tuple[str, str]] = []
+
+
 def _risolvi_cartella_dati() -> Path:
     if modello_openai.DATA_DIR.is_dir():
         return modello_openai.DATA_DIR
@@ -403,11 +430,16 @@ def _risolvi_cartella_dati() -> Path:
 
 
 def carica_fonti() -> list[tuple[str, str]]:
+    global _cache_fonti_chiave, _cache_fonti_valore
     cartella = _risolvi_cartella_dati()
     if not cartella.is_dir():
         return []
     percorsi = sorted(cartella.glob("*.txt"))
-    return [(p.name, p.read_text(encoding="utf-8")) for p in percorsi]
+    chiave = tuple((p.name, p.stat().st_mtime_ns) for p in percorsi)
+    if chiave != _cache_fonti_chiave:
+        _cache_fonti_valore = [(p.name, p.read_text(encoding="utf-8")) for p in percorsi]
+        _cache_fonti_chiave = chiave
+    return _cache_fonti_valore
 
 
 def _ha_chiave_configurata() -> tuple[bool, str]:
@@ -456,7 +488,7 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
             fonti = carica_fonti()
             ha_key, provider = _ha_chiave_configurata()
             modello_default = (
-                os.environ.get("NVIDIA_MODEL") or "nvidia/nemotron-3-ultra-550b-a55b"
+                os.environ.get("NVIDIA_MODEL") or modello_openai.MODELLO_NVIDIA_DEFAULT
                 if provider == "NVIDIA"
                 else os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
             )

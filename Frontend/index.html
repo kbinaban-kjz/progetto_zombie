@@ -169,14 +169,19 @@
               Modello Cloud (`modello_openai.py`)
             </label>
             <select id="modello-select" class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-amber-300 focus:outline-none">
-              <option value="">Default (.env / nvidia/nemotron-3-ultra-550b-a55b / gpt-4o-mini)</option>
-              <optgroup label="NVIDIA Principale &amp; MODELLI_NVIDIA_RISERVA">
-                <option value="nvidia/nemotron-3-ultra-550b-a55b">nvidia/nemotron-3-ultra-550b-a55b</option>
+              <option value="">Default (.env / meta/llama-3.1-8b-instruct / gpt-4o-mini)</option>
+              <optgroup label="NVIDIA NIM Veloci (Consigliati)">
+                <option value="meta/llama-3.1-8b-instruct">meta/llama-3.1-8b-instruct (Veloce)</option>
+                <option value="meta/llama-3.3-70b-instruct">meta/llama-3.3-70b-instruct</option>
+                <option value="nvidia/llama-3.1-nemotron-70b-instruct">nvidia/llama-3.1-nemotron-70b-instruct</option>
+              </optgroup>
+              <optgroup label="NVIDIA Nemotron (MODELLI_NVIDIA_RISERVA)">
                 <option value="nvidia/nemotron-3.5-lightning-30b-a3b">nvidia/nemotron-3.5-lightning-30b-a3b</option>
                 <option value="nvidia/llama-3.1-nemotron-51b-instruct">nvidia/llama-3.1-nemotron-51b-instruct</option>
                 <option value="nvidia/nemotron-3-super-120b-a12b">nvidia/nemotron-3-super-120b-a12b</option>
-                <option value="nvidia/llama-3.1-nemotron-70b-instruct">nvidia/llama-3.1-nemotron-70b-instruct</option>
                 <option value="nvidia/nemotron-4-340b-instruct">nvidia/nemotron-4-340b-instruct</option>
+                <option value="nvidia/llama-3.1-nemotron-ultra-253b-v1">nvidia/llama-3.1-nemotron-ultra-253b-v1</option>
+                <option value="nvidia/nemotron-3-ultra-550b-a55b">nvidia/nemotron-3-ultra-550b-a55b</option>
               </optgroup>
               <optgroup label="OpenAI">
                 <option value="gpt-4o-mini">gpt-4o-mini</option>
@@ -307,11 +312,15 @@
     const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1";
     const MODELLO_LOCALE_NOME = "Qwen/Qwen2.5-0.5B-Instruct";
     const MODELLI_NVIDIA_RISERVA = [
+      "meta/llama-3.1-8b-instruct",
+      "meta/llama-3.3-70b-instruct",
+      "nvidia/llama-3.1-nemotron-70b-instruct",
       "nvidia/nemotron-3.5-lightning-30b-a3b",
       "nvidia/llama-3.1-nemotron-51b-instruct",
       "nvidia/nemotron-3-super-120b-a12b",
-      "nvidia/llama-3.1-nemotron-70b-instruct",
       "nvidia/nemotron-4-340b-instruct",
+      "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "nvidia/nemotron-3-ultra-550b-a55b",
     ];
     const STATI_RIPROVABILI = new Set([404, 408, 429, 500, 502, 503, 504]);
     let DOMANDA_ESEMPIO = "Chi ha lasciato il messaggio? Rispondi citando la fonte.";
@@ -914,9 +923,9 @@ Non inventare persone, luoghi, cause o eventi.`;
         .map(f => `--- Fonte: ${f.nome} ---\n${f.contenuto}`)
         .join('\n\n');
 
-      const usaNvidia = apiKey.startsWith('nvapi-') || (modelloScelto && modelloScelto.startsWith('nvidia/'));
+      const usaNvidia = apiKey.startsWith('nvapi-') || (modelloScelto && (modelloScelto.startsWith('nvidia/') || modelloScelto.startsWith('meta/')));
       const baseUrl = usaNvidia ? NVIDIA_BASE_URL : 'https://api.openai.com/v1';
-      const modelloPrincipale = modelloScelto || (usaNvidia ? 'nvidia/nemotron-3-ultra-550b-a55b' : 'gpt-4o-mini');
+      const modelloPrincipale = modelloScelto || (usaNvidia ? 'meta/llama-3.1-8b-instruct' : 'gpt-4o-mini');
 
       const modelli = [modelloPrincipale];
       if (usaNvidia) {
@@ -941,7 +950,8 @@ Non inventare persone, luoghi, cause o eventi.`;
           body: JSON.stringify({
             model: modelloCorrente,
             messages: messaggi,
-            temperature: 0
+            temperature: 0,
+            max_tokens: 220
           })
         });
 
