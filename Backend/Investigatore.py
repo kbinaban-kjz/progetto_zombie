@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sys
+import time
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -35,7 +36,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import modello_openai
-from database import inizializza_db, salva_messaggio, leggi_cronologia
+from database import inizializza_db, salva_messaggio, leggi_cronologia, get_connection
 
 inizializza_db()
 
@@ -264,40 +265,130 @@ def genera_risposta_ibrida(
         usa_cloud = is_complessa
 
     livello = "complessa" if is_complessa else "semplice"
+    inizio = time.perf_counter()
 
     if not usa_cloud:
         risposta = genera_risposta_locale(domanda, fonti)
-        modello_effettivo = (
-            MODELLO_LOCALE if _modello_locale is not None else f"{MODELLO_LOCALE} (estrattore locale)"
-        )
-        return {
+        if _modello_locale is not None:
+            modello_effettivo = MODELLO_LOCALE
+        else:
+            modello_effettivo = "Estrattore locale sulle fonti (torch/transformers non disponibili)"
+        esito = {
             "risposta": risposta,
             "motore": "locale",
             "modello_usato": modello_effettivo,
             "complessita": livello,
             "motivo_routing": motivo,
         }
+    else:
+        # Richiesta complessa -> Modello Cloud (modello_openai.py)
+        risposta = modello_openai.genera_risposta(
+            domanda,
+            fonti,
+            api_key=api_key,
+            modello=modello,
+        )
+        _, provider = _ha_chiave_configurata()
+        usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (not api_key and provider == "NVIDIA")
+        modello_cloud = modello or (
+            os.environ.get("NVIDIA_MODEL") or modello_openai._valore_env_file("NVIDIA_MODEL")
+            or "nvidia/nemotron-3-ultra-550b-a55b"
+            if usa_nvidia
+            else os.environ.get("OPENAI_MODEL") or modello_openai._valore_env_file("OPENAI_MODEL") or "gpt-4o-mini"
+        )
+        esito = {
+            "risposta": risposta,
+            "motore": "cloud",
+            "modello_usato": f"{'NVIDIA' if usa_nvidia else 'OpenAI'} • {modello_cloud}",
+            "complessita": livello,
+            "motivo_routing": motivo,
+        }
 
-    # Richiesta complessa -> Modello Cloud (modello_openai.py)
-    risposta = modello_openai.genera_risposta(
-        domanda,
-        fonti,
-        api_key=api_key,
-        modello=modello,
+    esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
+    print(
+        f"[ROUTING] {esito['motore'].upper()} | {esito['modello_usato']} | "
+        f"{livello} ({motivo}) | {esito['durata_ms']} ms"
     )
-    ha_key, provider = _ha_chiave_configurata()
-    modello_cloud = modello or (
-        os.environ.get("NVIDIA_MODEL") or "nvidia/nemotron-3-ultra-550b-a55b"
-        if (api_key and api_key.startswith("nvapi-")) or provider == "NVIDIA"
-        else os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    return esito
+
+
+# ==============================================================================
+# 2b. METADATI DI INSTRADAMENTO SU SQLITE (tabella separata, non modifica schema.sql)
+# ==============================================================================
+def _inizializza_tabella_instradamento() -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS instradamento_chat (
+                id_messaggio INTEGER PRIMARY KEY,
+                motore TEXT NOT NULL,
+                modello_usato TEXT NOT NULL,
+                complessita TEXT NOT NULL,
+                motivo_routing TEXT NOT NULL,
+                durata_ms INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.commit()
+
+
+def salva_con_instradamento(domanda: str, fonti_nomi: list[str], esito: dict) -> dict:
+    """Salva il messaggio in cronologia_chat (salva_messaggio) e il motore usato in instradamento_chat."""
+    riga = salva_messaggio(domanda, esito["risposta"], fonti_nomi)
+    try:
+        _inizializza_tabella_instradamento()
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO instradamento_chat
+                    (id_messaggio, motore, modello_usato, complessita, motivo_routing, durata_ms)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    riga["id"],
+                    esito["motore"],
+                    esito["modello_usato"],
+                    esito["complessita"],
+                    esito["motivo_routing"],
+                    esito.get("durata_ms", 0),
+                ),
+            )
+            conn.commit()
+    except Exception as exc:
+        print(f"(Avviso salvataggio instradamento SQLite: {exc})")
+    riga.update(
+        {k: esito[k] for k in ("motore", "modello_usato", "complessita", "motivo_routing", "durata_ms") if k in esito}
     )
-    return {
-        "risposta": risposta,
-        "motore": "cloud",
-        "modello_usato": modello_cloud,
-        "complessita": livello,
-        "motivo_routing": motivo,
-    }
+    return riga
+
+
+def leggi_cronologia_con_instradamento() -> list[dict]:
+    """Restituisce leggi_cronologia() arricchita con il motore effettivamente usato (se registrato)."""
+    righe = leggi_cronologia()
+    try:
+        _inizializza_tabella_instradamento()
+        with get_connection() as conn:
+            meta = {
+                r["id_messaggio"]: dict(r)
+                for r in conn.execute("SELECT * FROM instradamento_chat").fetchall()
+            }
+    except Exception:
+        meta = {}
+    for r in righe:
+        m = meta.get(r["id"])
+        if m:
+            r.update(
+                {
+                    "motore": m["motore"],
+                    "modello_usato": m["modello_usato"],
+                    "complessita": m["complessita"],
+                    "motivo_routing": m["motivo_routing"],
+                    "durata_ms": m["durata_ms"],
+                }
+            )
+        else:
+            r["motore"] = None  # messaggio salvato prima del routing ibrido: motore sconosciuto
+    return righe
 
 
 # ==============================================================================
@@ -388,7 +479,7 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
             )
 
         if path == "/api/history":
-            return self._send_json({"ok": True, "cronologia": leggi_cronologia()})
+            return self._send_json({"ok": True, "cronologia": leggi_cronologia_con_instradamento()})
 
         if path == "/api/sources":
             fonti = carica_fonti()
@@ -461,7 +552,7 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
                     modalita=modalita,
                 )
                 risposta = esito["risposta"]
-                salva_messaggio(domanda, risposta, [nome for nome, _ in fonti])
+                record = salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
                 return self._send_json(
                     {
                         "ok": True,
@@ -471,8 +562,10 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
                         "modello_usato": esito["modello_usato"],
                         "complessita": esito["complessita"],
                         "motivo_routing": esito["motivo_routing"],
+                        "durata_ms": esito["durata_ms"],
                         "fonti": [nome for nome, _ in fonti],
-                        "cronologia": leggi_cronologia(),
+                        "record": record,
+                        "cronologia": leggi_cronologia_con_instradamento(),
                     }
                 )
             except modello_openai.AuthenticationError:
@@ -538,9 +631,9 @@ def avvia_cli() -> int:
                 if esito["motore"] == "locale"
                 else f"[CLOUD • {esito['modello_usato']}]"
             )
-            print(f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']})")
+            print(f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']}, {esito['durata_ms']} ms)")
             print(f"Risposta:\n{esito['risposta']}")
-            salva_messaggio(domanda, esito["risposta"], [nome for nome, _ in fonti])
+            salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
         except Exception as exc:
             print(f"Errore: {exc}")
 

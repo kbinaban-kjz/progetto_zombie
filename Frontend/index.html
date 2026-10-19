@@ -244,7 +244,7 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <button onclick="sincronizzaCronologiaSql(true)" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-amber-300 border border-bunker-700 text-xs font-mono" title="Ricarica i messaggi dalla tabella SQLite cronologia_chat">
+          <button onclick="sincronizzaCronologiaSql('tutta')" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-amber-300 border border-bunker-700 text-xs font-mono" title="Mostra di nuovo nella chat tutti i messaggi salvati in SQLite (annulla 'Pulisci vista')">
             Mostra da SQLite
           </button>
           <button onclick="pulisciTerminale()" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-300 border border-bunker-700 text-xs font-mono">
@@ -491,7 +491,16 @@ Non inventare persone, luoghi, cause o eventi.`;
       renderCronologiaSql();
     }
 
-    // Legge la tabella SQLite cronologia_chat tramite GET /api/history (leggi_cronologia() in Backend/database.py)
+    // "Pulisci vista" persistente: id dell'ultimo messaggio nascosto dalla chat (salvato nel browser).
+    // I record restano nel database SQLite e nel pannello "Cronologia SQLite".
+    const CHIAVE_VISTA_PULITA = 'investigatore_vista_pulita_fino_a_id';
+
+    function leggiMarkerVista() {
+      return parseInt(localStorage.getItem(CHIAVE_VISTA_PULITA) || '0', 10) || 0;
+    }
+
+    // Legge la tabella SQLite cronologia_chat tramite GET /api/history
+    // mostraInTerminale: 'filtrata' = solo messaggi dopo l'ultimo "Pulisci vista", 'tutta' = tutti
     async function sincronizzaCronologiaSql(mostraInTerminale = false) {
       if (apiBase === null) {
         renderCronologiaSql();
@@ -505,18 +514,15 @@ Non inventare persone, luoghi, cause o eventi.`;
             cronologiaSql = dHist.cronologia;
             renderCronologiaSql();
             if (mostraInTerminale) {
-              pulisciTerminale();
+              if (mostraInTerminale === 'tutta') {
+                localStorage.removeItem(CHIAVE_VISTA_PULITA);
+              }
+              const marker = leggiMarkerVista();
+              svuotaTerminale();
               for (const voce of cronologiaSql) {
-                const { isComplessa, motivo } = valutaComplessita(voce.domanda);
-                const metaConRouting = {
-                  ...voce,
-                  motore: isComplessa ? 'cloud' : 'locale',
-                  modello_usato: isComplessa ? 'modello_openai.py' : `Investigatore.py (${MODELLO_LOCALE_NOME})`,
-                  complessita: isComplessa ? 'complessa' : 'semplice',
-                  motivo_routing: motivo
-                };
-                aggiungiMessaggioUtente(voce.domanda, metaConRouting);
-                aggiungiMessaggioRisposta(voce.risposta, false, metaConRouting);
+                if ((voce.id || 0) <= marker) continue;
+                aggiungiMessaggioUtente(voce.domanda, voce);
+                aggiungiMessaggioRisposta(voce.risposta, false, voce);
               }
             }
           }
@@ -554,10 +560,11 @@ Non inventare persone, luoghi, cause o eventi.`;
         const badgesFonti = listaFonti.map(nome =>
           `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] text-amber-300">[${escapeHtml(nome)}]</span>`
         ).join(' ');
-        const { isComplessa } = valutaComplessita(voce.domanda);
-        const tagMotore = isComplessa
-          ? '<span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300">CLOUD</span>'
-          : '<span class="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-phosphor-400">LOCALE</span>';
+        const tagMotore = voce.motore === 'cloud'
+          ? '<span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300 font-bold">☁ CLOUD</span>'
+          : voce.motore === 'locale'
+            ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-phosphor-400 font-bold">💻 LOCALE</span>'
+            : '<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-stone-400" title="Messaggio salvato prima del routing ibrido">motore N/D</span>';
 
         return `
           <div onclick="selezionaRecordSql(${idx})"
@@ -640,7 +647,17 @@ Non inventare persone, luoghi, cause o eventi.`;
       input.focus();
     }
 
+    // Pulsante "Pulisci vista": svuota la chat e ricorda (anche dopo il refresh) fino a quale messaggio nasconderla
     function pulisciTerminale() {
+      const ultimoId = cronologiaSql.reduce((max, v) => Math.max(max, v.id || 0), 0);
+      if (ultimoId > 0) {
+        localStorage.setItem(CHIAVE_VISTA_PULITA, String(ultimoId));
+      }
+      svuotaTerminale();
+    }
+
+    // Pulizia interna del terminale (non modifica il marker della vista)
+    function svuotaTerminale() {
       programmaTerminato = false;
       document.getElementById('domanda-input').disabled = false;
       document.getElementById('invia-btn').disabled = false;
@@ -652,7 +669,7 @@ Non inventare persone, luoghi, cause o eventi.`;
     }
 
     function riavviaSessione() {
-      pulisciTerminale();
+      svuotaTerminale();
     }
 
     function aggiungiMessaggioUtente(domanda, metaSql = null) {
@@ -677,29 +694,39 @@ Non inventare persone, luoghi, cause o eventi.`;
 
     function aggiungiMessaggioRisposta(testo, isError = false, metaSql = null) {
       const box = document.getElementById('terminale-messaggi');
-      const borderClass = isError ? 'border-red-700 bg-red-950/40 text-red-300' : 'border-bunker-700 bg-bunker-950 text-stone-200';
+      const motore = !isError && metaSql ? metaSql.motore : null;
+      let borderClass = 'border-bunker-700 bg-bunker-950 text-stone-200';
+      if (isError) borderClass = 'border-red-700 bg-red-950/40 text-red-300';
+      else if (motore === 'cloud') borderClass = 'border-crimson-600 border-l-4 bg-bunker-950 text-stone-200';
+      else if (motore === 'locale') borderClass = 'border-emerald-600 border-l-4 bg-bunker-950 text-stone-200';
       const labelText = isError ? 'Errore:' : 'Risposta:';
       const labelColor = isError ? 'text-red-400' : 'text-amber-400';
 
       let badgeMotoreHtml = '';
       if (!isError && metaSql && metaSql.motore) {
         const isCloud = metaSql.motore === 'cloud';
-        const badgeStyle = isCloud
-          ? 'bg-crimson-950 border-crimson-700 text-crimson-300'
-          : 'bg-emerald-950 border-emerald-700 text-phosphor-400';
-        const etichettaMotore = isCloud
-          ? `CLOUD • modello_openai.py (${escapeHtml(metaSql.modello_usato || 'NVIDIA/OpenAI')})`
-          : `LOCALE • Investigatore.py (${escapeHtml(metaSql.modello_usato || MODELLO_LOCALE_NOME)})`;
-        const motivo = metaSql.motivo_routing ? ` — ${escapeHtml(metaSql.motivo_routing)}` : '';
+        const titolo = isCloud ? '☁ RISPOSTA DAL MODELLO CLOUD' : '💻 RISPOSTA DAL MODELLO LOCALE';
+        const sorgente = isCloud ? 'modello_openai.py' : 'Investigatore.py';
+        const titoloStyle = isCloud
+          ? 'bg-crimson-800 text-white'
+          : 'bg-emerald-700 text-white';
+        const durata = metaSql.durata_ms != null ? ` • ${escapeHtml(metaSql.durata_ms)} ms` : '';
+        const motivo = metaSql.motivo_routing ? escapeHtml(metaSql.motivo_routing) : '';
 
         badgeMotoreHtml = `
-          <div class="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-bunker-800">
-            <span class="px-2 py-0.5 rounded border text-[10px] font-mono font-bold ${badgeStyle}">
-              ${etichettaMotore}
-            </span>
-            <span class="text-[10px] font-mono text-stone-400">
-              Complessità: <strong>${escapeHtml(metaSql.complessita || (isCloud ? 'complessa' : 'semplice'))}</strong>${motivo}
-            </span>
+          <div class="-mx-4 -mt-4 mb-2 px-4 py-2 rounded-tr-xl ${titoloStyle} flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-display font-bold tracking-wider">${titolo}</span>
+            <span class="text-[10px] font-mono opacity-90">${sorgente}${durata}</span>
+          </div>
+          <div class="text-[10px] font-mono text-stone-400 space-y-0.5 pb-1.5 border-b border-bunker-800">
+            <div>Modello: <strong class="text-stone-200">${escapeHtml(metaSql.modello_usato || (isCloud ? 'NVIDIA/OpenAI' : MODELLO_LOCALE_NOME))}</strong></div>
+            <div>Complessità: <strong class="text-stone-200">${escapeHtml(metaSql.complessita || (isCloud ? 'complessa' : 'semplice'))}</strong>${motivo ? ` — ${motivo}` : ''}</div>
+          </div>
+        `;
+      } else if (!isError && metaSql && metaSql.id) {
+        badgeMotoreHtml = `
+          <div class="text-[10px] font-mono text-stone-500 pb-1.5 border-b border-bunker-800">
+            Motore non registrato (messaggio salvato prima dell'introduzione del routing Locale/Cloud)
           </div>
         `;
       }
@@ -789,11 +816,11 @@ Non inventare persone, luoghi, cause o eventi.`;
           });
           const data = await resp.json();
           if (resp.ok && data.ok) {
-            let recordSalvato = null;
+            let recordSalvato = data.record || null;
             if (Array.isArray(data.cronologia)) {
               cronologiaSql = data.cronologia;
               renderCronologiaSql();
-              recordSalvato = cronologiaSql[cronologiaSql.length - 1] || null;
+              if (!recordSalvato) recordSalvato = cronologiaSql[cronologiaSql.length - 1] || null;
             }
             const metaRisposta = {
               ...(recordSalvato || {}),
@@ -801,7 +828,8 @@ Non inventare persone, luoghi, cause o eventi.`;
               motore: data.motore,
               modello_usato: data.modello_usato,
               complessita: data.complessita,
-              motivo_routing: data.motivo_routing
+              motivo_routing: data.motivo_routing,
+              durata_ms: data.durata_ms
             };
             aggiungiMessaggioRisposta(data.risposta, false, metaRisposta);
           } else {
@@ -815,13 +843,15 @@ Non inventare persone, luoghi, cause o eventi.`;
         const usaCloud = modalita === 'cloud' ? true : (modalita === 'locale' ? false : isComplessa);
 
         if (!usaCloud) {
+          const t0 = performance.now();
           const rispostaLocale = generaRispostaLocaleBrowser(domanda, fonti);
           aggiungiMessaggioRisposta(rispostaLocale, false, {
             fonti: fonti.map(f => f.nome),
             motore: 'locale',
-            modello_usato: `${MODELLO_LOCALE_NOME} (locale)`,
+            modello_usato: 'Estrattore locale nel browser (server Python non attivo: Qwen non disponibile)',
             complessita: isComplessa ? 'complessa' : 'semplice',
-            motivo_routing: modalita === 'locale' ? 'Scelta manuale: Modello Locale' : motivo
+            motivo_routing: modalita === 'locale' ? 'Scelta manuale: Modello Locale' : motivo,
+            durata_ms: Math.round(performance.now() - t0)
           });
           return;
         }
