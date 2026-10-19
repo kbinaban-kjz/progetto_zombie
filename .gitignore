@@ -34,7 +34,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-.db
+*.db
 
 # Virtual Environments
 .env
