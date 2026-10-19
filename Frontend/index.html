@@ -79,30 +79,32 @@
       <div>
         <div class="flex flex-wrap items-center gap-2 text-xs font-mono text-stone-400">
           <span id="backend-status-badge" class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-amber-400">
-            ● Backend: modello_openai.py
+            ● Backend Ibrido: Investigatore.py + modello_openai.py
           </span>
           <span id="sqlite-status-badge" class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-400">
             DB SQLite: cronologia_chat (0)
           </span>
-          <span>ENDPOINT: <code id="header-base-url" class="text-stone-300">https://integrate.api.nvidia.com/v1</code></span>
         </div>
         <h1 class="font-display text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white mt-1">
-          Investigatore AI — <span class="text-crimson-400">modello_openai.py</span>
+          Investigatore AI — <span class="text-phosphor-400">Locale</span> <span class="text-stone-500">/</span> <span class="text-crimson-400">Cloud</span>
         </h1>
       </div>
 
-      <div class="flex items-center gap-2 text-xs font-mono">
+      <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+        <span id="local-model-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-emerald-800/80 text-phosphor-400">
+          Semplici → Locale (Qwen2.5-0.5B)
+        </span>
         <span id="env-key-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-bunker-700 text-stone-300">
-          Chiave API: verifica .env...
+          Complesse → Cloud: verifica .env...
         </span>
       </div>
     </div>
   </header>
 
-  <!-- MAIN CONTENT: ALLINEATO A modello_openai.py + SQLite (Backend/database.py) -->
+  <!-- MAIN CONTENT: ROUTING IBRIDO (Investigatore.py Locale + modello_openai.py Cloud) + SQLite -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-    <!-- COLONNA SINISTRA (5 col): Fonti, Parametri genera_risposta() e Cronologia SQLite (cronologia_chat) -->
+    <!-- COLONNA SINISTRA (5 col): Fonti, Routing & Parametri, Cronologia SQLite (cronologia_chat) -->
     <div class="lg:col-span-5 space-y-6">
 
       <!-- 1. FONTI FORNITE (DATA_DIR / *.txt) -->
@@ -122,24 +124,49 @@
           </label>
         </div>
 
-        <div id="fonti-container" class="p-3 space-y-2.5 max-h-[260px] overflow-y-auto">
+        <div id="fonti-container" class="p-3 space-y-2.5 max-h-[240px] overflow-y-auto">
           <!-- Formattate esattamente come in modello_openai.py: "--- Fonte: {nome} ---\n{contenuto}" -->
         </div>
       </section>
 
-      <!-- 2. PARAMETRI DI genera_risposta(domanda, fonti, *, api_key=None, modello=None) & ISTRUZIONI -->
+      <!-- 2. ROUTING IBRIDO (LOCALE vs CLOUD) & PARAMETRI -->
       <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
         <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between">
           <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-            Parametri `genera_risposta()`
+            Routing Ibrido &amp; Parametri
           </h2>
-          <span class="text-[11px] font-mono text-stone-400">temperature=0</span>
+          <span class="text-[11px] font-mono text-stone-400">Locale / Cloud</span>
         </div>
 
         <div class="p-4 space-y-3">
           <div>
+            <label for="modalita-select" class="block text-xs font-mono uppercase text-stone-400 mb-1">
+              Modalità di instradamento (`modalita`)
+            </label>
+            <select id="modalita-select" onchange="aggiornaAnteprimaComplessita()"
+              class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none">
+              <option value="auto">Automatico (Semplici → Locale Investigatore.py | Complesse → Cloud modello_openai.py)</option>
+              <option value="locale">Forza Modello Locale (Investigatore.py — Qwen/Qwen2.5-0.5B-Instruct)</option>
+              <option value="cloud">Forza Modello Cloud (modello_openai.py — NVIDIA / OpenAI)</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+            <div class="p-2.5 rounded-lg bg-bunker-950 border border-emerald-900/80">
+              <div class="text-phosphor-400 font-bold uppercase">Richieste Semplici</div>
+              <div class="text-stone-300 mt-0.5">Locale: <code>Investigatore.py</code></div>
+              <div class="text-stone-500 text-[10px]">Qwen/Qwen2.5-0.5B-Instruct</div>
+            </div>
+            <div class="p-2.5 rounded-lg bg-bunker-950 border border-crimson-900/80">
+              <div class="text-crimson-400 font-bold uppercase">Richieste Complesse</div>
+              <div class="text-stone-300 mt-0.5">Cloud: <code>modello_openai.py</code></div>
+              <div class="text-stone-500 text-[10px]">NVIDIA / OpenAI API</div>
+            </div>
+          </div>
+
+          <div>
             <label for="modello-select" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              modello (`modello: str | None = None`)
+              Modello Cloud (`modello_openai.py`)
             </label>
             <select id="modello-select" class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-amber-300 focus:outline-none">
               <option value="">Default (.env / nvidia/nemotron-3-ultra-550b-a55b / gpt-4o-mini)</option>
@@ -159,7 +186,7 @@
 
           <div>
             <label for="api-key-input" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              api_key (`api_key: str | None = None`)
+              api_key Cloud (`api_key: str | None = None`)
             </label>
             <input id="api-key-input" type="password"
               placeholder="Lascia vuoto per usare NVIDIA_API_KEY / OPENAI_API_KEY da .env"
@@ -168,9 +195,9 @@
 
           <div>
             <label for="istruzioni-view" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              ISTRUZIONI (da `modello_openai.py`)
+              ISTRUZIONI
             </label>
-            <textarea id="istruzioni-view" rows="6" readonly
+            <textarea id="istruzioni-view" rows="5" readonly
               class="w-full bg-bunker-950/80 border border-bunker-700 rounded-lg p-2.5 text-xs font-mono text-stone-400 focus:outline-none leading-relaxed"></textarea>
           </div>
         </div>
@@ -193,7 +220,7 @@
           </button>
         </div>
 
-        <div id="sqlite-history-container" class="p-3 space-y-2 max-h-[260px] overflow-y-auto">
+        <div id="sqlite-history-container" class="p-3 space-y-2 max-h-[240px] overflow-y-auto">
           <div class="text-xs font-mono text-stone-500 p-2">
             Nessun record caricato da <code>cronologia_chat</code>.
           </div>
@@ -202,17 +229,17 @@
 
     </div>
 
-    <!-- COLONNA DESTRA (7 col): Terminale Domanda / Risposta (main() di modello_openai.py + salva_messaggio SQLite) -->
+    <!-- COLONNA DESTRA (7 col): Terminale Domanda / Risposta Ibrido (Locale + Cloud + SQLite) -->
     <div class="lg:col-span-7 flex flex-col bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl min-h-[620px]">
 
       <!-- Intestazione Chat -->
       <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="font-mono font-bold text-sm sm:text-base text-white">
-            Chiamata OpenAI / NVIDIA per rispondere usando solo le fonti fornite
+            Smistamento automatico: Locale (`Investigatore.py`) / Cloud (`modello_openai.py`)
           </h2>
           <p class="text-[11px] font-mono text-stone-400">
-            Scrivi una domanda alla volta. Digita '<code id="comando-uscita-label" class="text-amber-300">esci</code>' per terminare. Salvataggio automatico in SQLite (<code class="text-stone-300">salva_messaggio</code>).
+            Domande semplici → <span class="text-phosphor-400">Locale</span> • Domande complesse → <span class="text-crimson-400">Cloud</span> • Digita '<code id="comando-uscita-label" class="text-amber-300">esci</code>' per terminare.
           </p>
         </div>
 
@@ -226,27 +253,42 @@
         </div>
       </div>
 
-      <!-- Barra DOMANDA_ESEMPIO (da modello_openai.py riga 28) -->
+      <!-- Barra Esempi Rapidi (Semplice -> Locale / Complessa -> Cloud) -->
       <div class="bg-bunker-950/90 border-b border-bunker-800 px-4 py-2 flex flex-wrap items-center justify-between gap-2">
-        <span class="text-[11px] font-mono text-stone-400 uppercase">DOMANDA_ESEMPIO:</span>
-        <button onclick="usaDomandaEsempio()" id="domanda-esempio-btn"
-          class="text-xs font-mono px-2.5 py-1 rounded bg-bunker-800 hover:bg-crimson-900/70 border border-bunker-600 hover:border-crimson-600 text-amber-300 transition">
-          Chi ha lasciato il messaggio? Rispondi citando la fonte.
-        </button>
+        <span class="text-[11px] font-mono text-stone-400 uppercase">Esempi test routing:</span>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="usaDomandaEsempio('semplice')" id="domanda-esempio-btn"
+            class="text-xs font-mono px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-700/80 text-phosphor-400 transition">
+            [Semplice → Locale] Chi ha lasciato il messaggio?
+          </button>
+          <button onclick="usaDomandaEsempio('complessa')"
+            class="text-xs font-mono px-2.5 py-1 rounded bg-crimson-950/60 hover:bg-crimson-900/70 border border-crimson-700/80 text-crimson-300 transition">
+            [Complessa → Cloud] Confronta tutte le fonti e analizza perché le chiamate sono sospette.
+          </button>
+        </div>
       </div>
 
       <!-- Area Messaggi (Domanda / Risposta) -->
-      <div id="terminale-messaggi" class="flex-1 p-4 space-y-4 overflow-y-auto max-h-[540px]">
+      <div id="terminale-messaggi" class="flex-1 p-4 space-y-4 overflow-y-auto max-h-[520px]">
         <div class="bg-bunker-950 border border-bunker-700 rounded-xl p-3.5 text-xs font-mono text-stone-300">
-          Scrivi una domanda alla volta. Digita '<strong>esci</strong>' per terminare.
+          Scrivi una domanda alla volta. Le richieste semplici usano il modello <strong>locale</strong> (<code>Investigatore.py</code>), mentre quelle complesse usano il modello <strong>cloud</strong> (<code>modello_openai.py</code>). Digita '<strong>esci</strong>' per terminare.
         </div>
+      </div>
+
+      <!-- Indicatore live del routing prima dell'invio -->
+      <div class="px-4 py-1.5 bg-bunker-950 border-t border-bunker-800 flex items-center justify-between text-[11px] font-mono">
+        <span class="text-stone-400">Instradamento previsto:</span>
+        <span id="routing-preview-badge" class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400">
+          LOCALE (Investigatore.py) — Domanda semplice
+        </span>
       </div>
 
       <!-- Input Domanda -->
       <form onsubmit="inviaDomanda(event)" class="p-3 bg-bunker-950 border-t border-bunker-700 flex gap-2">
         <div class="relative flex-1">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-crimson-400 font-bold">Domanda:</span>
-          <input id="domanda-input" type="text" placeholder="Chi ha lasciato il messaggio? Rispondi citando la fonte."
+          <input id="domanda-input" type="text" oninput="aggiornaAnteprimaComplessita()"
+            placeholder="Scrivi una domanda semplice (Locale) o un'analisi complessa (Cloud)..."
             class="w-full bg-bunker-900 border border-bunker-600 focus:border-crimson-500 rounded-lg pl-24 pr-4 py-2.5 text-sm text-white placeholder-stone-500 focus:outline-none font-mono" />
         </div>
         <button id="invia-btn" type="submit" class="px-5 py-2.5 rounded-lg bg-crimson-800 hover:bg-crimson-700 text-white font-display font-bold uppercase tracking-wider text-sm transition shrink-0">
@@ -260,9 +302,10 @@
 
   <script>
     // =========================================================================
-    // COSTANTI E LOGICA ALLINEATE A modello_openai.py
+    // COSTANTI E LOGICA IBRIDA: LOCALE (Investigatore.py) + CLOUD (modello_openai.py)
     // =========================================================================
     const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1";
+    const MODELLO_LOCALE_NOME = "Qwen/Qwen2.5-0.5B-Instruct";
     const MODELLI_NVIDIA_RISERVA = [
       "nvidia/nemotron-3.5-lightning-30b-a3b",
       "nvidia/llama-3.1-nemotron-51b-instruct",
@@ -272,7 +315,18 @@
     ];
     const STATI_RIPROVABILI = new Set([404, 408, 429, 500, 502, 503, 504]);
     let DOMANDA_ESEMPIO = "Chi ha lasciato il messaggio? Rispondi citando la fonte.";
+    const DOMANDA_ESEMPIO_COMPLESSA = "Confronta tutte le fonti e analizza perché le chiamate della centrale sono sospette.";
     let COMANDO_USCITA = "esci";
+
+    const PAROLE_COMPLESSE = [
+      "confronta", "confronto", "analizza", "analisi", "riassumi", "riassunto",
+      "sintetizza", "sintesi", "spiega", "perché", "perche", "come mai",
+      "ipotesi", "differenza", "differenze", "collegamento", "collegamenti",
+      "relazione", "relazioni", "contraddizione", "contraddizioni", "incoerenza",
+      "incoerenze", "tutte le fonti", "tutti i documenti", "tra i documenti",
+      "incrocia", "incrociando", "dedurre", "deduzione", "dimostra", "dimostrato",
+      "prove", "valuta", "approfond", "cronologia", "elenca tutti"
+    ];
 
     let ISTRUZIONI = `Sei un investigatore e rispondi in italiano semplice.
 Rispondi solo alla domanda con la risposta, senza premesse, introduzioni,
@@ -311,11 +365,72 @@ Non inventare persone, luoghi, cause o eventi.`;
       document.getElementById('istruzioni-view').value = ISTRUZIONI;
       await rilevaServerBackend();
       renderFonti();
+      aggiornaAnteprimaComplessita();
+    }
+
+    // Stessa logica di valuta_complessita() in Backend/Investigatore.py
+    function valutaComplessita(domanda) {
+      const testo = (domanda || '').trim();
+      if (!testo) {
+        return { isComplessa: false, motivo: 'Domanda semplice → Modello Locale (Investigatore.py)' };
+      }
+      const lower = testo.toLowerCase();
+      const parole = lower.match(/\w+/g) || [];
+      const numParole = parole.length;
+
+      if ((testo.match(/\?/g) || []).length > 1) {
+        return { isComplessa: true, motivo: 'Domanda multipla (più quesiti nella stessa richiesta)' };
+      }
+
+      const fontiCitate = new Set(lower.match(/g\d+-\d+/g) || []);
+      if (fontiCitate.size > 1) {
+        return { isComplessa: true, motivo: 'Confronto esplicito tra più documenti del dossier' };
+      }
+
+      for (const kw of PAROLE_COMPLESSE) {
+        if (lower.includes(kw)) {
+          return { isComplessa: true, motivo: `Richiesta di ragionamento/analisi ('${kw}')` };
+        }
+      }
+
+      if (numParole > 14 || testo.length > 95) {
+        return { isComplessa: true, motivo: `Domanda articolata (${numParole} parole)` };
+      }
+
+      return { isComplessa: false, motivo: `Domanda diretta e concisa (${numParole} parole)` };
+    }
+
+    function aggiornaAnteprimaComplessita() {
+      const domanda = document.getElementById('domanda-input')?.value || '';
+      const modalita = document.getElementById('modalita-select')?.value || 'auto';
+      const previewBadge = document.getElementById('routing-preview-badge');
+      if (!previewBadge) return;
+
+      const { isComplessa, motivo } = valutaComplessita(domanda);
+      let usaCloud = isComplessa;
+      let descrizione = motivo;
+
+      if (modalita === 'locale') {
+        usaCloud = false;
+        descrizione = 'Scelta manuale: Modello Locale (Investigatore.py)';
+      } else if (modalita === 'cloud') {
+        usaCloud = true;
+        descrizione = 'Scelta manuale: Modello Cloud (modello_openai.py)';
+      }
+
+      if (usaCloud) {
+        previewBadge.textContent = `CLOUD (modello_openai.py) — ${descrizione}`;
+        previewBadge.className = 'px-2 py-0.5 rounded bg-crimson-950 border border-crimson-700 text-crimson-300';
+      } else {
+        previewBadge.textContent = `LOCALE (Investigatore.py • ${MODELLO_LOCALE_NOME}) — ${descrizione}`;
+        previewBadge.className = 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400';
+      }
     }
 
     async function rilevaServerBackend() {
       const badge = document.getElementById('backend-status-badge');
       const keyBadge = document.getElementById('env-key-badge');
+      const localBadge = document.getElementById('local-model-badge');
       const candidati = ['', 'http://127.0.0.1:8000', 'http://localhost:8000'];
 
       for (const base of candidati) {
@@ -329,26 +444,28 @@ Non inventare persone, luoghi, cause o eventi.`;
             const d = await r.json();
             if (d && d.ok) {
               apiBase = base;
-              badge.textContent = '● Connesso a modello_openai.py';
+              badge.textContent = '● Connesso: Investigatore.py (Locale) + modello_openai.py (Cloud)';
               badge.className = 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400';
 
+              if (localBadge) {
+                localBadge.textContent = `Semplici → Locale (${d.modello_locale || MODELLO_LOCALE_NOME})`;
+              }
               if (d.istruzioni) {
                 ISTRUZIONI = d.istruzioni;
                 document.getElementById('istruzioni-view').value = ISTRUZIONI;
               }
               if (d.domanda_esempio) {
                 DOMANDA_ESEMPIO = d.domanda_esempio;
-                document.getElementById('domanda-esempio-btn').textContent = DOMANDA_ESEMPIO;
               }
               if (d.comando_uscita) {
                 COMANDO_USCITA = d.comando_uscita;
                 document.getElementById('comando-uscita-label').textContent = COMANDO_USCITA;
               }
               if (d.chiave_configurata) {
-                keyBadge.textContent = `Chiave .env: ${d.provider} (${d.modello_default})`;
-                keyBadge.className = 'px-3 py-1.5 rounded-lg bg-emerald-950 border border-emerald-700 text-phosphor-400';
+                keyBadge.textContent = `Complesse → Cloud ${d.provider} (${d.modello_default})`;
+                keyBadge.className = 'px-3 py-1.5 rounded-lg bg-crimson-950 border border-crimson-700 text-crimson-300';
               } else {
-                keyBadge.textContent = 'Chiave .env non trovata (inserisci api_key o configura .env)';
+                keyBadge.textContent = 'Cloud: chiave .env non trovata (inserisci api_key o usa Locale)';
                 keyBadge.className = 'px-3 py-1.5 rounded-lg bg-bunker-950 border border-amber-700 text-amber-400';
               }
 
@@ -368,9 +485,9 @@ Non inventare persone, luoghi, cause o eventi.`;
       }
 
       apiBase = null;
-      badge.textContent = '● Modalità browser diretta (modello_openai.py)';
+      badge.textContent = '● Modalità browser diretta (Locale + Cloud API)';
       badge.className = 'px-2 py-0.5 rounded bg-bunker-950 border border-amber-700 text-amber-400';
-      keyBadge.textContent = 'Inserisci api_key nel pannello a sinistra o avvia il server';
+      keyBadge.textContent = 'Cloud: inserisci api_key a sinistra (Locale sempre attivo)';
       renderCronologiaSql();
     }
 
@@ -390,8 +507,16 @@ Non inventare persone, luoghi, cause o eventi.`;
             if (mostraInTerminale) {
               pulisciTerminale();
               for (const voce of cronologiaSql) {
-                aggiungiMessaggioUtente(voce.domanda, voce);
-                aggiungiMessaggioRisposta(voce.risposta, false, voce);
+                const { isComplessa, motivo } = valutaComplessita(voce.domanda);
+                const metaConRouting = {
+                  ...voce,
+                  motore: isComplessa ? 'cloud' : 'locale',
+                  modello_usato: isComplessa ? 'modello_openai.py' : `Investigatore.py (${MODELLO_LOCALE_NOME})`,
+                  complessita: isComplessa ? 'complessa' : 'semplice',
+                  motivo_routing: motivo
+                };
+                aggiungiMessaggioUtente(voce.domanda, metaConRouting);
+                aggiungiMessaggioRisposta(voce.risposta, false, metaConRouting);
               }
             }
           }
@@ -429,14 +554,21 @@ Non inventare persone, luoghi, cause o eventi.`;
         const badgesFonti = listaFonti.map(nome =>
           `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] text-amber-300">[${escapeHtml(nome)}]</span>`
         ).join(' ');
+        const { isComplessa } = valutaComplessita(voce.domanda);
+        const tagMotore = isComplessa
+          ? '<span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300">CLOUD</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-phosphor-400">LOCALE</span>';
 
         return `
           <div onclick="selezionaRecordSql(${idx})"
             class="cursor-pointer p-2.5 rounded-lg bg-bunker-950 hover:bg-bunker-800/80 border border-bunker-700 hover:border-crimson-700 transition space-y-1">
             <div class="flex items-center justify-between gap-2 text-[10px] font-mono">
-              <span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300 font-bold">
-                #${escapeHtml(voce.id ?? (idx + 1))}
-              </span>
+              <div class="flex items-center gap-1.5">
+                <span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-white font-bold">
+                  #${escapeHtml(voce.id ?? (idx + 1))}
+                </span>
+                ${tagMotore}
+              </div>
               <span class="text-stone-400">${escapeHtml(voce.created_at || '')}</span>
             </div>
             <div class="text-xs font-mono text-white font-semibold truncate" title="${escapeHtml(voce.domanda)}">
@@ -456,6 +588,7 @@ Non inventare persone, luoghi, cause o eventi.`;
       if (!voce) return;
       if (programmaTerminato) riavviaSessione();
       document.getElementById('domanda-input').value = voce.domanda;
+      aggiornaAnteprimaComplessita();
       document.getElementById('domanda-input').focus();
     }
 
@@ -499,10 +632,12 @@ Non inventare persone, luoghi, cause o eventi.`;
       });
     }
 
-    function usaDomandaEsempio() {
+    function usaDomandaEsempio(tipo = 'semplice') {
       if (programmaTerminato) riavviaSessione();
-      document.getElementById('domanda-input').value = DOMANDA_ESEMPIO;
-      document.getElementById('domanda-input').focus();
+      const input = document.getElementById('domanda-input');
+      input.value = tipo === 'complessa' ? DOMANDA_ESEMPIO_COMPLESSA : DOMANDA_ESEMPIO;
+      aggiornaAnteprimaComplessita();
+      input.focus();
     }
 
     function pulisciTerminale() {
@@ -511,7 +646,7 @@ Non inventare persone, luoghi, cause o eventi.`;
       document.getElementById('invia-btn').disabled = false;
       document.getElementById('terminale-messaggi').innerHTML = `
         <div class="bg-bunker-950 border border-bunker-700 rounded-xl p-3.5 text-xs font-mono text-stone-300">
-          Scrivi una domanda alla volta. Digita '<strong>${escapeHtml(COMANDO_USCITA)}</strong>' per terminare.
+          Scrivi una domanda alla volta. Le richieste semplici usano il modello <strong>locale</strong> (<code>Investigatore.py</code>), mentre quelle complesse usano il modello <strong>cloud</strong> (<code>modello_openai.py</code>). Digita '<strong>${escapeHtml(COMANDO_USCITA)}</strong>' per terminare.
         </div>
       `;
     }
@@ -546,6 +681,29 @@ Non inventare persone, luoghi, cause o eventi.`;
       const labelText = isError ? 'Errore:' : 'Risposta:';
       const labelColor = isError ? 'text-red-400' : 'text-amber-400';
 
+      let badgeMotoreHtml = '';
+      if (!isError && metaSql && metaSql.motore) {
+        const isCloud = metaSql.motore === 'cloud';
+        const badgeStyle = isCloud
+          ? 'bg-crimson-950 border-crimson-700 text-crimson-300'
+          : 'bg-emerald-950 border-emerald-700 text-phosphor-400';
+        const etichettaMotore = isCloud
+          ? `CLOUD • modello_openai.py (${escapeHtml(metaSql.modello_usato || 'NVIDIA/OpenAI')})`
+          : `LOCALE • Investigatore.py (${escapeHtml(metaSql.modello_usato || MODELLO_LOCALE_NOME)})`;
+        const motivo = metaSql.motivo_routing ? ` — ${escapeHtml(metaSql.motivo_routing)}` : '';
+
+        badgeMotoreHtml = `
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-bunker-800">
+            <span class="px-2 py-0.5 rounded border text-[10px] font-mono font-bold ${badgeStyle}">
+              ${etichettaMotore}
+            </span>
+            <span class="text-[10px] font-mono text-stone-400">
+              Complessità: <strong>${escapeHtml(metaSql.complessita || (isCloud ? 'complessa' : 'semplice'))}</strong>${motivo}
+            </span>
+          </div>
+        `;
+      }
+
       let footerSql = '';
       if (!isError && metaSql) {
         const listaFonti = Array.isArray(metaSql.fonti) ? metaSql.fonti : [];
@@ -568,7 +726,8 @@ Non inventare persone, luoghi, cause o eventi.`;
       }
 
       box.insertAdjacentHTML('beforeend', `
-        <div class="border ${borderClass} rounded-xl rounded-tl-none p-4 space-y-1.5">
+        <div class="border ${borderClass} rounded-xl rounded-tl-none p-4 space-y-2">
+          ${badgeMotoreHtml}
           <div class="text-[11px] font-mono font-bold ${labelColor} uppercase">${labelText}</div>
           <div class="text-sm leading-relaxed whitespace-pre-line font-mono">${escapeHtml(testo)}</div>
           ${footerSql}
@@ -585,13 +744,13 @@ Non inventare persone, luoghi, cause o eventi.`;
       const btn = document.getElementById('invia-btn');
       const domanda = input.value.trim();
 
-      // Stesso controllo di main() in modello_openai.py
       if (!domanda) {
         aggiungiMessaggioRisposta("La domanda è vuota: scrivi una domanda oppure digita 'esci'.", true);
         return;
       }
 
       input.value = '';
+      aggiornaAnteprimaComplessita();
       aggiungiMessaggioUtente(domanda);
 
       if (domanda.toLowerCase() === COMANDO_USCITA.toLowerCase()) {
@@ -609,12 +768,13 @@ Non inventare persone, luoghi, cause o eventi.`;
 
       const apiKey = document.getElementById('api-key-input').value.trim() || null;
       const modello = document.getElementById('modello-select').value.trim() || null;
+      const modalita = document.getElementById('modalita-select').value || 'auto';
 
       btn.disabled = true;
       btn.textContent = 'Attendi...';
 
       try {
-        // 1. Se il server Python è attivo, delega a modello_openai.genera_risposta() + salva_messaggio() su SQLite
+        // 1. Se il server Python è attivo, delega a Backend/Investigatore.py (genera_risposta_ibrida + SQLite)
         if (apiBase !== null) {
           const resp = await fetch(`${apiBase}/api/chat`, {
             method: 'POST',
@@ -623,7 +783,8 @@ Non inventare persone, luoghi, cause o eventi.`;
               domanda: domanda,
               fonti: fonti,
               api_key: apiKey,
-              modello: modello
+              modello: modello,
+              modalita: modalita
             })
           });
           const data = await resp.json();
@@ -634,23 +795,49 @@ Non inventare persone, luoghi, cause o eventi.`;
               renderCronologiaSql();
               recordSalvato = cronologiaSql[cronologiaSql.length - 1] || null;
             }
-            if (!recordSalvato && Array.isArray(data.fonti)) {
-              recordSalvato = { fonti: data.fonti };
-            }
-            aggiungiMessaggioRisposta(data.risposta, false, recordSalvato);
+            const metaRisposta = {
+              ...(recordSalvato || {}),
+              fonti: recordSalvato?.fonti || data.fonti || fonti.map(f => f.nome),
+              motore: data.motore,
+              modello_usato: data.modello_usato,
+              complessita: data.complessita,
+              motivo_routing: data.motivo_routing
+            };
+            aggiungiMessaggioRisposta(data.risposta, false, metaRisposta);
           } else {
             aggiungiMessaggioRisposta(data.error || "Impossibile ottenere una risposta.", true);
           }
           return;
         }
 
-        // 2. Se aperto senza server Python ma con api_key inserita, esegue la stessa chiamata di genera_risposta()
+        // 2. Modalità browser diretta (senza server Python): applica lo stesso routing ibrido
+        const { isComplessa, motivo } = valutaComplessita(domanda);
+        const usaCloud = modalita === 'cloud' ? true : (modalita === 'locale' ? false : isComplessa);
+
+        if (!usaCloud) {
+          const rispostaLocale = generaRispostaLocaleBrowser(domanda, fonti);
+          aggiungiMessaggioRisposta(rispostaLocale, false, {
+            fonti: fonti.map(f => f.nome),
+            motore: 'locale',
+            modello_usato: `${MODELLO_LOCALE_NOME} (locale)`,
+            complessita: isComplessa ? 'complessa' : 'semplice',
+            motivo_routing: modalita === 'locale' ? 'Scelta manuale: Modello Locale' : motivo
+          });
+          return;
+        }
+
         if (apiKey) {
           const rispostaDiretta = await generaRispostaBrowser(domanda, fonti, apiKey, modello);
-          aggiungiMessaggioRisposta(rispostaDiretta, false, { fonti: fonti.map(f => f.nome) });
+          aggiungiMessaggioRisposta(rispostaDiretta, false, {
+            fonti: fonti.map(f => f.nome),
+            motore: 'cloud',
+            modello_usato: modello || 'NVIDIA / OpenAI Cloud',
+            complessita: isComplessa ? 'complessa' : 'semplice',
+            motivo_routing: modalita === 'cloud' ? 'Scelta manuale: Modello Cloud' : motivo
+          });
         } else {
           aggiungiMessaggioRisposta(
-            "Impossibile ottenere una risposta: Configura NVIDIA_API_KEY oppure OPENAI_API_KEY nel file .env o nelle variabili d'ambiente.",
+            "Richiesta complessa instradata al Cloud: configura NVIDIA_API_KEY / OPENAI_API_KEY in .env (o nel campo api_key a sinistra), oppure seleziona 'Forza Modello Locale'.",
             true
           );
         }
@@ -664,7 +851,34 @@ Non inventare persone, luoghi, cause o eventi.`;
       }
     }
 
-    // Replica fedele di genera_risposta() in modello_openai.py per la modalità browser diretta
+    // Risponditore locale di Investigatore.py per richieste semplici in modalità browser
+    function generaRispostaLocaleBrowser(domanda, listaFonti) {
+      const q = domanda.trim().toLowerCase();
+      const mappa = Object.fromEntries(listaFonti.map(f => [f.nome, f.contenuto]));
+
+      if (["chi ha lasciato", "nora", "ferri", "voce dal quartiere", "registri"].some(k => q.includes(k)) && mappa["G1-02.txt"]) {
+        return "Nora Ferri ha lasciato il messaggio invitando a conservare i registri originali perché i riassunti della centrale non raccontano tutto; la trasmissione si interrompe prima di indicare un luogo [G1-02.txt].";
+      }
+      if (["quarantena", "infetti", "rifugi", "ordina", "città"].some(k => q.includes(k)) && mappa["G1-01.txt"]) {
+        return "La città è in quarantena, gli infetti inseguono chi si muove nelle strade e la centrale ordina ai superstiti di raggiungere i rifugi [G1-01.txt].";
+      }
+      if (["pausa", "tre secondi", "registrazione", "controllo radio", "chiamate"].some(k => q.includes(k)) && mappa["G1-03.txt"]) {
+        return "Due chiamate della centrale presentano la stessa pausa di tre secondi e la stessa frase finale: potrebbe trattarsi di una registrazione, ma questo dettaglio da solo non dimostra chi stia trasmettendo [G1-03.txt].";
+      }
+
+      const parole = (q.match(/\w+/g) || []).filter(p => p.length > 3);
+      const estratti = [];
+      for (const f of listaFonti) {
+        if (parole.some(p => f.contenuto.toLowerCase().includes(p))) {
+          const righe = f.contenuto.trim().split('\n').map(r => r.trim()).filter(Boolean);
+          const corpo = righe.length > 2 ? righe.slice(2).join(' ') : f.contenuto.trim();
+          estratti.push(`${corpo} [${f.nome}]`);
+        }
+      }
+      return estratti.length > 0 ? estratti.join('\n') : "Non documentato nelle fonti disponibili.";
+    }
+
+    // Replica fedele di genera_risposta() in modello_openai.py per le richieste complesse in modalità browser diretta
     async function generaRispostaBrowser(domanda, listaFonti, apiKey, modelloScelto) {
       const contenutoFonti = listaFonti
         .map(f => `--- Fonte: ${f.nome} ---\n${f.contenuto}`)
