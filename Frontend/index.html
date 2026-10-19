@@ -69,6 +69,10 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #742c3a;
     }
+    #sezione-mappa:fullscreen #mappa-wrapper {
+      height: calc(100vh - 56px);
+      flex: 1;
+    }
   </style>
 </head>
 <body class="text-stone-200 font-sans min-h-screen flex flex-col selection:bg-crimson-800 selection:text-white">
@@ -91,6 +95,9 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+        <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-crimson-900/70 hover:bg-crimson-800 border border-crimson-600 text-white font-bold transition">
+          🌍 Mappa Teatro Globale
+        </a>
         <span id="local-model-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-emerald-800/80 text-phosphor-400">
           Semplici → Locale (Qwen2.5-0.5B)
         </span>
@@ -296,6 +303,36 @@
 
     </div>
 
+    <!-- SEZIONE MAPPA INTERATTIVA (mappa/index.html — Protocollo Lazzaro Teatro Globale) -->
+    <section id="sezione-mappa" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col">
+      <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+            🌍 Mappa Interattiva — Protocollo Lazzaro (<code class="text-amber-300 font-mono text-xs">mappa/index.html</code>)
+          </h2>
+          <p class="text-[11px] font-mono text-stone-400">
+            Globo interattivo del teatro operativo (14 nodi di rete: Rifugi, Focolai, Segnali e Anomalie • Dossier G1-01, G1-02, G1-03).
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="toggleSchermoInteroMappa()"
+            class="px-2.5 py-1.5 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition">
+            ⛶ Schermo intero
+          </button>
+          <a id="mappa-external-link" href="../mappa/index.html" target="_blank" rel="noopener"
+            class="px-2.5 py-1.5 rounded bg-crimson-900/70 hover:bg-crimson-800 text-white border border-crimson-700 text-xs font-mono transition">
+            ↗ Apri in scheda dedicata
+          </a>
+        </div>
+      </div>
+
+      <div id="mappa-wrapper" class="relative w-full h-[680px] bg-bunker-950">
+        <iframe id="mappa-iframe" src="../mappa/index.html" title="Protocollo Lazzaro — Mappa Teatro Globale"
+          class="w-full h-full border-0" allowfullscreen loading="lazy"></iframe>
+      </div>
+    </section>
+
   </main>
 
   <script>
@@ -363,7 +400,32 @@ Non inventare persone, luoghi, cause o eventi.`;
     // Stato sincronizzato con la tabella SQLite cronologia_chat (id, domanda, risposta, fonti, created_at)
     let cronologiaSql = [];
 
+    function inizializzaMappa() {
+      const urlMappa = (window.location.protocol === 'file:' || window.location.pathname.includes('/Frontend/'))
+        ? '../mappa/index.html'
+        : '/mappa/index.html';
+      const iframe = document.getElementById('mappa-iframe');
+      const link = document.getElementById('mappa-external-link');
+      if (iframe && iframe.getAttribute('src') !== urlMappa) {
+        iframe.src = urlMappa;
+      }
+      if (link) {
+        link.href = urlMappa;
+      }
+    }
+
+    function toggleSchermoInteroMappa() {
+      const wrapper = document.getElementById('sezione-mappa');
+      if (!wrapper) return;
+      if (!document.fullscreenElement) {
+        wrapper.requestFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    }
+
     async function init() {
+      inizializzaMappa();
       document.getElementById('istruzioni-view').value = ISTRUZIONI;
       await rilevaServerBackend();
       renderFonti();
