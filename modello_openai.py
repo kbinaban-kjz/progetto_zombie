@@ -14,9 +14,8 @@ from openai import (
     OpenAIError,
 )
 
-NVIDIA_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-#"https://integrate.api.nvidia.com/v1"
-MODELLO_NVIDIA_DEFAULT = "gemini-3.8-flash"  #"meta/llama-3.1-8b-instruct"
+NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1" #"https://generativelanguage.googleapis.com/v1beta/openai/"
+MODELLO_NVIDIA_DEFAULT = "nvidia/nemotron-3-ultra-550b-a55b"  # "gemini-3.6-flash"  #"meta/llama-3.1-8b-instruct"
 MODELLI_NVIDIA_RISERVA = [
     "meta/llama-3.1-8b-instruct",
     "meta/llama-3.3-70b-instruct",
@@ -26,7 +25,6 @@ MODELLI_NVIDIA_RISERVA = [
     "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/nemotron-4-340b-instruct",
     "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    "nvidia/nemotron-3-ultra-550b-a55b",
 ]
 STATI_RIPROVABILI = {404, 408, 429, 500, 502, 503, 504}
 TIMEOUT_SECONDI = 30.0
@@ -56,7 +54,6 @@ Sei Armando, un investigatore rigoroso. Rispondi in italiano semplice e diretto.
      "Non documentato nelle fonti disponibili."
 3. GESTIONE DELLE DOMANDE DI CULTURA GENERALE / SENSO COMUNE:
    - Se la domanda riguarda fatti generali non presenti nei documenti, rispondi basandoti su conoscenze certe.
-   - Se non sei certo al 100% di una risposta generale, dichiara apertamente di non saperlo. Non inventare mai informazioni.
 4. FOGLI DI VERITÀ E CERTEZZA:
    - Distingui nettamente i fatti certi dalle ipotesi o dalle possibilità. Non trasformare mai un'ipotesi in una certezza.
    - Non inventare mai persone, luoghi, cause, date o eventi."""
@@ -161,6 +158,7 @@ def genera_risposta(
             "content": f"FONTI:\n{contenuto_fonti}\n\nDOMANDA:\n{domanda}",
         },
     ]
+    risultato = None
     for indice, modello_corrente in enumerate(modelli):
         try:
             kwargs_chiamata: dict = {
@@ -188,6 +186,8 @@ def genera_risposta(
             ):
                 raise
 
+    if risultato is None:
+        raise RuntimeError("Nessun modello ha restituito una risposta.")
     risposta = risultato.choices[0].message.content
     if not risposta:
         raise RuntimeError("OpenAI ha restituito una risposta vuota.")
