@@ -219,10 +219,6 @@
               <code class="text-amber-300">Backend/cronologia.db</code> • Record salvati: <span id="sqlite-count" class="text-white font-bold">0</span>
             </p>
           </div>
-          <button onclick="sincronizzaCronologiaSql(true)"
-            class="px-2.5 py-1.5 rounded bg-bunker-950 hover:bg-bunker-700 border border-bunker-600 text-xs font-mono text-stone-200 transition shrink-0">
-            ↻ Ricarica SQL
-          </button>
         </div>
 
         <div id="sqlite-history-container" class="p-3 space-y-2 max-h-[240px] overflow-y-auto">
@@ -249,9 +245,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <button onclick="sincronizzaCronologiaSql('tutta')" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-amber-300 border border-bunker-700 text-xs font-mono" title="Mostra di nuovo nella chat tutti i messaggi salvati in SQLite (annulla 'Pulisci vista')">
-            Mostra da SQLite
-          </button>
           <button onclick="pulisciTerminale()" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-300 border border-bunker-700 text-xs font-mono">
             Pulisci vista
           </button>
