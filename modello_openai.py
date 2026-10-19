@@ -20,6 +20,7 @@ MODELLI_NVIDIA_RISERVA = [
     "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/llama-3.1-nemotron-70b-instruct",
     "nvidia/nemotron-4-340b-instruct",
+    "nvidia/llama-3.1-nemotron-ultra-253b-v1"
 ]
 STATI_RIPROVABILI = {404, 408, 429, 500, 502, 503, 504}
 BASE_DIR = Path(__file__).resolve().parent
