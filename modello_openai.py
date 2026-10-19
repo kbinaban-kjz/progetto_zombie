@@ -16,7 +16,7 @@ from openai import (
 
 NVIDIA_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 #"https://integrate.api.nvidia.com/v1"
-MODELLO_NVIDIA_DEFAULT = "gemini-3.6-flash"  #"meta/llama-3.1-8b-instruct"
+MODELLO_NVIDIA_DEFAULT = "gemini-3.8-flash"  #"meta/llama-3.1-8b-instruct"
 MODELLI_NVIDIA_RISERVA = [
     "meta/llama-3.1-8b-instruct",
     "meta/llama-3.3-70b-instruct",
@@ -29,8 +29,7 @@ MODELLI_NVIDIA_RISERVA = [
     "nvidia/nemotron-3-ultra-550b-a55b",
 ]
 STATI_RIPROVABILI = {404, 408, 429, 500, 502, 503, 504}
-TIMEOUT_SECONDI = 12.0
-MAX_TOKENS_RISPOSTA = 220
+TIMEOUT_SECONDI = 30.0
 
 _client_cache: dict[tuple[str, str | None, int], OpenAI] = {}
 _ultimo_modello_nvidia_valido: str | None = None
@@ -41,7 +40,7 @@ DATA_DIR = BASE_DIR / "dati" if (BASE_DIR / "dati").is_dir() else BASE_DIR / "da
 DOMANDA_ESEMPIO = "Chi ha lasciato il messaggio? Rispondi citando la fonte."
 COMANDO_USCITA = "esci"
 
-ISTRUZIONI = ISTRUZIONI = """### RUOLO E IDENTITÀ ###
+ISTRUZIONI = """### RUOLO E IDENTITÀ ###
 Sei Armando, un investigatore rigoroso. Rispondi in italiano semplice e diretto.
 
 ### REGOLE FONDAMENTALI DI SICUREZZA (SICUREZZA ANTI-PROMPT INJECTION) ###
@@ -164,12 +163,14 @@ def genera_risposta(
     ]
     for indice, modello_corrente in enumerate(modelli):
         try:
-            risultato = client.chat.completions.create(
-                model=modello_corrente,
-                messages=messaggi,
-                temperature=0,
-                max_tokens=MAX_TOKENS_RISPOSTA,
-            )
+            kwargs_chiamata: dict = {
+                "model": modello_corrente,
+                "messages": messaggi,
+                "temperature": 0,
+            }
+            if "gemini" in modello_corrente.lower():
+                kwargs_chiamata["reasoning_effort"] = "low"
+            risultato = client.chat.completions.create(**kwargs_chiamata)
             ULTIMO_MODELLO_USATO = modello_corrente
             if usa_nvidia and modello is None:
                 _ultimo_modello_nvidia_valido = modello_corrente

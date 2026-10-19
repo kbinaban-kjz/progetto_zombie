@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
+import importlib
 import json
 import os
 import re
@@ -38,6 +39,20 @@ if str(BACKEND_DIR) not in sys.path:
 import modello_openai
 from database import inizializza_db, salva_messaggio, leggi_cronologia, get_connection
 
+_modello_openai_mtime: int | None = None
+
+
+def _ricarica_modello_openai_se_modificato() -> None:
+    global _modello_openai_mtime
+    percorso = Path(modello_openai.__file__).resolve()
+    if percorso.is_file():
+        mtime = percorso.stat().st_mtime_ns
+        if _modello_openai_mtime is not None and mtime != _modello_openai_mtime:
+            importlib.reload(modello_openai)
+        _modello_openai_mtime = mtime
+
+
+_ricarica_modello_openai_se_modificato()
 inizializza_db()
 
 # ==============================================================================
@@ -135,7 +150,7 @@ def _risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) ->
     return "Non documentato nelle fonti disponibili."
 
 
-def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 110) -> str:
+def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 256) -> str:
     """Esegue la generazione sul modello locale di Investigatore.py (Qwen/Qwen2.5-0.5B-Instruct)."""
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
@@ -298,6 +313,7 @@ def genera_risposta_ibrida(
         }
     else:
         # Richiesta complessa -> Modello Cloud (modello_openai.py)
+        _ricarica_modello_openai_se_modificato()
         risposta = modello_openai.genera_risposta(
             domanda,
             fonti,
