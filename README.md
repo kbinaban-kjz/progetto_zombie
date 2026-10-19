@@ -6,14 +6,18 @@ Assistente investigativo basato su LLM (`Qwen/Qwen2.5-0.5B-Instruct`) progettato
 
 ```text
 .
-├── Investigatore.ipynb   # Notebook principale (caricamento dati, modello e chat backend)
-├── Missione.xlsx         # Specifiche e obiettivi della missione
-├── dati/                 # Dossier e testimonianze (.txt)
+├── Backend/
+│   ├── Investigatore.py      # Script Python del Backend (convertito da Investigatore.ipynb + server web)
+│   ├── Investigatore.ipynb   # Notebook originale
+│   ├── Missione.xlsx         # Specifiche e obiettivi della missione
+│   └── diario_chat.jsonl     # Log generato automaticamente con la cronologia domande/risposte
+├── Frontend/
+│   └── index.html            # Interfaccia web collegata a Backend/Investigatore.py
+├── dati/                     # Dossier e testimonianze (.txt)
 │   ├── G1-01.txt
 │   ├── G1-02.txt
 │   └── G1-03.txt
-├── diario_chat.jsonl     # Log generato automaticamente con la cronologia domande/risposte
-├── requirements.txt      # Dipendenze Python
+├── requirements.txt          # Dipendenze Python
 └── .gitignore
 ```
 
@@ -30,10 +34,14 @@ Assistente investigativo basato su LLM (`Qwen/Qwen2.5-0.5B-Instruct`) progettato
    pip install -r requirements.txt
    ```
 
-3. **Esegui il notebook:**
-   Apri `Investigatore.ipynb` (in VS Code, JupyterLab o Google Colab) ed esegui le celle in ordine:
-   - **Cella 1:** Installazione pacchetti.
-   - **Cella 2:** Caricamento dei file `.txt` dalla cartella `dati/` (o estrazione automatica da `.zip`).
-   - **Cella 3:** Caricamento del modello `Qwen/Qwen2.5-0.5B-Instruct` su CPU.
-   - **Cella 4:** Avvio della chat interattiva da backend (`input()`), con salvataggio automatico di ogni domanda e risposta nella lista `cronologia` e nel file `diario_chat.jsonl`.
+3. **Avvia il Backend (`Backend/Investigatore.py`):**
+   - **Con interfaccia Web (`Frontend/index.html`):**
+     ```bash
+     python Backend/Investigatore.py
+     ```
+     Apri poi `http://127.0.0.1:8000` nel browser.
+   - **Da terminale (`input()`):**
+     ```bash
+     python Backend/Investigatore.py --cli
+     ```
 
