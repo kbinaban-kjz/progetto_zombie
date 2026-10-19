@@ -81,6 +81,9 @@
           <span id="backend-status-badge" class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-amber-400">
             ● Backend: modello_openai.py
           </span>
+          <span id="sqlite-status-badge" class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-400">
+            DB SQLite: cronologia_chat (0)
+          </span>
           <span>ENDPOINT: <code id="header-base-url" class="text-stone-300">https://integrate.api.nvidia.com/v1</code></span>
         </div>
         <h1 class="font-display text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white mt-1">
@@ -96,10 +99,10 @@
     </div>
   </header>
 
-  <!-- MAIN CONTENT: ALLINEATO ESCLUSIVAMENTE A modello_openai.py -->
+  <!-- MAIN CONTENT: ALLINEATO A modello_openai.py + SQLite (Backend/database.py) -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-    <!-- COLONNA SINISTRA (5 col): Fonti (fonti: Sequence[tuple[str, str]]) & Parametri genera_risposta() -->
+    <!-- COLONNA SINISTRA (5 col): Fonti, Parametri genera_risposta() e Cronologia SQLite (cronologia_chat) -->
     <div class="lg:col-span-5 space-y-6">
 
       <!-- 1. FONTI FORNITE (DATA_DIR / *.txt) -->
@@ -119,7 +122,7 @@
           </label>
         </div>
 
-        <div id="fonti-container" class="p-3 space-y-2.5 max-h-[310px] overflow-y-auto">
+        <div id="fonti-container" class="p-3 space-y-2.5 max-h-[260px] overflow-y-auto">
           <!-- Formattate esattamente come in modello_openai.py: "--- Fonte: {nome} ---\n{contenuto}" -->
         </div>
       </section>
@@ -167,15 +170,39 @@
             <label for="istruzioni-view" class="block text-xs font-mono uppercase text-stone-400 mb-1">
               ISTRUZIONI (da `modello_openai.py`)
             </label>
-            <textarea id="istruzioni-view" rows="7" readonly
+            <textarea id="istruzioni-view" rows="6" readonly
               class="w-full bg-bunker-950/80 border border-bunker-700 rounded-lg p-2.5 text-xs font-mono text-stone-400 focus:outline-none leading-relaxed"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. CRONOLOGIA DATABASE SQLite (Backend/cronologia.db — tabella cronologia_chat) -->
+      <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
+        <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between gap-2">
+          <div>
+            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+              Cronologia SQLite (`cronologia_chat`)
+            </h2>
+            <p class="text-[11px] font-mono text-stone-400">
+              <code class="text-amber-300">Backend/cronologia.db</code> • Record salvati: <span id="sqlite-count" class="text-white font-bold">0</span>
+            </p>
+          </div>
+          <button onclick="sincronizzaCronologiaSql(true)"
+            class="px-2.5 py-1.5 rounded bg-bunker-950 hover:bg-bunker-700 border border-bunker-600 text-xs font-mono text-stone-200 transition shrink-0">
+            ↻ Ricarica SQL
+          </button>
+        </div>
+
+        <div id="sqlite-history-container" class="p-3 space-y-2 max-h-[260px] overflow-y-auto">
+          <div class="text-xs font-mono text-stone-500 p-2">
+            Nessun record caricato da <code>cronologia_chat</code>.
           </div>
         </div>
       </section>
 
     </div>
 
-    <!-- COLONNA DESTRA (7 col): Terminale Domanda / Risposta (main() di modello_openai.py) -->
+    <!-- COLONNA DESTRA (7 col): Terminale Domanda / Risposta (main() di modello_openai.py + salva_messaggio SQLite) -->
     <div class="lg:col-span-7 flex flex-col bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl min-h-[620px]">
 
       <!-- Intestazione Chat -->
@@ -185,13 +212,18 @@
             Chiamata OpenAI / NVIDIA per rispondere usando solo le fonti fornite
           </h2>
           <p class="text-[11px] font-mono text-stone-400">
-            Scrivi una domanda alla volta. Digita '<code id="comando-uscita-label" class="text-amber-300">esci</code>' per terminare.
+            Scrivi una domanda alla volta. Digita '<code id="comando-uscita-label" class="text-amber-300">esci</code>' per terminare. Salvataggio automatico in SQLite (<code class="text-stone-300">salva_messaggio</code>).
           </p>
         </div>
 
-        <button onclick="pulisciTerminale()" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-300 border border-bunker-700 text-xs font-mono">
-          Pulisci
-        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="sincronizzaCronologiaSql(true)" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-amber-300 border border-bunker-700 text-xs font-mono" title="Ricarica i messaggi dalla tabella SQLite cronologia_chat">
+            Mostra da SQLite
+          </button>
+          <button onclick="pulisciTerminale()" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-300 border border-bunker-700 text-xs font-mono">
+            Pulisci vista
+          </button>
+        </div>
       </div>
 
       <!-- Barra DOMANDA_ESEMPIO (da modello_openai.py riga 28) -->
@@ -204,7 +236,7 @@
       </div>
 
       <!-- Area Messaggi (Domanda / Risposta) -->
-      <div id="terminale-messaggi" class="flex-1 p-4 space-y-4 overflow-y-auto max-h-[480px]">
+      <div id="terminale-messaggi" class="flex-1 p-4 space-y-4 overflow-y-auto max-h-[540px]">
         <div class="bg-bunker-950 border border-bunker-700 rounded-xl p-3.5 text-xs font-mono text-stone-300">
           Scrivi una domanda alla volta. Digita '<strong>esci</strong>' per terminare.
         </div>
@@ -272,6 +304,8 @@ Non inventare persone, luoghi, cause o eventi.`;
 
     let apiBase = null;
     let programmaTerminato = false;
+    // Stato sincronizzato con la tabella SQLite cronologia_chat (id, domanda, risposta, fonti, created_at)
+    let cronologiaSql = [];
 
     async function init() {
       document.getElementById('istruzioni-view').value = ISTRUZIONI;
@@ -325,16 +359,8 @@ Non inventare persone, luoghi, cause o eventi.`;
                   fonti = dSrc.fonti;
                 }
               }
-              const rHist = await fetch(`${base}/api/history`);
-              if (rHist.ok) {
-                const dHist = await rHist.json();
-                if (dHist.ok && Array.isArray(dHist.cronologia)) {
-                  for (const voce of dHist.cronologia) {
-                    aggiungiMessaggioUtente(voce.domanda);
-                    aggiungiMessaggioRisposta(voce.risposta);
-                  }
-                }
-              }
+
+              await sincronizzaCronologiaSql(true);
               return;
             }
           }
@@ -345,6 +371,92 @@ Non inventare persone, luoghi, cause o eventi.`;
       badge.textContent = '● Modalità browser diretta (modello_openai.py)';
       badge.className = 'px-2 py-0.5 rounded bg-bunker-950 border border-amber-700 text-amber-400';
       keyBadge.textContent = 'Inserisci api_key nel pannello a sinistra o avvia il server';
+      renderCronologiaSql();
+    }
+
+    // Legge la tabella SQLite cronologia_chat tramite GET /api/history (leggi_cronologia() in Backend/database.py)
+    async function sincronizzaCronologiaSql(mostraInTerminale = false) {
+      if (apiBase === null) {
+        renderCronologiaSql();
+        return;
+      }
+      try {
+        const rHist = await fetch(`${apiBase}/api/history`);
+        if (rHist.ok) {
+          const dHist = await rHist.json();
+          if (dHist.ok && Array.isArray(dHist.cronologia)) {
+            cronologiaSql = dHist.cronologia;
+            renderCronologiaSql();
+            if (mostraInTerminale) {
+              pulisciTerminale();
+              for (const voce of cronologiaSql) {
+                aggiungiMessaggioUtente(voce.domanda, voce);
+                aggiungiMessaggioRisposta(voce.risposta, false, voce);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Visualizza i record salvati in SQLite: id, domanda, risposta, fonti, created_at
+    function renderCronologiaSql() {
+      const sqlBadge = document.getElementById('sqlite-status-badge');
+      const countEl = document.getElementById('sqlite-count');
+      const container = document.getElementById('sqlite-history-container');
+
+      countEl.textContent = cronologiaSql.length;
+
+      if (apiBase !== null) {
+        sqlBadge.textContent = `● DB SQLite: cronologia_chat (${cronologiaSql.length} record)`;
+        sqlBadge.className = 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400';
+      } else {
+        sqlBadge.textContent = 'DB SQLite: richiede server Python';
+        sqlBadge.className = 'px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-400';
+      }
+
+      if (cronologiaSql.length === 0) {
+        container.innerHTML = `
+          <div class="text-xs font-mono text-stone-500 p-2 bg-bunker-950 rounded-lg border border-bunker-800">
+            Nessuna domanda salvata nella tabella <code>cronologia_chat</code>.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = cronologiaSql.map((voce, idx) => {
+        const listaFonti = Array.isArray(voce.fonti) ? voce.fonti : [];
+        const badgesFonti = listaFonti.map(nome =>
+          `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] text-amber-300">[${escapeHtml(nome)}]</span>`
+        ).join(' ');
+
+        return `
+          <div onclick="selezionaRecordSql(${idx})"
+            class="cursor-pointer p-2.5 rounded-lg bg-bunker-950 hover:bg-bunker-800/80 border border-bunker-700 hover:border-crimson-700 transition space-y-1">
+            <div class="flex items-center justify-between gap-2 text-[10px] font-mono">
+              <span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300 font-bold">
+                #${escapeHtml(voce.id ?? (idx + 1))}
+              </span>
+              <span class="text-stone-400">${escapeHtml(voce.created_at || '')}</span>
+            </div>
+            <div class="text-xs font-mono text-white font-semibold truncate" title="${escapeHtml(voce.domanda)}">
+              D: ${escapeHtml(voce.domanda)}
+            </div>
+            <div class="text-[11px] font-mono text-stone-400 line-clamp-2">
+              R: ${escapeHtml(voce.risposta)}
+            </div>
+            ${badgesFonti ? `<div class="flex flex-wrap gap-1 pt-1">${badgesFonti}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selezionaRecordSql(idx) {
+      const voce = cronologiaSql[idx];
+      if (!voce) return;
+      if (programmaTerminato) riavviaSessione();
+      document.getElementById('domanda-input').value = voce.domanda;
+      document.getElementById('domanda-input').focus();
     }
 
     // Formatta ogni fonte esattamente come in modello_openai.py: "--- Fonte: {nome} ---\n{contenuto}"
@@ -408,12 +520,19 @@ Non inventare persone, luoghi, cause o eventi.`;
       pulisciTerminale();
     }
 
-    function aggiungiMessaggioUtente(domanda) {
+    function aggiungiMessaggioUtente(domanda, metaSql = null) {
       const box = document.getElementById('terminale-messaggi');
+      const infoSql = metaSql && metaSql.id
+        ? `<span class="text-[10px] font-mono text-stone-400 ml-2">#${escapeHtml(metaSql.id)} • ${escapeHtml(metaSql.created_at || '')}</span>`
+        : '';
+
       box.insertAdjacentHTML('beforeend', `
         <div class="flex justify-end">
           <div class="bg-crimson-900/40 border border-crimson-700/70 rounded-xl rounded-tr-none px-4 py-2.5 max-w-2xl">
-            <div class="text-[10px] font-mono text-crimson-300 uppercase mb-0.5">Domanda:</div>
+            <div class="flex items-center justify-between gap-2 mb-0.5">
+              <span class="text-[10px] font-mono text-crimson-300 uppercase">Domanda:</span>
+              ${infoSql}
+            </div>
             <div class="text-sm text-white font-mono">${escapeHtml(domanda)}</div>
           </div>
         </div>
@@ -421,16 +540,38 @@ Non inventare persone, luoghi, cause o eventi.`;
       box.scrollTop = box.scrollHeight;
     }
 
-    function aggiungiMessaggioRisposta(testo, isError = false) {
+    function aggiungiMessaggioRisposta(testo, isError = false, metaSql = null) {
       const box = document.getElementById('terminale-messaggi');
       const borderClass = isError ? 'border-red-700 bg-red-950/40 text-red-300' : 'border-bunker-700 bg-bunker-950 text-stone-200';
       const labelText = isError ? 'Errore:' : 'Risposta:';
       const labelColor = isError ? 'text-red-400' : 'text-amber-400';
 
+      let footerSql = '';
+      if (!isError && metaSql) {
+        const listaFonti = Array.isArray(metaSql.fonti) ? metaSql.fonti : [];
+        const badgesFonti = listaFonti.map(nome =>
+          `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] font-mono text-amber-300">[${escapeHtml(nome)}]</span>`
+        ).join(' ');
+
+        const idTag = metaSql.id ? `SQLite #${escapeHtml(metaSql.id)}` : 'SQLite';
+        const tsTag = metaSql.created_at ? ` • ${escapeHtml(metaSql.created_at)}` : '';
+
+        footerSql = `
+          <div class="pt-2 mt-2 border-t border-bunker-800 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-1">
+              <span class="text-[10px] font-mono text-stone-500">fonti:</span>
+              ${badgesFonti || '<span class="text-[10px] font-mono text-stone-500">[]</span>'}
+            </div>
+            <span class="text-[10px] font-mono text-phosphor-400">${idTag}${tsTag}</span>
+          </div>
+        `;
+      }
+
       box.insertAdjacentHTML('beforeend', `
         <div class="border ${borderClass} rounded-xl rounded-tl-none p-4 space-y-1.5">
           <div class="text-[11px] font-mono font-bold ${labelColor} uppercase">${labelText}</div>
           <div class="text-sm leading-relaxed whitespace-pre-line font-mono">${escapeHtml(testo)}</div>
+          ${footerSql}
         </div>
       `);
       box.scrollTop = box.scrollHeight;
@@ -473,7 +614,7 @@ Non inventare persone, luoghi, cause o eventi.`;
       btn.textContent = 'Attendi...';
 
       try {
-        // 1. Se il server Python è attivo, delega a modello_openai.genera_risposta()
+        // 1. Se il server Python è attivo, delega a modello_openai.genera_risposta() + salva_messaggio() su SQLite
         if (apiBase !== null) {
           const resp = await fetch(`${apiBase}/api/chat`, {
             method: 'POST',
@@ -487,7 +628,16 @@ Non inventare persone, luoghi, cause o eventi.`;
           });
           const data = await resp.json();
           if (resp.ok && data.ok) {
-            aggiungiMessaggioRisposta(data.risposta);
+            let recordSalvato = null;
+            if (Array.isArray(data.cronologia)) {
+              cronologiaSql = data.cronologia;
+              renderCronologiaSql();
+              recordSalvato = cronologiaSql[cronologiaSql.length - 1] || null;
+            }
+            if (!recordSalvato && Array.isArray(data.fonti)) {
+              recordSalvato = { fonti: data.fonti };
+            }
+            aggiungiMessaggioRisposta(data.risposta, false, recordSalvato);
           } else {
             aggiungiMessaggioRisposta(data.error || "Impossibile ottenere una risposta.", true);
           }
@@ -497,7 +647,7 @@ Non inventare persone, luoghi, cause o eventi.`;
         // 2. Se aperto senza server Python ma con api_key inserita, esegue la stessa chiamata di genera_risposta()
         if (apiKey) {
           const rispostaDiretta = await generaRispostaBrowser(domanda, fonti, apiKey, modello);
-          aggiungiMessaggioRisposta(rispostaDiretta);
+          aggiungiMessaggioRisposta(rispostaDiretta, false, { fonti: fonti.map(f => f.nome) });
         } else {
           aggiungiMessaggioRisposta(
             "Impossibile ottenere una risposta: Configura NVIDIA_API_KEY oppure OPENAI_API_KEY nel file .env o nelle variabili d'ambiente.",
