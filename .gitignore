@@ -53,6 +53,7 @@ models/
 # Gradio / Temp logs
 flagged/
 gradio_cached_examples/
+diario_chat.jsonl
 *.log
 *.tmp
 

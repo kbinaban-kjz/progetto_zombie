@@ -24,7 +24,7 @@ MODELLI_NVIDIA_RISERVA = [
 STATI_RIPROVABILI = {404, 408, 429, 500, 502, 503, 504}
 BASE_DIR = Path(__file__).resolve().parent
 ENV_PATH = BASE_DIR / ".env"
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = BASE_DIR / "dati" if (BASE_DIR / "dati").is_dir() else BASE_DIR / "data"
 DOMANDA_ESEMPIO = "Chi ha lasciato il messaggio? Rispondi citando la fonte."
 COMANDO_USCITA = "esci"
 
@@ -190,6 +190,12 @@ def main() -> int:
             return 1
 
         print(f"\nRisposta:\n{risposta}")
+        try:
+            from Backend.database import salva_messaggio
+
+            salva_messaggio(domanda, risposta, [nome for nome, _ in fonti])
+        except Exception as exc_db:
+            print(f"(Avviso salvataggio SQLite: {exc_db})")
 
     return 0
 
