@@ -13,6 +13,8 @@ BACKEND_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BACKEND_DIR.parent
 ENV_PATH = ROOT_DIR / ".env"
 DATI_DIR = ROOT_DIR / "dati" if (ROOT_DIR / "dati").is_dir() else ROOT_DIR / "data"
+# Documenti aggiunti giorno per giorno (es. new_dati/ per il Giorno 2)
+NUOVI_DATI_DIR = ROOT_DIR / "new_dati"
 
 # Assicura che la root e la cartella Backend siano nel PYTHONPATH
 if str(ROOT_DIR) not in sys.path:
