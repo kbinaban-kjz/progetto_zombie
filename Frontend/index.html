@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Investigatore AI — modello_openai.py</title>
+  <title>Investigatore AI — Protocollo Lazzaro</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Rendering Markdown standard (GFM) delle risposte del modello + sanitizzazione anti-XSS -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
@@ -238,106 +238,98 @@
 <body class="text-stone-200 font-sans min-h-screen flex flex-col selection:bg-crimson-800 selection:text-white">
 
   <!-- HEADER -->
-  <header class="bg-bunker-900/95 border-b border-bunker-700 sticky top-0 z-20">
+  <header class="bg-bunker-900/95 border-b border-bunker-700 sticky top-0 z-20 backdrop-blur">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
       <div>
         <div class="flex flex-wrap items-center gap-2 text-xs font-mono text-stone-400">
-          <span id="backend-status-badge" class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-amber-400">
-            ● Backend Ibrido: Investigatore.py + modello_openai.py
+          <span id="backend-status-badge" class="px-2.5 py-0.5 rounded-full bg-bunker-950 border border-bunker-700 text-amber-400 font-medium">
+            ● Server: Inizializzazione...
           </span>
-          <span id="sqlite-status-badge" class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-400">
-            DB SQLite: cronologia_chat (0)
+          <span id="sqlite-status-badge" class="px-2.5 py-0.5 rounded-full bg-bunker-950 border border-bunker-700 text-stone-400 font-medium">
+            💾 SQLite: 0 record
           </span>
         </div>
-        <h1 class="font-display text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white mt-1">
-          Investigatore AI — <span class="text-phosphor-400">Locale</span> <span class="text-stone-500">/</span> <span class="text-crimson-400">Cloud</span>
+        <h1 class="font-display text-2xl sm:text-3xl font-bold tracking-wider uppercase text-white mt-1 flex items-center gap-2">
+          <span>Investigatore AI</span>
+          <span class="text-xs font-mono px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-400 uppercase tracking-normal">Protocollo Lazzaro</span>
         </h1>
       </div>
 
       <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
-        <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-crimson-900/70 hover:bg-crimson-800 border border-crimson-600 text-white font-bold transition">
-          🌍 Mappa Teatro Globale
+        <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-crimson-900/70 hover:bg-crimson-800 border border-crimson-600 text-white font-bold transition flex items-center gap-1.5 shadow">
+          <span>🌍</span> Mappa Teatro Globale
         </a>
         <span id="local-model-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-emerald-800/80 text-phosphor-400">
-          Semplici → Locale (Qwen2.5-0.5B)
+          ⚡ Locale: Qwen 0.5B
         </span>
         <span id="env-key-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-bunker-700 text-stone-300">
-          Complesse → Cloud: verifica .env...
+          ☁ Cloud: verifica .env...
         </span>
       </div>
     </div>
   </header>
 
-  <!-- MAIN CONTENT: ROUTING IBRIDO (Investigatore.py Locale + modello_openai.py Cloud) + SQLite -->
+  <!-- MAIN CONTENT: LAYOUT A DUE COLONNE -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-    <!-- COLONNA SINISTRA (5 col): Fonti, Routing & Parametri, Cronologia SQLite (cronologia_chat) -->
+    <!-- COLONNA SINISTRA (5 col): Routing & Motore, Dossier & Fonti, Cronologia SQLite -->
     <div class="lg:col-span-5 space-y-6">
 
-      <!-- 1. FONTI FORNITE (DATA_DIR / *.txt) -->
-      <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
-        <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between gap-2">
-          <div>
-            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-              Fonti (`fonti: Sequence[tuple[str, str]]`)
-            </h2>
-            <p class="text-[11px] font-mono text-stone-400">
-              File <code class="text-amber-300">*.txt</code> caricati: <span id="fonti-count">3</span>
-            </p>
-          </div>
-          <label class="cursor-pointer px-2.5 py-1.5 rounded bg-crimson-900/70 hover:bg-crimson-800 border border-crimson-700 text-xs font-mono text-white transition shrink-0">
-            <input type="file" id="txt-upload-input" multiple accept=".txt" class="hidden" onchange="caricaFileTxt(event)" />
-            + Carica .TXT
-          </label>
-        </div>
-
-        <div id="fonti-container" class="p-3 space-y-2.5 max-h-[240px] overflow-y-auto">
-          <!-- Formattate esattamente come in modello_openai.py: "--- Fonte: {nome} ---\n{contenuto}" -->
-        </div>
-      </section>
-
-      <!-- 2. ROUTING IBRIDO (LOCALE vs CLOUD) & PARAMETRI -->
+      <!-- 1. MOTORE & INSTRADAMENTO -->
       <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
         <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between">
-          <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-            Routing Ibrido &amp; Parametri
-          </h2>
-          <span class="text-[11px] font-mono text-stone-400">Locale / Cloud</span>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-crimson-400"></span>
+            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+              Motore &amp; Instradamento
+            </h2>
+          </div>
+          <span class="text-[11px] font-mono text-stone-400">Configurazione AI</span>
         </div>
 
-        <div class="p-4 space-y-3">
+        <div class="p-4 space-y-3.5">
           <div>
-            <label for="modalita-select" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              Modalità di instradamento (`modalita`)
+            <label for="modalita-select" class="block text-xs font-mono uppercase text-stone-300 mb-1.5 font-semibold">
+              Modalità Operativa
             </label>
             <select id="modalita-select" onchange="aggiornaAnteprimaComplessita()"
-              class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none">
-              <option value="auto">Automatico (Semplici → Locale Investigatore.py | Complesse → Cloud)</option>
-              <option value="gemini">Forza Google Gemini (modello_gemini.py)</option>
-              <option value="locale">Forza Modello Locale (Investigatore.py — Qwen/Qwen2.5-0.5B-Instruct)</option>
+              class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none transition">
+              <option value="auto">Automatico (Semplici → Locale | Complesse → Cloud)</option>
+              <option value="gemini">Forza Google Gemini (Consigliato)</option>
+              <option value="locale">Forza Modello Locale (Qwen 0.5B)</option>
               <option value="cloud">Forza Modello Cloud (NVIDIA / OpenAI)</option>
             </select>
           </div>
 
           <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
-            <div class="p-2.5 rounded-lg bg-bunker-950 border border-emerald-900/80">
-              <div class="text-phosphor-400 font-bold uppercase">Richieste Semplici</div>
-              <div class="text-stone-300 mt-0.5">Locale: <code>Investigatore.py</code></div>
-              <div class="text-stone-500 text-[10px]">Qwen/Qwen2.5-0.5B-Instruct</div>
+            <div class="p-2.5 rounded-lg bg-bunker-950 border border-emerald-900/60 flex flex-col justify-between">
+              <div>
+                <div class="text-phosphor-400 font-bold uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Richieste Semplici
+                </div>
+                <div class="text-stone-300 mt-1">Locale (Qwen 0.5B)</div>
+              </div>
+              <div class="text-stone-500 text-[10px] mt-1">Elaborazione immediata</div>
             </div>
-            <div class="p-2.5 rounded-lg bg-bunker-950 border border-crimson-900/80">
-              <div class="text-crimson-400 font-bold uppercase">Richieste Complesse</div>
-              <div class="text-stone-300 mt-0.5">Cloud: <code>Gemini / NVIDIA</code></div>
-              <div class="text-stone-500 text-[10px]">Google GenAI / NIM API</div>
+            <div class="p-2.5 rounded-lg bg-bunker-950 border border-crimson-900/60 flex flex-col justify-between">
+              <div>
+                <div class="text-crimson-400 font-bold uppercase flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-crimson-400"></span>
+                  Analisi Complesse
+                </div>
+                <div class="text-stone-300 mt-1">Cloud (Gemini / NVIDIA)</div>
+              </div>
+              <div class="text-stone-500 text-[10px] mt-1">Ragionamento multi-fonte</div>
             </div>
           </div>
 
           <div>
-            <label for="modello-select" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              Modello Cloud (`modello_gemini.py` / `modello_openai.py`)
+            <label for="modello-select" class="block text-xs font-mono uppercase text-stone-300 mb-1.5 font-semibold">
+              Modello Cloud
             </label>
-            <select id="modello-select" class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-amber-300 focus:outline-none">
-              <option value="">Default (.env / gemini-3.8-flash-lite / meta/llama-3.1-8b-instruct)</option>
+            <select id="modello-select" class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-amber-300 focus:outline-none transition">
+              <option value="">Default (.env / gemini-3.8-flash-lite)</option>
               <optgroup label="Google Gemini (Consigliati)">
                 <option value="gemini-3.8-flash-lite" selected>gemini-3.8-flash-lite (Flash Lite — Veloce)</option>
                 <option value="gemini-3.8-flash">gemini-3.8-flash (Standard)</option>
@@ -351,13 +343,11 @@
                 <option value="meta/llama-3.3-70b-instruct">meta/llama-3.3-70b-instruct</option>
                 <option value="nvidia/llama-3.1-nemotron-70b-instruct">nvidia/llama-3.1-nemotron-70b-instruct</option>
               </optgroup>
-              <optgroup label="NVIDIA Nemotron (MODELLI_NVIDIA_RISERVA)">
+              <optgroup label="NVIDIA Nemotron">
                 <option value="nvidia/nemotron-3.5-lightning-30b-a3b">nvidia/nemotron-3.5-lightning-30b-a3b</option>
                 <option value="nvidia/llama-3.1-nemotron-51b-instruct">nvidia/llama-3.1-nemotron-51b-instruct</option>
                 <option value="nvidia/nemotron-3-super-120b-a12b">nvidia/nemotron-3-super-120b-a12b</option>
                 <option value="nvidia/nemotron-4-340b-instruct">nvidia/nemotron-4-340b-instruct</option>
-                <option value="nvidia/llama-3.1-nemotron-ultra-253b-v1">nvidia/llama-3.1-nemotron-ultra-253b-v1</option>
-                <option value="nvidia/nemotron-3-ultra-550b-a55b">nvidia/nemotron-3-ultra-550b-a55b</option>
               </optgroup>
               <optgroup label="OpenAI">
                 <option value="gpt-4o-mini">gpt-4o-mini</option>
@@ -366,78 +356,57 @@
           </div>
 
           <div>
-            <label for="api-key-input" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              api_key Cloud (`api_key: str | None = None`)
+            <label for="api-key-input" class="block text-xs font-mono uppercase text-stone-400 mb-1 font-semibold">
+              Chiave API Personalizzata (Opzionale)
             </label>
             <input id="api-key-input" type="password"
-              placeholder="Lascia vuoto per usare GEMINI_API_KEY / NVIDIA_API_KEY / OPENAI_API_KEY da .env"
-              class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-stone-200 placeholder-stone-500 focus:outline-none" />
+              placeholder="Lascia vuoto per usare le chiavi predefinite nel file .env"
+              class="w-full bg-bunker-950 border border-bunker-600 focus:border-crimson-500 rounded-lg px-3 py-2 text-xs font-mono text-stone-200 placeholder-stone-500 focus:outline-none transition" />
           </div>
 
-          <div>
-            <label for="istruzioni-view" class="block text-xs font-mono uppercase text-stone-400 mb-1">
-              ISTRUZIONI
-            </label>
-            <textarea id="istruzioni-view" rows="5" readonly
-              class="w-full bg-bunker-950/80 border border-bunker-700 rounded-lg p-2.5 text-xs font-mono text-stone-400 focus:outline-none leading-relaxed"></textarea>
-          </div>
+          <!-- Preserva compatibilità backend/frontend per ISTRUZIONI senza ingombrare la UI -->
+          <input type="hidden" id="istruzioni-view" />
         </div>
       </section>
 
-      <!-- 2b. STRUMENTI AI (Backend/tools.py — Function Calling & Utility Operative) -->
+      <!-- 2. DOSSIER & FONTI -->
       <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
         <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between gap-2">
-          <div>
-            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-              Strumenti AI (`Backend/tools.py`)
-            </h2>
-            <p class="text-[11px] font-mono text-stone-400">
-              Tool operativi: <span id="tools-count" class="text-phosphor-400 font-bold">7 disponibili</span>
-            </p>
-          </div>
-          <span class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-[10px] font-mono text-amber-300">
-            Function Calling
-          </span>
-        </div>
-        <div class="p-3 space-y-2">
-          <div class="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
-            <button onclick="eseguiToolUi('statistiche_missione')" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-amber-600 text-left transition">
-              <span class="text-amber-400 font-bold">📊 statistiche</span>
-              <p class="text-[10px] text-stone-400 truncate">Sintesi missione e dossier</p>
-            </button>
-            <button onclick="eseguiToolUi('ottieni_nodi_mappa')" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-emerald-600 text-left transition">
-              <span class="text-phosphor-400 font-bold">🗺️ nodi_mappa</span>
-              <p class="text-[10px] text-stone-400 truncate">14 nodi teatro operativo</p>
-            </button>
-            <button onclick="eseguiToolUi('elenca_fonti')" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-crimson-600 text-left transition">
-              <span class="text-crimson-300 font-bold">📁 elenca_fonti</span>
-              <p class="text-[10px] text-stone-400 truncate">Testimonianze nel dossier</p>
-            </button>
-            <button onclick="eseguiToolUi('ottieni_dettaglio_nodo', {id_o_codice: 'ferri'})" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-purple-600 text-left transition">
-              <span class="text-purple-300 font-bold">🔍 nodo: ferri</span>
-              <p class="text-[10px] text-stone-400 truncate">Dettaglio Nora Ferri</p>
-            </button>
-          </div>
-          <div id="tool-output-container" class="hidden p-2.5 rounded bg-bunker-950 border border-bunker-700 text-xs font-mono text-stone-300 max-h-48 overflow-y-auto">
-            <div class="flex items-center justify-between pb-1 border-b border-bunker-800 mb-1 text-[10px] text-stone-400">
-              <span id="tool-output-title" class="font-bold text-amber-300">Esito Tool</span>
-              <button onclick="chiudiOutputTool()" class="text-stone-500 hover:text-white">✕ Chiudi</button>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <div>
+              <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+                Dossier Investigativo
+              </h2>
+              <p class="text-[11px] font-mono text-stone-400">
+                Documenti caricati: <span id="fonti-count" class="text-amber-300 font-bold">3</span>
+              </p>
             </div>
-            <pre id="tool-output-pre" class="whitespace-pre-wrap text-[11px] text-stone-300"></pre>
           </div>
+          <label class="cursor-pointer px-3 py-1.5 rounded-lg bg-crimson-900/70 hover:bg-crimson-800 border border-crimson-700 text-xs font-mono text-white transition shrink-0 flex items-center gap-1 shadow">
+            <input type="file" id="txt-upload-input" multiple accept=".txt" class="hidden" onchange="caricaFileTxt(event)" />
+            <span>+ Carica .TXT</span>
+          </label>
+        </div>
+
+        <div id="fonti-container" class="p-3 space-y-3 max-h-[380px] overflow-y-auto">
+          <!-- Documenti renderizzati dinamicamente -->
         </div>
       </section>
 
-      <!-- 3. CRONOLOGIA DATABASE SQLite (Backend/cronologia.db — tabella cronologia_chat) -->
+      <!-- 3. CRONOLOGIA SESSIONI (SQLite) -->
       <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
         <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between gap-2">
-          <div>
-            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-              Cronologia SQLite (`cronologia_chat`)
-            </h2>
-            <p class="text-[11px] font-mono text-stone-400">
-              <code class="text-amber-300">Backend/cronologia.db</code> • Record salvati: <span id="sqlite-count" class="text-white font-bold">0</span>
-            </p>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <div>
+              <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+                Cronologia Investigativa
+              </h2>
+              <p class="text-[11px] font-mono text-stone-400">
+                Record SQLite: <span id="sqlite-count" class="text-white font-bold">0</span>
+              </p>
+            </div>
           </div>
           <button type="button" onclick="rimuoviTuttaCronologia()" id="btn-elimina-cronologia-sql"
             class="px-2.5 py-1.5 rounded-lg bg-crimson-950/80 hover:bg-crimson-900 border border-crimson-700/80 hover:border-crimson-500 text-xs font-mono text-crimson-200 hover:text-white transition flex items-center gap-1.5 shrink-0"
@@ -445,65 +414,68 @@
             <svg class="w-3.5 h-3.5 text-crimson-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Elimina tutto
+            Svuota
           </button>
         </div>
 
-        <div id="sqlite-history-container" class="p-3 space-y-2 max-h-[240px] overflow-y-auto">
-          <div class="text-xs font-mono text-stone-500 p-2">
-            Nessun record caricato da <code>cronologia_chat</code>.
+        <div id="sqlite-history-container" class="p-3 space-y-2 max-h-[260px] overflow-y-auto">
+          <div class="text-xs font-mono text-stone-500 p-2 text-center">
+            Nessun record caricato dalla cronologia.
           </div>
         </div>
       </section>
 
     </div>
 
-    <!-- COLONNA DESTRA (7 col): Terminale Domanda / Risposta Ibrido (Locale + Cloud + SQLite) -->
+    <!-- COLONNA DESTRA (7 col): Terminale Investigativo -->
     <div class="lg:col-span-7 flex flex-col bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl min-h-[620px]">
 
       <!-- Intestazione Chat -->
       <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="font-mono font-bold text-sm sm:text-base text-white">
-            Smistamento automatico: Locale (`Investigatore.py`) / Cloud (`modello_openai.py`)
+          <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+            Terminale Investigativo
           </h2>
           <p class="text-[11px] font-mono text-stone-400">
-            Domande semplici → <span class="text-phosphor-400">Locale</span> • Domande complesse → <span class="text-crimson-400">Cloud</span> • Digita '<code id="comando-uscita-label" class="text-amber-300">esci</code>' per terminare.
+            Smistamento: <span class="text-phosphor-400">Locale (Qwen)</span> per semplici • <span class="text-crimson-400">Cloud (Gemini)</span> per complesse • '<code id="comando-uscita-label" class="text-amber-300">esci</code>' per terminare.
           </p>
         </div>
 
         <div class="flex items-center gap-2">
-          <button type="button" onclick="pulisciTerminale()" class="px-2.5 py-1 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-300 border border-bunker-700 text-xs font-mono transition" title="Nasconde i messaggi dalla schermata senza cancellarli dal database">
+          <button type="button" onclick="pulisciTerminale()" class="px-2.5 py-1 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-300 border border-bunker-700 text-xs font-mono transition" title="Nasconde i messaggi dalla schermata senza cancellarli dal database">
             Pulisci vista
           </button>
-          <button type="button" onclick="rimuoviTuttaCronologia()" id="btn-elimina-cronologia-chat" class="px-2.5 py-1 rounded bg-crimson-950/70 hover:bg-crimson-800 text-crimson-300 hover:text-white border border-crimson-700/80 hover:border-crimson-500 text-xs font-mono transition flex items-center gap-1.5" title="Elimina definitivamente tutta la cronologia da SQLite e dalla chat">
+          <button type="button" onclick="rimuoviTuttaCronologia()" id="btn-elimina-cronologia-chat" class="px-2.5 py-1 rounded-lg bg-crimson-950/70 hover:bg-crimson-800 text-crimson-300 hover:text-white border border-crimson-700/80 hover:border-crimson-500 text-xs font-mono transition flex items-center gap-1.5" title="Elimina definitivamente tutta la cronologia da SQLite e dalla chat">
             <svg class="w-3.5 h-3.5 text-crimson-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Elimina cronologia
+            Elimina tutto
           </button>
         </div>
       </div>
 
-      <!-- Barra Esempi Rapidi (Semplice -> Locale / Complessa -> Cloud) -->
+      <!-- Barra Esempi Rapidi -->
       <div class="bg-bunker-950/90 border-b border-bunker-800 px-4 py-2 flex flex-wrap items-center justify-between gap-2">
-        <span class="text-[11px] font-mono text-stone-400 uppercase">Esempi test routing:</span>
+        <span class="text-[11px] font-mono text-stone-400 uppercase tracking-wider">Esempi rapidi:</span>
         <div class="flex flex-wrap gap-2">
           <button onclick="usaDomandaEsempio('semplice')" id="domanda-esempio-btn"
-            class="text-xs font-mono px-2.5 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-700/80 text-phosphor-400 transition">
-            [Semplice → Locale] Chi ha lasciato il messaggio?
+            class="text-xs font-mono px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-700/80 text-phosphor-400 transition flex items-center gap-1.5">
+            <span>⚡ [Locale] Chi ha lasciato il messaggio?</span>
           </button>
           <button onclick="usaDomandaEsempio('complessa')"
-            class="text-xs font-mono px-2.5 py-1 rounded bg-crimson-950/60 hover:bg-crimson-900/70 border border-crimson-700/80 text-crimson-300 transition">
-            [Complessa → Cloud] Confronta tutte le fonti e analizza perché le chiamate sono sospette.
+            class="text-xs font-mono px-2.5 py-1 rounded-lg bg-crimson-950/60 hover:bg-crimson-900/70 border border-crimson-700/80 text-crimson-300 transition flex items-center gap-1.5">
+            <span>☁ [Cloud] Analisi anomalie chiamate centrale</span>
           </button>
         </div>
       </div>
 
       <!-- Area Messaggi (Domanda / Risposta) -->
       <div id="terminale-messaggi" class="flex-1 p-4 space-y-4 overflow-y-auto max-h-[520px]">
-        <div class="bg-bunker-950 border border-bunker-700 rounded-xl p-3.5 text-xs font-mono text-stone-300 chat-markdown">
-          Scrivi una domanda alla volta. Le richieste semplici usano il modello <strong>locale</strong> (<code>Investigatore.py</code>), mentre quelle complesse usano il modello <strong>cloud</strong> (<code>modello_openai.py</code>). Digita '<strong>esci</strong>' per terminare.
+        <div class="bg-bunker-950/80 border border-bunker-700/80 rounded-xl p-4 text-xs font-mono text-stone-300 chat-markdown leading-relaxed">
+          <div class="flex items-center gap-2 text-amber-300 font-bold mb-1 uppercase tracking-wider text-xs">
+            <span>🛡️ Terminale Operativo Attivo</span>
+          </div>
+          Invia una domanda per consultare i documenti del dossier. Le richieste semplici e dirette vengono elaborate dal modello <strong class="text-phosphor-400">Locale (Qwen)</strong>, mentre le analisi complesse e i confronti multi-fonte vengono affidati a <strong class="text-crimson-400">Google Gemini / Cloud</strong>. Digita '<strong>esci</strong>' per terminare la sessione.
         </div>
       </div>
 
@@ -511,7 +483,7 @@
       <div class="px-4 py-1.5 bg-bunker-950 border-t border-bunker-800 flex items-center justify-between text-[11px] font-mono">
         <span class="text-stone-400">Instradamento previsto:</span>
         <span id="routing-preview-badge" class="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400">
-          LOCALE (Investigatore.py) — Domanda semplice
+          LOCALE — Domanda diretta
         </span>
       </div>
 
@@ -520,10 +492,10 @@
         <div class="relative flex-1">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-crimson-400 font-bold">Domanda:</span>
           <input id="domanda-input" type="text" oninput="aggiornaAnteprimaComplessita()"
-            placeholder="Scrivi una domanda semplice (Locale) o un'analisi complessa (Cloud)..."
-            class="w-full bg-bunker-900 border border-bunker-600 focus:border-crimson-500 rounded-lg pl-24 pr-4 py-2.5 text-sm text-white placeholder-stone-500 focus:outline-none font-mono" />
+            placeholder="Scrivi una domanda o richiedi un'analisi comparativa..."
+            class="w-full bg-bunker-900 border border-bunker-600 focus:border-crimson-500 rounded-lg pl-24 pr-4 py-2.5 text-sm text-white placeholder-stone-500 focus:outline-none font-mono transition" />
         </div>
-        <button id="invia-btn" type="submit" class="px-5 py-2.5 rounded-lg bg-crimson-800 hover:bg-crimson-700 text-white font-display font-bold uppercase tracking-wider text-sm transition shrink-0">
+        <button id="invia-btn" type="submit" class="px-5 py-2.5 rounded-lg bg-crimson-800 hover:bg-crimson-700 text-white font-display font-bold uppercase tracking-wider text-sm transition shrink-0 shadow">
           Invia
         </button>
       </form>
@@ -534,27 +506,28 @@
     <section id="sezione-mappa" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col">
       <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-            🌍 Mappa Interattiva — Protocollo Lazzaro (<code class="text-amber-300 font-mono text-xs">Frontend/mappa/index.html</code>)
+          <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white flex items-center gap-2">
+            <span>🌍</span>
+            Mappa Tattica del Teatro Operativo
           </h2>
           <p class="text-[11px] font-mono text-stone-400">
-            Globo interattivo del teatro operativo (14 nodi di rete: Rifugi, Focolai, Segnali e Anomalie • Dossier G1-01, G1-02, G1-03).
+            Globo interattivo del teatro operativo: 14 nodi di rete (Rifugi, Focolai, Segnali e Anomalie).
           </p>
         </div>
 
         <div class="flex items-center gap-2">
           <button onclick="toggleSchermoInteroMappa()"
-            class="px-2.5 py-1.5 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition">
+            class="px-2.5 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition">
             ⛶ Schermo intero
           </button>
           <a id="mappa-external-link" href="mappa/index.html" target="_blank" rel="noopener"
-            class="px-2.5 py-1.5 rounded bg-crimson-900/70 hover:bg-crimson-800 text-white border border-crimson-600 text-xs font-mono transition">
-            ↗ Apri in scheda dedicata
+            class="px-2.5 py-1.5 rounded-lg bg-crimson-900/70 hover:bg-crimson-800 text-white border border-crimson-600 text-xs font-mono transition">
+            ↗ Apri in nuova scheda
           </a>
         </div>
       </div>
 
-      <div id="mappa-wrapper" class="relative w-full h-[680px] bg-bunker-950">
+      <div id="mappa-wrapper" class="relative w-full h-[640px] bg-bunker-950">
         <iframe id="mappa-iframe" src="mappa/index.html" title="Protocollo Lazzaro — Mappa Teatro Globale"
           class="w-full h-full border-0" allowfullscreen loading="lazy"></iframe>
       </div>
@@ -648,7 +621,8 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
     async function init() {
       inizializzaMappa();
-      document.getElementById('istruzioni-view').value = ISTRUZIONI;
+      const istrEl = document.getElementById('istruzioni-view');
+      if (istrEl) istrEl.value = ISTRUZIONI;
       await rilevaServerBackend();
       renderFonti();
       aggiornaAnteprimaComplessita();
@@ -658,24 +632,24 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
     function valutaComplessita(domanda) {
       const testo = (domanda || '').trim();
       if (!testo) {
-        return { isComplessa: false, motivo: 'Domanda semplice → Modello Locale (Investigatore.py)' };
+        return { isComplessa: false, motivo: 'Domanda rapida → Modello Locale' };
       }
       const lower = testo.toLowerCase();
       const parole = lower.match(/\w+/g) || [];
       const numParole = parole.length;
 
       if ((testo.match(/\?/g) || []).length > 1) {
-        return { isComplessa: true, motivo: 'Domanda multipla (più quesiti nella stessa richiesta)' };
+        return { isComplessa: true, motivo: 'Domanda multipla (più quesiti)' };
       }
 
       const fontiCitate = new Set(lower.match(/g\d+-\d+/g) || []);
       if (fontiCitate.size > 1) {
-        return { isComplessa: true, motivo: 'Confronto esplicito tra più documenti del dossier' };
+        return { isComplessa: true, motivo: 'Confronto tra più documenti' };
       }
 
       for (const kw of PAROLE_COMPLESSE) {
         if (lower.includes(kw)) {
-          return { isComplessa: true, motivo: `Richiesta di ragionamento/analisi ('${kw}')` };
+          return { isComplessa: true, motivo: `Analisi approfondita ('${kw}')` };
         }
       }
 
@@ -683,7 +657,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         return { isComplessa: true, motivo: `Domanda articolata (${numParole} parole)` };
       }
 
-      return { isComplessa: false, motivo: `Domanda diretta e concisa (${numParole} parole)` };
+      return { isComplessa: false, motivo: `Domanda diretta (${numParole} parole)` };
     }
 
     function aggiornaAnteprimaComplessita() {
@@ -698,24 +672,24 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
       if (modalita === 'locale') {
         usaCloud = false;
-        descrizione = 'Scelta manuale: Modello Locale (Investigatore.py)';
+        descrizione = 'Forzato Modello Locale';
       } else if (modalita === 'gemini') {
         usaCloud = true;
-        descrizione = 'Scelta manuale: Google Gemini (modello_gemini.py)';
+        descrizione = 'Forzato Google Gemini';
       } else if (modalita === 'cloud') {
         usaCloud = true;
-        descrizione = 'Scelta manuale: Modello Cloud (NVIDIA / OpenAI)';
+        descrizione = 'Forzato Cloud NVIDIA / OpenAI';
       }
 
       if (usaCloud) {
-        const etichetta = modalita === 'gemini' ? 'GEMINI (modello_gemini.py)' : 'CLOUD';
+        const etichetta = modalita === 'gemini' ? '✨ GEMINI' : '☁ CLOUD';
         previewBadge.textContent = `${etichetta} — ${descrizione}`;
         previewBadge.className = modalita === 'gemini'
-          ? 'px-2 py-0.5 rounded bg-sky-950 border border-sky-700 text-sky-300'
-          : 'px-2 py-0.5 rounded bg-crimson-950 border border-crimson-700 text-crimson-300';
+          ? 'px-2.5 py-0.5 rounded bg-sky-950 border border-sky-700 text-sky-300 font-medium'
+          : 'px-2.5 py-0.5 rounded bg-crimson-950 border border-crimson-700 text-crimson-300 font-medium';
       } else {
-        previewBadge.textContent = `LOCALE (Investigatore.py • ${MODELLO_LOCALE_NOME}) — ${descrizione}`;
-        previewBadge.className = 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400';
+        previewBadge.textContent = `⚡ LOCALE — ${descrizione}`;
+        previewBadge.className = 'px-2.5 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400 font-medium';
       }
     }
 
@@ -736,34 +710,41 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
             const d = await r.json();
             if (d && d.ok) {
               apiBase = base;
-              badge.textContent = `● Connesso: Investigatore.py (Locale) + ${d.provider || 'Cloud'} (Cloud)`;
-              badge.className = 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400';
+              if (badge) {
+                badge.textContent = `● Server Connesso (${d.provider || 'Cloud'})`;
+                badge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-phosphor-400 font-medium';
+              }
 
               if (localBadge) {
-                localBadge.textContent = `Semplici → Locale (${d.modello_locale || MODELLO_LOCALE_NOME})`;
+                const nomeModLocale = d.modello_locale ? d.modello_locale.split('/').pop() : 'Qwen 0.5B';
+                localBadge.textContent = `⚡ Locale: ${nomeModLocale}`;
               }
               if (d.istruzioni) {
                 ISTRUZIONI = d.istruzioni;
-                document.getElementById('istruzioni-view').value = ISTRUZIONI;
+                const istrEl = document.getElementById('istruzioni-view');
+                if (istrEl) istrEl.value = ISTRUZIONI;
               }
               if (d.domanda_esempio) {
                 DOMANDA_ESEMPIO = d.domanda_esempio;
               }
               if (d.comando_uscita) {
                 COMANDO_USCITA = d.comando_uscita;
-                document.getElementById('comando-uscita-label').textContent = COMANDO_USCITA;
+                const cmdLabel = document.getElementById('comando-uscita-label');
+                if (cmdLabel) cmdLabel.textContent = COMANDO_USCITA;
               }
-              if (d.chiave_configurata) {
-                keyBadge.textContent = `Complesse → Cloud ${d.provider} (${d.modello_default})`;
-                keyBadge.className = 'px-3 py-1.5 rounded-lg bg-crimson-950 border border-crimson-700 text-crimson-300';
-              } else {
-                keyBadge.textContent = 'Cloud: chiave .env non trovata (inserisci api_key o usa Locale)';
-                keyBadge.className = 'px-3 py-1.5 rounded-lg bg-bunker-950 border border-amber-700 text-amber-400';
+              if (keyBadge) {
+                if (d.chiave_configurata) {
+                  keyBadge.textContent = `☁ Cloud: ${d.provider} (${d.modello_default || 'attivo'})`;
+                  keyBadge.className = 'px-3 py-1.5 rounded-lg bg-crimson-950 border border-crimson-700 text-crimson-300';
+                } else {
+                  keyBadge.textContent = '☁ Cloud: API Key non rilevata in .env';
+                  keyBadge.className = 'px-3 py-1.5 rounded-lg bg-bunker-950 border border-amber-700 text-amber-400';
+                }
               }
 
               if (d.tools_disponibili && Array.isArray(d.tools_disponibili)) {
                 const toolsEl = document.getElementById('tools-count');
-                if (toolsEl) toolsEl.textContent = `${d.tools_disponibili.length} attivi (tools.py)`;
+                if (toolsEl) toolsEl.textContent = `${d.tools_disponibili.length} attivi`;
               }
 
               const rSrc = await fetch(`${base}/api/sources`);
@@ -782,9 +763,13 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       }
 
       apiBase = null;
-      badge.textContent = '● Modalità browser diretta (Locale + Cloud API)';
-      badge.className = 'px-2 py-0.5 rounded bg-bunker-950 border border-amber-700 text-amber-400';
-      keyBadge.textContent = 'Cloud: inserisci api_key a sinistra (Locale sempre attivo)';
+      if (badge) {
+        badge.textContent = '● Modalità Browser (API Diretta)';
+        badge.className = 'px-2.5 py-0.5 rounded-full bg-bunker-950 border border-amber-700 text-amber-400 font-medium';
+      }
+      if (keyBadge) {
+        keyBadge.textContent = '☁ Cloud: API Key personalizzata';
+      }
       renderCronologiaSql();
     }
 
@@ -833,20 +818,24 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       const countEl = document.getElementById('sqlite-count');
       const container = document.getElementById('sqlite-history-container');
 
-      countEl.textContent = cronologiaSql.length;
+      if (countEl) countEl.textContent = cronologiaSql.length;
 
-      if (apiBase !== null) {
-        sqlBadge.textContent = `● DB SQLite: cronologia_chat (${cronologiaSql.length} record)`;
-        sqlBadge.className = 'px-2 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-phosphor-400';
-      } else {
-        sqlBadge.textContent = 'DB SQLite: richiede server Python';
-        sqlBadge.className = 'px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-400';
+      if (sqlBadge) {
+        if (apiBase !== null) {
+          sqlBadge.textContent = `💾 SQLite: ${cronologiaSql.length} record`;
+          sqlBadge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-phosphor-400 font-medium';
+        } else {
+          sqlBadge.textContent = '💾 SQLite: non connesso';
+          sqlBadge.className = 'px-2.5 py-0.5 rounded-full bg-bunker-950 border border-bunker-700 text-stone-400 font-medium';
+        }
       }
+
+      if (!container) return;
 
       if (cronologiaSql.length === 0) {
         container.innerHTML = `
-          <div class="text-xs font-mono text-stone-500 p-2 bg-bunker-950 rounded-lg border border-bunker-800">
-            Nessuna domanda salvata nella tabella <code>cronologia_chat</code>.
+          <div class="text-xs font-mono text-stone-500 p-3 bg-bunker-950 rounded-lg border border-bunker-800 text-center">
+            Nessuna domanda salvata nella cronologia.
           </div>
         `;
         return;
@@ -855,27 +844,27 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       container.innerHTML = cronologiaSql.map((voce, idx) => {
         const listaFonti = Array.isArray(voce.fonti) ? voce.fonti : [];
         const badgesFonti = listaFonti.map(nome =>
-          `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] text-amber-300">[${escapeHtml(nome)}]</span>`
+          `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-700 text-[10px] text-amber-300 font-mono">[${escapeHtml(nome)}]</span>`
         ).join(' ');
         const tagMotore = voce.motore === 'gemini'
-          ? '<span class="px-1.5 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300 font-bold">✨ GEMINI</span>'
+          ? '<span class="px-1.5 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300 font-bold text-[10px]">✨ GEMINI</span>'
           : voce.motore === 'cloud'
-            ? '<span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300 font-bold">☁ CLOUD</span>'
+            ? '<span class="px-1.5 py-0.5 rounded bg-crimson-950 border border-crimson-800 text-crimson-300 font-bold text-[10px]">☁ CLOUD</span>'
             : voce.motore === 'locale'
-              ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-phosphor-400 font-bold">💻 LOCALE</span>'
-              : '<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-stone-400" title="Messaggio salvato prima del routing ibrido">motore N/D</span>';
+              ? '<span class="px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-phosphor-400 font-bold text-[10px]">⚡ LOCALE</span>'
+              : '<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-stone-400 text-[10px]">N/D</span>';
 
         return `
           <div onclick="selezionaRecordSql(${idx})"
-            class="cursor-pointer p-2.5 rounded-lg bg-bunker-950 hover:bg-bunker-800/80 border border-bunker-700 hover:border-crimson-700 transition space-y-1">
+            class="cursor-pointer p-2.5 rounded-xl bg-bunker-950 hover:bg-bunker-800/80 border border-bunker-700/80 hover:border-crimson-700 transition space-y-1">
             <div class="flex items-center justify-between gap-2 text-[10px] font-mono">
               <div class="flex items-center gap-1.5">
-                <span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-white font-bold">
+                <span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-stone-200 font-bold">
                   #${escapeHtml(voce.id ?? (idx + 1))}
                 </span>
                 ${tagMotore}
               </div>
-              <span class="text-stone-400">${escapeHtml(voce.created_at || '')}</span>
+              <span class="text-stone-500 text-[10px]">${escapeHtml(voce.created_at || '')}</span>
             </div>
             <div class="text-xs font-mono text-white font-semibold truncate chat-markdown" title="${escapeHtml(voce.domanda)}">
               D: ${formatInlineMarkdown(escapeHtml(voce.domanda))}
@@ -898,22 +887,38 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       document.getElementById('domanda-input').focus();
     }
 
-    // Formatta ogni fonte esattamente come in modello_openai.py: "--- Fonte: {nome} ---\n{contenuto}"
+    // Formatta e visualizza le fonti del dossier in schede pulite e leggibili
     function renderFonti() {
-      document.getElementById('fonti-count').textContent = fonti.length;
+      const countEl = document.getElementById('fonti-count');
+      if (countEl) countEl.textContent = fonti.length;
       const container = document.getElementById('fonti-container');
+      if (!container) return;
+
+      if (fonti.length === 0) {
+        container.innerHTML = `
+          <div class="text-xs font-mono text-stone-500 p-3 bg-bunker-950 rounded-lg border border-bunker-800 text-center">
+            Nessun documento caricato nel dossier.
+          </div>
+        `;
+        return;
+      }
 
       container.innerHTML = fonti.map(f => {
-        const bloccoFormattato = `--- Fonte: ${f.nome} ---\n${f.contenuto.trim()}`;
+        const righe = f.contenuto.trim().split('\n').map(r => r.trim()).filter(Boolean);
+        const titolo = righe.length > 1 ? righe[1] : (righe[0] || f.nome);
         return `
-          <div class="p-3 rounded-lg bg-bunker-950 border border-bunker-700 space-y-1.5">
-            <div class="flex items-center justify-between text-xs font-mono">
-              <span class="px-2 py-0.5 rounded bg-crimson-900/60 border border-crimson-700 text-crimson-300 font-bold">
-                [${escapeHtml(f.nome)}]
+          <div class="p-3 rounded-xl bg-bunker-950 border border-bunker-700/80 hover:border-bunker-600 transition space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="px-2 py-0.5 rounded bg-crimson-900/60 border border-crimson-700/80 text-crimson-300 font-mono font-bold text-xs">
+                ${escapeHtml(f.nome)}
               </span>
-              <span class="text-stone-500">tuple[str, str]</span>
+              <span class="text-[11px] font-mono text-stone-400 truncate max-w-[170px]" title="${escapeHtml(titolo)}">
+                ${escapeHtml(titolo)}
+              </span>
             </div>
-            <pre class="text-xs text-stone-300 font-mono whitespace-pre-wrap leading-relaxed bg-bunker-900 p-2.5 rounded border border-bunker-800 overflow-x-auto">${escapeHtml(bloccoFormattato)}</pre>
+            <div class="text-xs text-stone-300 font-mono whitespace-pre-wrap leading-relaxed bg-bunker-900/90 p-3 rounded-lg border border-bunker-800">
+              ${escapeHtml(f.contenuto.trim())}
+            </div>
           </div>
         `;
       }).join('');
@@ -1106,40 +1111,43 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         const isCloud = metaSql.motore === 'cloud';
         const isLocale = metaSql.motore === 'locale';
 
-        let titolo = '💻 RISPOSTA DAL MODELLO LOCALE';
-        let sorgente = 'Investigatore.py';
-        let titoloStyle = 'bg-emerald-700 text-white';
-        let fallbackModello = MODELLO_LOCALE_NOME;
+        let titolo = '⚡ RISPOSTA MODELLO LOCALE';
+        let sorgente = 'Locale (Qwen 0.5B)';
+        let titoloStyle = 'bg-emerald-800 text-white';
+        let fallbackModello = 'Qwen2.5-0.5B';
 
         if (isGemini) {
-          titolo = '✨ RISPOSTA DA GOOGLE GEMINI';
-          sorgente = 'modello_gemini.py';
-          titoloStyle = 'bg-sky-700 text-white';
+          titolo = '✨ RISPOSTA GOOGLE GEMINI';
+          sorgente = 'Cloud (Gemini)';
+          titoloStyle = 'bg-sky-800 text-white';
           fallbackModello = 'Google Gemini';
         } else if (isCloud) {
-          titolo = '☁ RISPOSTA DAL MODELLO CLOUD';
-          sorgente = 'modello_openai.py';
+          titolo = '☁ RISPOSTA MODELLO CLOUD';
+          sorgente = 'Cloud (NVIDIA / OpenAI)';
           titoloStyle = 'bg-crimson-800 text-white';
           fallbackModello = 'NVIDIA/OpenAI';
         }
 
         const durata = metaSql.durata_ms != null ? ` • ${escapeHtml(metaSql.durata_ms)} ms` : '';
-        const motivo = metaSql.motivo_routing ? escapeHtml(metaSql.motivo_routing) : '';
+        const motivo = metaSql.motivo_routing ? ` • ${escapeHtml(metaSql.motivo_routing)}` : '';
+        const nomeModello = escapeHtml(metaSql.modello_usato || fallbackModello).split('/').pop();
 
         badgeMotoreHtml = `
-          <div class="-mx-4 -mt-4 mb-2 px-4 py-2 rounded-tr-xl ${titoloStyle} flex flex-wrap items-center justify-between gap-2">
+          <div class="-mx-4 -mt-4 mb-3 px-4 py-2 rounded-tr-xl ${titoloStyle} flex flex-wrap items-center justify-between gap-2 shadow-sm">
             <span class="text-xs font-display font-bold tracking-wider">${titolo}</span>
             <span class="text-[10px] font-mono opacity-90">${sorgente}${durata}</span>
           </div>
-          <div class="text-[10px] font-mono text-stone-400 space-y-0.5 pb-1.5 border-b border-bunker-800">
-            <div>Modello: <strong class="text-stone-200">${escapeHtml(metaSql.modello_usato || fallbackModello)}</strong></div>
-            <div>Complessità: <strong class="text-stone-200">${escapeHtml(metaSql.complessita || (isLocale ? 'semplice' : 'complessa'))}</strong>${motivo ? ` — ${motivo}` : ''}</div>
+          <div class="text-[11px] font-mono text-stone-400 flex flex-wrap items-center gap-2 pb-2 mb-2 border-b border-bunker-800">
+            <span class="px-2 py-0.5 rounded bg-bunker-900 border border-bunker-700 text-stone-200">
+              Modello: <strong>${nomeModello}</strong>
+            </span>
+            <span class="text-stone-400 text-[10px]">${motivo}</span>
           </div>
         `;
       } else if (!isError && metaSql && metaSql.id) {
         badgeMotoreHtml = `
           <div class="text-[10px] font-mono text-stone-500 pb-1.5 border-b border-bunker-800">
-            Motore non registrato (messaggio salvato prima dell'introduzione del routing Locale/Cloud)
+            Messaggio archiviato nella cronologia SQLite
           </div>
         `;
       }
@@ -1155,12 +1163,12 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         const tsTag = metaSql.created_at ? ` • ${escapeHtml(metaSql.created_at)}` : '';
 
         footerSql = `
-          <div class="pt-2 mt-2 border-t border-bunker-800 flex flex-wrap items-center justify-between gap-2">
-            <div class="flex flex-wrap items-center gap-1">
-              <span class="text-[10px] font-mono text-stone-500">fonti:</span>
-              ${badgesFonti || '<span class="text-[10px] font-mono text-stone-500">[]</span>'}
+          <div class="pt-2 mt-2 border-t border-bunker-800 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="text-stone-500 uppercase tracking-wider">Fonti citate:</span>
+              ${badgesFonti || '<span class="text-stone-500">Nessuna fonte citata</span>'}
             </div>
-            <span class="text-[10px] font-mono text-phosphor-400">${idTag}${tsTag}</span>
+            <span class="text-phosphor-400 font-semibold">${idTag}${tsTag}</span>
           </div>
         `;
       }
