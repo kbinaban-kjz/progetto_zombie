@@ -401,6 +401,7 @@ def cerca_fonti(query: str, limite: int = 5) -> dict[str, Any]:
     """
     Cerca termini o concetti chiave all'interno dei documenti del dossier.
     Restituisce i brani più rilevanti e il file di provenienza.
+    USARE SOLO SE i documenti pertinenti non sono già presenti nel testo fornito nel blocco fonti.
     """
     fonti = carica_fonti()
     risultati = cerca_in_fonti(query, fonti)
@@ -415,6 +416,7 @@ def cerca_fonti(query: str, limite: int = 5) -> dict[str, Any]:
 def leggi_fonte(nome_file: str) -> dict[str, Any]:
     """
     Restituisce il testo completo e i dettagli di un documento specifico (es. 'G1-01.txt').
+    USARE SOLO SE il testo integrale del file manca dal contesto già fornito.
     """
     fonti = carica_fonti()
     mappa = {n.lower(): (n, t) for n, t in fonti}
@@ -442,6 +444,7 @@ def leggi_fonte(nome_file: str) -> dict[str, Any]:
 def elenca_fonti() -> dict[str, Any]:
     """
     Elenca tutti i documenti attualmente disponibili nel dossier con metadati riassuntivi.
+    USARE SOLO SE l'utente chiede esplicitamente il censimento o elenco completo dei file in archivio.
     """
     fonti = carica_fonti()
     elenco = []
@@ -463,6 +466,7 @@ def verifica_sicurezza_fonti() -> dict[str, Any]:
     """
     Controlla tutti i documenti del dossier alla ricerca di testi che simulano
     istruzioni rivolte all'AI (prompt injection) e li segnala come prova dell'attacco.
+    USARE ESCLUSIVAMENTE SE l'utente richiede espressamente un audit di sicurezza o scansione anti-manomissione delle fonti.
     """
     fonti = carica_fonti()
     sospetti = fonti_sospette(fonti)
@@ -482,6 +486,7 @@ def ottieni_nodi_mappa(tipo: str | None = None, min_threat: int = 0) -> dict[str
     """
     Restituisce i nodi strategici della mappa operativa Protocollo Lazzaro
     (bunker, focolai, segnali, anomalie).
+    USARE SOLO SE l'utente chiede una panoramica o lista delle installazioni della mappa per tipologia o livello minaccia.
     """
     nodi_filtrati = []
     tipo_filtro = tipo.strip().lower() if tipo else None
@@ -495,6 +500,7 @@ def ottieni_nodi_mappa(tipo: str | None = None, min_threat: int = 0) -> dict[str
 
     return {
         "ok": True,
+        "tipo_fonte": "SCHEDA_MAPPA_TATTICA (metadati geografici della mappa operativa, distinti dai documenti testuali .txt del dossier)",
         "totale": len(nodi_filtrati),
         "filtro_tipo": tipo,
         "min_threat": min_threat,
@@ -506,6 +512,7 @@ def ottieni_dettaglio_nodo(id_o_codice: str) -> dict[str, Any]:
     """
     Restituisce l'analisi di intelligence dettagliata di un nodo della mappa
     (es. 'laz01', 'ferri', 'echo', 'berlino', 'LAZ-01').
+    USARE SOLO SE l'utente chiede coordinate, status, superstiti o scheda tecnica di un nodo della mappa.
     """
     chiave = id_o_codice.strip().lower()
     for nodo in NODI_TEATRO:
@@ -513,8 +520,13 @@ def ottieni_dettaglio_nodo(id_o_codice: str) -> dict[str, Any]:
             nodo["id"].lower() == chiave
             or nodo["code"].lower() == chiave
             or nodo["name"].lower() == chiave
+            or nodo["place"].lower() == chiave
         ):
-            return {"ok": True, "nodo": nodo}
+            return {
+                "ok": True,
+                "tipo_fonte": "SCHEDA_MAPPA_TATTICA (metadati geografici della mappa operativa, distinti dai documenti testuali .txt del dossier)",
+                "nodo": nodo,
+            }
 
     return {
         "ok": False,
@@ -526,6 +538,7 @@ def ottieni_dettaglio_nodo(id_o_codice: str) -> dict[str, Any]:
 def cerca_cronologia(termine: str) -> dict[str, Any]:
     """
     Cerca tra le domande e risposte registrate nel database SQLite locale.
+    USARE SOLO SE l'utente chiede di cercare in conversazioni o sessioni precedenti.
     """
     risultati = cerca_in_cronologia(termine)
     return {
@@ -539,6 +552,7 @@ def cerca_cronologia(termine: str) -> dict[str, Any]:
 def statistiche_missione() -> dict[str, Any]:
     """
     Restituisce un quadro di sintesi sullo stato della missione, fonti e database.
+    USARE SOLO SE l'utente chiede metriche numeriche o conteggi quantitativi globali della missione.
     """
     fonti = carica_fonti()
     cronologia = leggi_cronologia()

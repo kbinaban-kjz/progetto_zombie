@@ -41,20 +41,38 @@ CREATE TABLE IF NOT EXISTS instradamento_chat (
 """
 
 
+_db_inizializzati: set[str] = set()
+
+
+class _ClosingConnection(sqlite3.Connection):
+    """Connessione SQLite che chiude automaticamente il descrittore all'uscita dal blocco with."""
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            return super().__exit__(exc_type, exc_val, exc_tb)
+        finally:
+            self.close()
+
+
 def get_connection() -> sqlite3.Connection:
-    """Restituisce una connessione al database SQLite con row_factory attivo."""
+    """Restituisce una connessione al database SQLite con row_factory e foreign_keys attivi."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), factory=_ClosingConnection)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
 def inizializza_db() -> None:
-    """Crea le tabelle cronologia_chat e instradamento_chat se non esistono."""
+    """Crea le tabelle cronologia_chat e instradamento_chat se non esistono (con cache per percorso DB)."""
+    percorso_str = str(DB_PATH.resolve())
+    if percorso_str in _db_inizializzati and DB_PATH.exists():
+        return
     sql = SCHEMA_FILE.read_text(encoding="utf-8") if SCHEMA_FILE.exists() else SCHEMA_FALLBACK
     with get_connection() as conn:
         conn.executescript(sql)
         conn.commit()
+    _db_inizializzati.add(percorso_str)
 
 
 def salva_messaggio(domanda: str, risposta: str, fonti: list[str] | None = None) -> dict[str, Any]:
@@ -186,10 +204,12 @@ def formatta_memoria_testo(
 def salva_con_instradamento(domanda: str, fonti_nomi: list[str], esito: dict[str, Any]) -> dict[str, Any]:
     """
     Salva il messaggio in cronologia_chat e i metadati del motore usato in instradamento_chat.
+    Se `esito` include `fonti_citate`, salva solo le fonti effettivamente citate nella risposta.
     Restituisce il record completo arricchito.
     """
     inizializza_db()
-    riga = salva_messaggio(domanda, esito["risposta"], fonti_nomi)
+    fonti_effettive = esito.get("fonti_citate") if "fonti_citate" in esito else list(dict.fromkeys(fonti_nomi or []))
+    riga = salva_messaggio(domanda, esito["risposta"], fonti_effettive)
     try:
         with get_connection() as conn:
             conn.execute(

@@ -8,6 +8,7 @@ Responsabilità:
 - Gestione resiliente dell'importazione della libreria openai.
 """
 
+import json
 import os
 import sys
 from collections.abc import Sequence
@@ -29,7 +30,7 @@ try:
     )
     from Backend.sources import formatta_blocco_openai, carica_fonti
     from Backend.tools import TOOLS_OPENAI_SCHEMA, esegui_tool
-    from Backend.prompts import formatta_messaggio_cloud
+    from Backend.prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 except ImportError:
     from config import (
         NVIDIA_BASE_URL,
@@ -45,7 +46,7 @@ except ImportError:
     )
     from sources import formatta_blocco_openai, carica_fonti
     from tools import TOOLS_OPENAI_SCHEMA, esegui_tool
-    from prompts import formatta_messaggio_cloud
+    from prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 
 # Gestione tollerante dell'importazione di OpenAI
 try:
@@ -179,11 +180,12 @@ def genera_risposta(
         base_url=base_url,
         max_retries=0 if usa_nvidia else 1,
     )
-    messaggi: list[dict[str, Any]] = [{"role": "system", "content": ISTRUZIONI}]
+    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti)
+    messaggi: list[dict[str, Any]] = [{"role": "system", "content": istruzioni_sistema}]
 
-    # Inietta i turni della memoria passata
+    # Inietta i turni della memoria passata (ultimi 10 scambi)
     if memoria:
-        for m in memoria:
+        for m in memoria[-10:]:
             d = (m.get("domanda") or "").strip()
             r = (m.get("risposta") or "").strip()
             if d:
@@ -194,9 +196,15 @@ def genera_risposta(
     messaggi.append(
         {
             "role": "user",
-            "content": formatta_messaggio_cloud(contenuto_fonti, domanda, memoria=memoria),
+            "content": domanda,
         }
     )
+
+    tools_attivi = [
+        t
+        for t in TOOLS_OPENAI_SCHEMA
+        if t.get("function", {}).get("name") not in {"cerca_fonti", "leggi_fonte", "elenca_fonti"}
+    ]
 
     risultato = None
     for indice, modello_corrente in enumerate(modelli):
@@ -208,8 +216,8 @@ def genera_risposta(
             }
             if "gemini" in modello_corrente.lower():
                 kwargs_chiamata["reasoning_effort"] = "low"
-            if usa_tools and TOOLS_OPENAI_SCHEMA:
-                kwargs_chiamata["tools"] = TOOLS_OPENAI_SCHEMA
+            if usa_tools and tools_attivi:
+                kwargs_chiamata["tools"] = tools_attivi
 
             risultato = client.chat.completions.create(**kwargs_chiamata)
             ULTIMO_MODELLO_USATO = modello_corrente

@@ -223,6 +223,14 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                 }
             )
 
+        # Sicurezza file statici: consenti solo risorse dentro /Frontend/
+        norm_path = os.path.normpath(path).replace("\\", "/")
+        if ".." in path or not norm_path.startswith("/Frontend/"):
+            return self._send_json(
+                {"ok": False, "error": "Accesso negato alla risorsa richiesta."},
+                status=403,
+            )
+
         return super().do_GET()
 
     def do_POST(self):
@@ -282,18 +290,21 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             # Usa le fonti inviate dal client oppure quelle lette da disco
             fonti_payload = payload.get("fonti")
             if isinstance(fonti_payload, list) and fonti_payload:
-                fonti = [
-                    (str(f.get("nome", "")), str(f.get("contenuto", "")))
-                    for f in fonti_payload
-                    if f.get("nome") and f.get("contenuto")
-                ]
+                visti: set[str] = set()
+                fonti = []
+                for f in fonti_payload:
+                    nome_f = str(f.get("nome", ""))
+                    contenuto_f = str(f.get("contenuto", ""))
+                    if nome_f and contenuto_f and nome_f not in visti:
+                        visti.add(nome_f)
+                        fonti.append((nome_f, contenuto_f))
             else:
                 fonti = carica_fonti()
 
             api_key = (payload.get("api_key") or "").strip() or None
             modello = (payload.get("modello") or "").strip() or None
             modalita = (payload.get("modalita") or "auto").strip().lower()
-            usa_tools = bool(payload.get("usa_tools", False))
+            usa_tools = bool(payload.get("usa_tools", True))
             memoria = payload.get("memoria")
 
             try:
@@ -307,6 +318,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     memoria=memoria,
                 )
                 risposta = esito["risposta"]
+                fonti_citate = esito.get("fonti_citate") or []
                 record = salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
                 return self._send_json(
                     {
@@ -319,7 +331,9 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                         "motivo_routing": esito["motivo_routing"],
                         "durata_ms": esito["durata_ms"],
                         "memoria_usata": esito.get("memoria_usata", 0),
-                        "fonti": [nome for nome, _ in fonti],
+                        "fonti": fonti_citate,
+                        "fonti_disponibili": [nome for nome, _ in fonti],
+                        "grounding_ok": esito.get("grounding_ok", True),
                         "record": record,
                         "cronologia": leggi_cronologia_con_instradamento(),
                     }

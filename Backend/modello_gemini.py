@@ -22,6 +22,8 @@ try:
     from Backend.config import (
         MODELLO_GEMINI_DEFAULT,
         MODELLI_GEMINI_RISERVA,
+        TIMEOUT_SECONDI,
+        STATI_RIPROVABILI,
         ISTRUZIONI,
         DOMANDA_ESEMPIO,
         COMANDO_USCITA,
@@ -35,16 +37,19 @@ try:
         cerca_fonti,
         leggi_fonte,
         elenca_fonti,
+        verifica_sicurezza_fonti,
         ottieni_nodi_mappa,
         ottieni_dettaglio_nodo,
         cerca_cronologia,
         statistiche_missione,
     )
-    from Backend.prompts import formatta_messaggio_cloud
+    from Backend.prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 except ImportError:
     from config import (
         MODELLO_GEMINI_DEFAULT,
         MODELLI_GEMINI_RISERVA,
+        TIMEOUT_SECONDI,
+        STATI_RIPROVABILI,
         ISTRUZIONI,
         DOMANDA_ESEMPIO,
         COMANDO_USCITA,
@@ -58,12 +63,13 @@ except ImportError:
         cerca_fonti,
         leggi_fonte,
         elenca_fonti,
+        verifica_sicurezza_fonti,
         ottieni_nodi_mappa,
         ottieni_dettaglio_nodo,
         cerca_cronologia,
         statistiche_missione,
     )
-    from prompts import formatta_messaggio_cloud
+    from prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 
 # ==============================================================================
 # GESTIONE ECCEZIONI GEMINI
@@ -106,31 +112,36 @@ _client_cache: dict[str, Any] = {}
 _ultimo_modello_gemini_valido: str | None = None
 ULTIMO_MODELLO_USATO: str | None = None
 
-# Mappatura retrocompatibile per versioni ritirate o deprecate dell'API Google Gemini
+# Mappatura retrocompatibile per versioni ritirate, preview o alias dell'API Google Gemini
 ALIAS_MODELLI: dict[str, str] = {
     "gemini-3.8-flash-lite": "gemini-flash-lite-latest",
     "3.8-flash-lite": "gemini-flash-lite-latest",
     "3.8 flash lite": "gemini-flash-lite-latest",
     "gemini-flash-lite": "gemini-flash-lite-latest",
-    "gemini-2.5-flash-lite": "gemini-flash-lite-latest",
     "gemini-3.5-flash-lite": "gemini-flash-lite-latest",
-    "gemini-2.5-flash": "gemini-3.8-flash",
-    "gemini-2.0-flash": "gemini-3.8-flash",
-    "gemini-1.5-flash": "gemini-3.8-flash",
-    "gemini-1.5-pro": "gemini-3.1-pro-preview",
-    "gemini-2.5-pro": "gemini-3.1-pro-preview",
-    "gemini-pro": "gemini-3.8-flash",
+    "gemini-3.8-flash": "gemini-flash-latest",
+    "gemini-3.5-flash": "gemini-flash-latest",
+    "gemini-1.5-flash": "gemini-flash-latest",
+    "gemini-pro": "gemini-flash-latest",
+    "gemini-1.5-pro": "gemini-2.5-pro",
+    "gemini-3.1-pro-preview": "gemini-2.5-pro",
 }
 
 
 def ottieni_client(api_key: str) -> Any:
-    """Restituisce un'istanza client google.genai.Client memorizzata nella cache."""
+    """Restituisce un'istanza client google.genai.Client memorizzata nella cache con timeout configurato."""
     if not GOOGLE_GENAI_DISPONIBILE or genai is None:
         return None
     chiave_pulita = api_key.strip()
     client = _client_cache.get(chiave_pulita)
     if client is None:
-        client = genai.Client(api_key=chiave_pulita)
+        try:
+            client = genai.Client(
+                api_key=chiave_pulita,
+                http_options={"timeout": int(TIMEOUT_SECONDI * 1000)},
+            )
+        except Exception:
+            client = genai.Client(api_key=chiave_pulita)
         _client_cache[chiave_pulita] = client
     return client
 
@@ -148,7 +159,7 @@ def _genera_risposta_rest(
     """
     global ULTIMO_MODELLO_USATO
     contenuto_fonti = formatta_blocco_openai(fonti)
-    messaggio_completo = formatta_messaggio_cloud(contenuto_fonti, domanda, memoria=memoria)
+    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti)
 
     # Assicura formato corretto del modello per la REST API
     id_modello = modello.split("/")[-1] if "/" in modello else modello
@@ -156,18 +167,18 @@ def _genera_risposta_rest(
 
     contents_rest: list[dict[str, Any]] = []
     if memoria:
-        for m in memoria:
+        for m in memoria[-10:]:
             d = (m.get("domanda") or "").strip()
             r = (m.get("risposta") or "").strip()
             if d:
                 contents_rest.append({"role": "user", "parts": [{"text": d}]})
             if r:
                 contents_rest.append({"role": "model", "parts": [{"text": r}]})
-    contents_rest.append({"role": "user", "parts": [{"text": messaggio_completo}]})
+    contents_rest.append({"role": "user", "parts": [{"text": domanda}]})
 
     payload = {
         "system_instruction": {
-            "parts": [{"text": ISTRUZIONI}]
+            "parts": [{"text": istruzioni_sistema}]
         },
         "contents": contents_rest,
         "generationConfig": {
@@ -184,7 +195,7 @@ def _genera_risposta_rest(
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=int(TIMEOUT_SECONDI)) as resp:
             risultato = json.loads(resp.read().decode("utf-8"))
             ULTIMO_MODELLO_USATO = modello
             candidati = risultato.get("candidates", [])
@@ -251,7 +262,7 @@ def genera_risposta(
             modelli.append(m_risolto)
 
     contenuto_fonti = formatta_blocco_openai(fonti)
-    messaggio_utente = formatta_messaggio_cloud(contenuto_fonti, domanda, memoria=memoria)
+    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti)
 
     # --------------------------------------------------------------------------
     # PERCORSO 1: google-genai SDK (se disponibile)
@@ -259,23 +270,22 @@ def genera_risposta(
     if GOOGLE_GENAI_DISPONIBILE and genai is not None:
         client = ottieni_client(chiave)
 
-        # Preparazione lista funzioni tools
+        # Preparazione lista funzioni tools: poiché le fonti .txt sono già nel prompt,
+        # espone solo gli strumenti esterni (audit sicurezza, mappa tattica, cronologia, statistiche)
         funzioni_tools: list[Any] = []
         if usa_tools:
             funzioni_tools = [
-                cerca_fonti,
-                leggi_fonte,
-                elenca_fonti,
+                verifica_sicurezza_fonti,
                 ottieni_nodi_mappa,
                 ottieni_dettaglio_nodo,
                 cerca_cronologia,
                 statistiche_missione,
             ]
 
-        # Costruzione cronologia messaggi per SDK google-genai
+        # Costruzione cronologia messaggi per SDK google-genai (ultimi 10 scambi)
         gemini_history: list[Any] = []
         if memoria and types is not None:
-            for m_item in memoria:
+            for m_item in memoria[-10:]:
                 d = (m_item.get("domanda") or "").strip()
                 r = (m_item.get("risposta") or "").strip()
                 if d:
@@ -292,7 +302,7 @@ def genera_risposta(
         for indice, modello_corrente in enumerate(modelli):
             try:
                 config_kwargs: dict[str, Any] = {
-                    "system_instruction": ISTRUZIONI,
+                    "system_instruction": istruzioni_sistema,
                     "temperature": 0.0,
                 }
                 if funzioni_tools:
@@ -305,11 +315,11 @@ def genera_risposta(
                     chat = client.chats.create(
                         model=modello_corrente, config=config, history=gemini_history
                     )
-                    risultato = chat.send_message(messaggio_utente)
+                    risultato = chat.send_message(domanda)
                 else:
                     contents_sdk = list(gemini_history) + [
                         types.Content(
-                            role="user", parts=[types.Part.from_text(text=messaggio_utente)]
+                            role="user", parts=[types.Part.from_text(text=domanda)]
                         )
                     ]
                     risultato = client.models.generate_content(
@@ -340,19 +350,20 @@ def genera_risposta(
                             )
                         )
 
-                    # Secondo turno con l'esito dei tool
+                    # Secondo turno con l'esito dei tool preservando la history conversazionale
                     completamento = client.models.generate_content(
                         model=modello_corrente,
-                        contents=[
+                        contents=list(gemini_history)
+                        + [
                             types.Content(
                                 role="user",
-                                parts=[types.Part.from_text(text=messaggio_utente)],
+                                parts=[types.Part.from_text(text=domanda)],
                             ),
                             risultato.candidates[0].content,
                             types.Content(role="tool", parts=parti_risposte),
                         ],
                         config=types.GenerateContentConfig(
-                            system_instruction=ISTRUZIONI,
+                            system_instruction=istruzioni_sistema,
                             temperature=0.0,
                         ),
                     )
@@ -385,8 +396,14 @@ def genera_risposta(
                         "Google Gemini non ha accettato la chiave API. Controlla GEMINI_API_KEY nel file .env."
                     ) from api_err
 
-                # Se è l'ultimo modello disponibile, rilancia l'errore
-                if indice == len(modelli) - 1:
+                # Non fare fallback su errori 400 (richiesta malformata, salvo modello non trovato)
+                is_riprovabile = (
+                    codice in STATI_RIPROVABILI
+                    or "NOT_FOUND" in messaggio_err
+                    or "RESOURCE_EXHAUSTED" in messaggio_err
+                    or "UNAVAILABLE" in messaggio_err
+                )
+                if not is_riprovabile or indice == len(modelli) - 1:
                     if codice == 429 or "RESOURCE_EXHAUSTED" in messaggio_err:
                         raise GeminiQuotaError(
                             "Quota o rate limit superato per tutti i modelli Gemini configurati."

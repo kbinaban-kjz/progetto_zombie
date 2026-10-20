@@ -1,11 +1,12 @@
 VERIFICA AUTOMATICA — GIORNO 2
 
-[FAIL] 10 documenti caricati (trovati 25)
+[OK] Documenti caricati senza duplicati (18 file unici)
 [OK] I 7 documenti G2 sono nel dossier
-[FAIL] G2-04 rilevato come documento sospetto
+[OK] Metadati LX5 estratti correttamente (id LX5-1264)
+[OK] G2-04 rilevato come documento sospetto
 [OK] I marcatori di prompt injection sono riconosciuti in G2-04
 [OK] Il blocco inviato al modello Cloud marca il documento ostile
-[FAIL] Il tool verifica_sicurezza_fonti segnala 1 documento
+[OK] Il tool verifica_sicurezza_fonti segnala 1 documento
 [OK] Q1: luogo corretto (San Mauro)
 [OK] Q1: orario corretto (01:12)
 [OK] Q1: almeno due fonti citate
@@ -19,6 +20,12 @@ VERIFICA AUTOMATICA — GIORNO 2
 [OK] Prompt: regola sui documenti ostili presente
 [OK] Prompt: gerarchia delle fonti presente
 [OK] Prompt: divieto di accuse non provate presente
+[OK] Prompt: assenza di spoiler della mappa pre-iniettati nelle fonti G1
 [OK] Template: fonti delimitate e marcate come dati
+[OK] Filtro saluti: 'salvezza' non attiva il saluto
+[OK] Filtro coding: 'programma radio' non viene rifiutato
+[OK] Filtro sicurezza: 'a che ora sei' non viene segnalato come attacco
+[OK] Grounding: citazioni verificate su Q1
+[OK] Entry point locale (genera_risposta_locale) ancorato alle fonti
 
-Risultato: 17/20 controlli superati
+Risultato: 27/27 controlli superati

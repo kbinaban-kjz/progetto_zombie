@@ -26,6 +26,7 @@ try:
     )
     from Backend.modello_locale import genera_risposta_locale, is_modello_caricato
     from Backend.database import leggi_ultimi_messaggi
+    from Backend.sources import estrai_fonti_citate, verifica_grounding_risposta
     import Backend.modello_openai as modello_openai
     import Backend.modello_gemini as modello_gemini
 except ImportError:
@@ -41,10 +42,11 @@ except ImportError:
     )
     from modello_locale import genera_risposta_locale, is_modello_caricato
     from database import leggi_ultimi_messaggi
+    from sources import estrai_fonti_citate, verifica_grounding_risposta
     import modello_openai
     import modello_gemini
 
-PAROLE_COMPLESSE = {
+PAROLE_COMPLESSE: tuple[str, ...] = (
     "confronta",
     "confronto",
     "analizza",
@@ -82,7 +84,21 @@ PAROLE_COMPLESSE = {
     "approfond",
     "cronologia",
     "elenca tutti",
-}
+    "focolaio",
+    "causa",
+    "colpevole",
+    "sabotaggio",
+    "firmato",
+    "sincronizz",
+    "ripetitore",
+    "manomess",
+    "audit",
+    "coordinate",
+    "pensi",
+    "secondo te",
+    "quanti",
+    "quante",
+)
 
 
 def valuta_complessita(domanda: str) -> tuple[bool, str]:
@@ -100,15 +116,19 @@ def valuta_complessita(domanda: str) -> tuple[bool, str]:
     if testo.count("?") > 1:
         return True, "Domanda multipla (più quesiti nella stessa richiesta)"
 
-    # 2. Riferimento esplicito a più fonti/documenti (es. G1-01 e G1-02)
-    fonti_citate = re.findall(r"g\d+-\d+", testo_lower)
-    if len(set(fonti_citate)) > 1:
+    # 2. Riferimento esplicito a più fonti/documenti (es. G1-01, G2-01, LX5-1264)
+    fonti_citate = {
+        m.replace("_", "-")
+        for m in re.findall(r"(?:g\d+-\d+|lx5[-_]\d+)", testo_lower)
+    }
+    if len(fonti_citate) > 1:
         return True, "Confronto esplicito tra più documenti del dossier"
 
-    # 3. Parole chiave di ragionamento complesso, analisi, confronto o sintesi
+    # 3. Parole chiave di ragionamento complesso, analisi, confronto o sintesi (con word boundary iniziale)
     for indicatore in PAROLE_COMPLESSE:
-        if indicatore.strip() in testo_lower:
-            return True, f"Richiesta di ragionamento/analisi ('{indicatore.strip()}')"
+        ind_clean = indicatore.strip()
+        if re.search(rf"\b{re.escape(ind_clean)}", testo_lower):
+            return True, f"Richiesta di ragionamento/analisi ('{ind_clean}')"
 
     # 4. Domande lunghe o strutturate in più frasi
     if num_parole > 14 or len(testo) > 95:
@@ -124,7 +144,7 @@ def genera_risposta_ibrida(
     api_key: str | None = None,
     modello: str | None = None,
     modalita: str = "auto",
-    usa_tools: bool = False,
+    usa_tools: bool = True,
     memoria: list[dict[str, Any]] | None = None,
     limite_memoria: int = 10,
 ) -> dict[str, Any]:
@@ -145,6 +165,7 @@ def genera_risposta_ibrida(
 
     is_complessa, motivo = valuta_complessita(domanda)
     modalita_norm = (modalita or "auto").strip().lower()
+    ha_chiave_env, _ = stato_chiavi_api()
 
     if modalita_norm == "locale":
         usa_cloud = False
@@ -153,7 +174,11 @@ def genera_risposta_ibrida(
         usa_cloud = True
         motivo = f"Scelta manuale: Modello Cloud ({modalita_norm.capitalize()})"
     else:
-        usa_cloud = is_complessa
+        if is_complessa and not (api_key or ha_chiave_env):
+            usa_cloud = False
+            motivo = f"{motivo} [Fallback Locale: nessuna chiave Cloud configurata]"
+        else:
+            usa_cloud = is_complessa
 
     livello = "complessa" if is_complessa else "semplice"
     inizio = time.perf_counter()
@@ -264,11 +289,16 @@ def genera_risposta_ibrida(
                 "motivo_routing": motivo,
             }
 
+    grounding = verifica_grounding_risposta(esito.get("risposta", ""), fonti)
+    esito["fonti_citate"] = grounding["fonti_file"]
+    esito["grounding_ok"] = grounding["ok"]
+    esito["citazioni_ignote"] = grounding["citazioni_ignote"]
     esito["memoria_usata"] = len(memoria)
     esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
     print(
         f"[ROUTING] {esito['motore'].upper()} | {esito['modello_usato']} | "
-        f"{livello} ({motivo}) | memoria: {len(memoria)} msg | {esito['durata_ms']} ms"
+        f"{livello} ({motivo}) | fonti citate: {len(esito['fonti_citate'])} | "
+        f"memoria: {len(memoria)} msg | {esito['durata_ms']} ms"
     )
     return esito
 

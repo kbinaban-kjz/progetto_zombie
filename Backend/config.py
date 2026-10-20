@@ -22,13 +22,21 @@ if str(ROOT_DIR) not in sys.path:
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+# Cache per il caricamento del file .env
+_env_cache_mtime: int | None = None
+_env_cache_valori: dict[str, str] = {}
+
 # Caricamento variabili dal file .env (se presente)
 def carica_env() -> dict[str, str]:
-    """Legge le variabili definite nel file .env senza sovrascrivere l'ambiente esistente."""
-    valori: dict[str, str] = {}
+    """Legge le variabili definite nel file .env con cache basata su mtime senza sovrascrivere l'ambiente esistente."""
+    global _env_cache_mtime, _env_cache_valori
     if not ENV_PATH.is_file():
-        return valori
+        return {}
     try:
+        mtime = ENV_PATH.stat().st_mtime_ns
+        if _env_cache_mtime == mtime:
+            return _env_cache_valori
+        valori: dict[str, str] = {}
         for riga in ENV_PATH.read_text(encoding="utf-8").splitlines():
             riga = riga.strip()
             if not riga or riga.startswith("#") or "=" not in riga:
@@ -38,9 +46,11 @@ def carica_env() -> dict[str, str]:
             valore_clean = valore.strip().strip("\"'")
             valori[chiave_clean] = valore_clean
             os.environ.setdefault(chiave_clean, valore_clean)
+        _env_cache_valori = valori
+        _env_cache_mtime = mtime
+        return valori
     except Exception:
-        pass
-    return valori
+        return _env_cache_valori
 
 # Inizializza l'ambiente da .env
 carica_env()
@@ -56,14 +66,13 @@ DB_PATH = Path(valore_env("SQLITE_DB_PATH", str(BACKEND_DIR / "cronologia.db")))
 MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"
 
 # Modelli Cloud (Google Gemini)
-MODELLO_GEMINI_DEFAULT = valore_env("GEMINI_MODEL", "gemini-3.8-flash-lite")
+MODELLO_GEMINI_DEFAULT = valore_env("GEMINI_MODEL", "gemini-flash-lite-latest")
 MODELLI_GEMINI_RISERVA = [
     "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
     "gemini-flash-latest",
-    "gemini-3.1-pro-preview",
+    "gemini-2.0-flash",
 ]
 
 # Modelli Cloud (OpenAI / NVIDIA NIM)

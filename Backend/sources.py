@@ -61,6 +61,7 @@ def risolvi_cartella_dati() -> Path:
 def carica_fonti() -> list[tuple[str, str]]:
     """
     Carica tutti i file .txt delle cartelle del dossier (dati/ e new_dati/) con cache automatica.
+    Deduplica per nome file così i documenti presenti sia in dati/ che in new_dati/ non vengono caricati due volte.
     Ricarica solo se i file sono stati modificati o aggiunti.
     """
     global _cache_fonti_chiave, _cache_fonti_valore
@@ -68,7 +69,13 @@ def carica_fonti() -> list[tuple[str, str]]:
     if not cartelle:
         return []
 
-    percorsi = [p for cartella in cartelle for p in sorted(cartella.glob("*.txt"))]
+    percorsi_unici: dict[str, Path] = {}
+    for cartella in cartelle:
+        for p in sorted(cartella.glob("*.txt")):
+            if p.name not in percorsi_unici:
+                percorsi_unici[p.name] = p
+
+    percorsi = list(percorsi_unici.values())
     chiave = tuple((str(p), p.stat().st_mtime_ns) for p in percorsi)
     if chiave != _cache_fonti_chiave:
         _cache_fonti_valore = [(p.name, p.read_text(encoding="utf-8")) for p in percorsi]
@@ -89,7 +96,11 @@ def fonti_sospette(fonti: Sequence[tuple[str, str]] | None = None) -> list[dict[
     """Elenca i documenti del dossier contenenti tentativi di istruire l'assistente."""
     fonti_effettive = fonti if fonti is not None else carica_fonti()
     sospetti = []
+    visti: set[str] = set()
     for nome, contenuto in fonti_effettive:
+        if nome in visti:
+            continue
+        visti.add(nome)
         marcatori = rileva_istruzioni_ostili(contenuto)
         if marcatori:
             meta = estrai_metadati_fonte(nome, contenuto)
@@ -107,11 +118,30 @@ def fonti_sospette(fonti: Sequence[tuple[str, str]] | None = None) -> list[dict[
 def estrai_metadati_fonte(nome: str, testo: str) -> dict[str, str]:
     """Estrae ID, titolo, corpo e fase operativa (Giorno 1, Giorno 2, Imprevisti) da un testo del dossier."""
     righe = [r.strip() for r in testo.strip().splitlines() if r.strip()]
-    doc_id = righe[0].replace("ID ", "").strip() if righe else nome.replace(".txt", "")
-    titolo = righe[1] if len(righe) > 1 else "Documento"
-    corpo = " ".join(righe[2:]) if len(righe) > 2 else testo.strip()
+    stem = Path(nome).stem.replace("_", "-") if nome else "DOC"
+    doc_id = stem
+    titolo = "Documento"
+    corpo_righe = righe
 
-    nome_lower = nome.lower()
+    if righe:
+        m0 = re.match(r"^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)$", righe[0], re.IGNORECASE)
+        if m0:
+            doc_id = m0.group(1).strip()
+            titolo = righe[1] if len(righe) > 1 else "Documento"
+            corpo_righe = righe[2:]
+        elif len(righe) > 1 and re.match(r"^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)$", righe[1], re.IGNORECASE):
+            m1 = re.match(r"^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)$", righe[1], re.IGNORECASE)
+            doc_id = m1.group(1).strip() if m1 else stem
+            titolo = righe[2] if len(righe) > 2 else righe[0]
+            corpo_righe = righe[3:]
+        else:
+            doc_id = righe[0].replace("ID ", "").strip() or stem
+            titolo = righe[1] if len(righe) > 1 else "Documento"
+            corpo_righe = righe[2:]
+
+    corpo = " ".join(corpo_righe) if corpo_righe else testo.strip()
+
+    nome_lower = (nome or doc_id).lower()
     if nome_lower.startswith("g1"):
         fase = "Giorno 1"
     elif nome_lower.startswith("g2"):
@@ -144,16 +174,21 @@ def formatta_blocco_openai(fonti: Sequence[tuple[str, str]]) -> str:
     Include la mappatura esplicita della fase: G1 = Giorno 1, G2 = Giorno 2, LX5 = Imprevisti.
     """
     blocchi = []
+    visti: set[str] = set()
     for nome, contenuto in fonti:
+        if nome in visti:
+            continue
+        visti.add(nome)
+        meta = estrai_metadati_fonte(nome, contenuto)
         nome_lower = nome.lower()
         if nome_lower.startswith("g1"):
-            tag_fase = " [Giorno 1]"
+            tag_fase = f" [ID: {meta['id']} | Giorno 1]"
         elif nome_lower.startswith("g2"):
-            tag_fase = " [Giorno 2]"
+            tag_fase = f" [ID: {meta['id']} | Giorno 2]"
         elif nome_lower.startswith("lx5"):
-            tag_fase = " [Imprevisti]"
+            tag_fase = f" [ID: {meta['id']} | Imprevisti]"
         else:
-            tag_fase = ""
+            tag_fase = f" [ID: {meta['id']}]" if meta.get("id") else ""
 
         avviso = ""
         if rileva_istruzioni_ostili(contenuto):
@@ -164,6 +199,73 @@ def formatta_blocco_openai(fonti: Sequence[tuple[str, str]]) -> str:
             )
         blocchi.append(f"--- Fonte: {nome}{tag_fase} ---\n{contenuto}{avviso}")
     return "\n\n".join(blocchi)
+
+
+def estrai_fonti_citate(
+    testo_risposta: str, fonti_disponibili: Sequence[tuple[str, str]] | None = None
+) -> list[str]:
+    """
+    Estrae i nomi dei file o ID effettivamente citati nella risposta (es. 'G2-01.txt', 'LX5_1264.txt')
+    mappandoli sui file reali presenti nel dossier.
+    """
+    if not testo_risposta:
+        return []
+    fonti_eff = fonti_disponibili if fonti_disponibili is not None else carica_fonti()
+    mappa_id_to_file: dict[str, str] = {}
+    for nome, contenuto in fonti_eff:
+        meta = estrai_metadati_fonte(nome, contenuto)
+        doc_id = meta["id"].upper().replace("_", "-")
+        stem = Path(nome).stem.upper().replace("_", "-")
+        mappa_id_to_file[doc_id] = nome
+        mappa_id_to_file[stem] = nome
+        mappa_id_to_file[nome.upper()] = nome
+
+    match_raw = re.findall(r"\b(?:G\d+-\d+|LX5[-_]\d+)(?:\.txt)?\b", testo_risposta, re.IGNORECASE)
+    citate: list[str] = []
+    for m in match_raw:
+        chiave = m.upper().removesuffix(".TXT").replace("_", "-")
+        nome_file = mappa_id_to_file.get(chiave) or f"{chiave}.txt"
+        if nome_file not in citate:
+            citate.append(nome_file)
+    return citate
+
+
+def verifica_grounding_risposta(
+    risposta: str, fonti: Sequence[tuple[str, str]] | None = None
+) -> dict[str, Any]:
+    """
+    Verifica che le citazioni presenti nella risposta corrispondano a documenti reali
+    del dossier e non contengano ID inventati.
+    """
+    fonti_eff = fonti if fonti is not None else carica_fonti()
+    id_validi: set[str] = set()
+    for nome, contenuto in fonti_eff:
+        meta = estrai_metadati_fonte(nome, contenuto)
+        id_validi.add(meta["id"].upper().replace("_", "-"))
+        id_validi.add(Path(nome).stem.upper().replace("_", "-"))
+
+    trovati_raw = re.findall(r"\b(?:G\d+-\d+|LX\d+[-_]\d+|LOG-\d+)\b", risposta or "", re.IGNORECASE)
+    citazioni_valide: list[str] = []
+    citazioni_ignote: list[str] = []
+    for c in trovati_raw:
+        norm = c.upper().replace("_", "-")
+        if norm in id_validi:
+            if norm not in citazioni_valide:
+                citazioni_valide.append(norm)
+        else:
+            if norm not in citazioni_ignote:
+                citazioni_ignote.append(norm)
+
+    fonti_file = estrai_fonti_citate(risposta, fonti_eff)
+    grounding_ok = len(citazioni_ignote) == 0
+    return {
+        "ok": grounding_ok,
+        "grounding_ok": grounding_ok,
+        "citazioni_valide": citazioni_valide,
+        "citazioni_ignote": citazioni_ignote,
+        "fonti_file": fonti_file,
+        "fonti_citate": fonti_file,
+    }
 
 
 def cerca_in_fonti(

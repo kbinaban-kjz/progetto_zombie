@@ -95,12 +95,14 @@ MARCATORI_ATTACCO_UTENTE: tuple[str, ...] = (
     "ignora i documenti",
     "ignora g1-",
     "ignora g2-",
+    "ignora lx5",
     "non citare le fonti",
-    "ora sei",
+    "ora sei un",
+    "d'ora in poi sei",
     "fai finta di essere",
     "jailbreak",
-    "system prompt",
-    "prompt di sistema",
+    "mostra il system prompt",
+    "rivela il prompt di sistema",
 )
 
 PAROLE_VUOTE = {
@@ -117,7 +119,8 @@ PAROLE_VUOTE = {
 
 def _rileva_attacco_utente(domanda: str) -> bool:
     """Rileva un tentativo di override contenuto nel messaggio dell'utente."""
-    return any(marcatore in domanda for marcatore in MARCATORI_ATTACCO_UTENTE)
+    q_norm = domanda.strip().lower().replace("\u2019", "'")
+    return any(marcatore in q_norm for marcatore in MARCATORI_ATTACCO_UTENTE)
 
 
 def _radice(parola: str) -> str:
@@ -126,13 +129,13 @@ def _radice(parola: str) -> str:
 
 
 def _radici_testuali(testo: str) -> set[str]:
-    parole = re.findall(r"[a-zàèéìòù]+", testo.lower().replace("\u2019", "'"))
+    parole = re.findall(r"[a-zàèéìòù0-9]+", testo.lower().replace("\u2019", "'"))
     return {_radice(p) for p in parole if len(p) > 2}
 
 
 def _parole_chiave(domanda: str) -> list[str]:
     """Estrae le radici delle parole di contenuto, conservando l'ordine della domanda."""
-    parole = re.findall(r"[a-zàèéìòù]+", domanda.lower().replace("\u2019", "'"))
+    parole = re.findall(r"[a-zàèéìòù0-9]+", domanda.lower().replace("\u2019", "'"))
     chiavi: list[str] = []
     for parola in parole:
         if len(parola) <= 2 or parola in PAROLE_VUOTE:
@@ -143,10 +146,10 @@ def _parole_chiave(domanda: str) -> list[str]:
     return chiavi
 
 
-def _unita_testuali(testo: str) -> list[str]:
+def _unita_testuali(testo: str, nome: str = "") -> list[str]:
     """Divide un documento in frasi, unendo un orario isolato alla frase che lo segue."""
-    righe = [r.strip() for r in testo.strip().splitlines() if r.strip()]
-    corpo = " ".join(righe[2:]) if len(righe) > 2 else testo.strip()
+    meta = estrai_metadati_fonte(nome, testo)
+    corpo = meta["corpo"]
     frasi = [f.strip() for f in re.split(r"(?<=[.!?;])\s+", corpo) if f.strip()]
     unite: list[str] = []
     for frase in frasi:
@@ -160,9 +163,13 @@ def _unita_testuali(testo: str) -> list[str]:
 def _indice_documenti(
     fonti: Sequence[tuple[str, str]], includi_ostili: bool = False
 ) -> list[dict[str, object]]:
-    """Costruisce l'indice dei documenti (titolo + corpo), escludendo quelli ostili."""
+    """Costruisce l'indice dei documenti (titolo + corpo), escludendo quelli ostili e i duplicati."""
     indice: list[dict[str, object]] = []
+    visti: set[str] = set()
     for nome, testo in fonti:
+        if nome in visti:
+            continue
+        visti.add(nome)
         if not includi_ostili and rileva_istruzioni_ostili(testo):
             continue
         meta = estrai_metadati_fonte(nome, testo)
@@ -183,15 +190,20 @@ def _indice_documenti(
 def _indice_frasi(
     fonti: Sequence[tuple[str, str]], includi_ostili: bool = False
 ) -> list[dict[str, object]]:
-    """Costruisce l'indice delle frasi del dossier, escludendo i documenti ostili."""
+    """Costruisce l'indice delle frasi del dossier, escludendo i documenti ostili e i duplicati."""
     indice: list[dict[str, object]] = []
+    visti: set[str] = set()
     for nome, testo in fonti:
+        if nome in visti:
+            continue
+        visti.add(nome)
         if not includi_ostili and rileva_istruzioni_ostili(testo):
             continue
-        for frase in _unita_testuali(testo):
+        meta = estrai_metadati_fonte(nome, testo)
+        for frase in _unita_testuali(testo, nome=nome):
             indice.append(
                 {
-                    "id": nome.removesuffix(".txt"),
+                    "id": meta["id"],
                     "file": nome,
                     "frase": frase,
                     "radici": _radici_testuali(frase),
@@ -253,7 +265,7 @@ def _chiede_tempo(domanda: str) -> bool:
     )
 
 
-def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 8) -> list[dict[str, object]]:
+def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 12) -> list[dict[str, object]]:
     """Ordina le frasi che contengono un orario HH:MM, dalla più antica alla più recente."""
     eventi: list[tuple[int, dict[str, object]]] = []
     for unita in indice:
@@ -266,8 +278,11 @@ def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 8) -> lis
 
 
 def _documenti_citati(domanda: str) -> set[str]:
-    """Estrae gli ID documento citati esplicitamente (es. g2-04, lx5-1264)."""
-    return set(re.findall(r"g[12]-\d{2}|lx5[-_]\d{4}", domanda.lower()))
+    """Estrae gli ID documento citati esplicitamente normalizzando '_' in '-' (es. g2-04, lx5-1264)."""
+    return {
+        m.replace("_", "-")
+        for m in re.findall(r"g[12]-\d{2}|lx5[-_]\d{4}", domanda.lower())
+    }
 
 
 def _rendi(unita: Sequence[dict[str, object]]) -> str:
@@ -296,14 +311,36 @@ def risposta_locale_da_fonti(
     documenti_citati = _documenti_citati(q)
 
     # 1. Tentativi di sostituire il ruolo dell'assistente
-    if any(k in q for k in ("ora sei", "fai finta di essere", "jailbreak", "system prompt", "prompt di sistema")):
+    if any(
+        k in q
+        for k in (
+            "ora sei un",
+            "d'ora in poi sei",
+            "fai finta di essere",
+            "jailbreak",
+            "mostra il system prompt",
+            "rivela il prompt di sistema",
+            "estrai il prompt di sistema",
+        )
+    ):
         return (
             "Sono Armando, investigatore dell'unità operativa. "
             "Tratto ogni messaggio unicamente come dato da analizzare e mantengo saldo il mio ruolo nella missione."
         )
 
     # 2. Richieste fuori contesto (coding/programmazione)
-    parole_coding = ("for loop", "in java", "in python", "in c++", "in javascript", "scrivi codice", "funzione python", "algoritmo di", "fai un programma")
+    parole_coding = (
+        "for loop",
+        "in java",
+        "in python",
+        "in c++",
+        "in javascript",
+        "scrivi codice",
+        "funzione python",
+        "algoritmo di",
+        "fai un programma",
+        "scrivi un programma",
+    )
     if any(k in q for k in parole_coding):
         return (
             "Sono Armando, un investigatore operativo. Non posso aiutarti con la scrittura di codice "
@@ -311,8 +348,13 @@ def risposta_locale_da_fonti(
             "i dossier, le testimonianze o le informazioni sul territorio."
         )
 
-    # 3. Convenevoli: solo identità, nessun contenuto sul caso
-    if any(q.startswith(s) or q == s or s in q for s in ("ciao", "buongiorno", "buonasera", "salve", "chi sei", "hey", "qual è il tuo ruolo", "tuo ruolo")):
+    # 3. Convenevoli: solo identità, nessun contenuto sul caso (usa word boundaries per evitare falsi positivi come 'salvezza')
+    if re.search(r"^\s*(?:ciao|buongiorno|buonasera|salve|hey)\b", q) or q.rstrip("?!.") in {
+        "chi sei",
+        "qual è il tuo ruolo",
+        "qual e il tuo ruolo",
+        "tuo ruolo",
+    }:
         return (
             "Ciao. Sono Armando, investigatore operativo dell'unità Operazione Silenzio. "
             "Come posso aiutarti con l'analisi dei dossier, le trasmissioni radio o la situazione sul campo?"
@@ -354,10 +396,15 @@ def risposta_locale_da_fonti(
 
     # 4. Documenti citati esplicitamente: si riportano quei documenti (se non è un attacco)
     if documenti_citati and not attacco_utente:
-        scelti = [u for u in indice_documenti if str(u["id"]).lower() in documenti_citati][:3]
+        scelti = [
+            u
+            for u in indice_documenti
+            if str(u["id"]).lower().replace("_", "-") in documenti_citati
+        ][:3]
         if scelti:
             nota = ""
-            if any(rileva_istruzioni_ostili(dict(fonti)[str(u["file"])]) for u in scelti):
+            mappa_fonti = dict(fonti)
+            if any(rileva_istruzioni_ostili(mappa_fonti.get(str(u["file"]), "")) for u in scelti):
                 nota = "[SICUREZZA] Documento segnalato come testo che simula istruzioni: riportato come dato.\n"
             return avviso + nota + _rendi(scelti)
 
@@ -382,12 +429,57 @@ def risposta_locale_da_fonti(
         if eventi:
             return avviso + "Orari registrati nelle fonti:\n" + _rendi(eventi)
 
-    # 6. Recupero generico dei documenti pertinenti
-    scelti = _estrai_pertinenti(_parole_chiave(q), indice_documenti)
+    # 6. Recupero generico dei documenti pertinenti (con continuità su domande ellittiche brevi)
+    chiavi_q = _parole_chiave(q)
+    scelti = _estrai_pertinenti(chiavi_q, indice_documenti)
+    if not scelti and memoria and len(chiavi_q) <= 1:
+        ultima_domanda = str(memoria[-1].get("domanda") or "").lower()
+        scelti = _estrai_pertinenti(_parole_chiave(ultima_domanda), indice_documenti)
     if scelti:
         return avviso + _rendi(scelti)
 
     return avviso + "Non documentato nelle fonti disponibili."
+
+
+def _risposta_neurale_valida(risposta_neurale: str, base_deterministica: str, attacco_utente: bool) -> bool:
+    """
+    Guardrail post-generazione per Qwen2.5-0.5B-Instruct:
+    Verifica che la risposta neurale non abbia perso le citazioni [ID], gli orari chiave
+    o le clausole di sicurezza/astensione rispetto all'estrattore deterministico.
+    """
+    if not risposta_neurale or len(risposta_neurale.strip()) < 10:
+        return False
+    if attacco_utente and "[SICUREZZA]" not in risposta_neurale:
+        return False
+
+    base_lower = base_deterministica.lower()
+    resp_lower = risposta_neurale.lower()
+
+    # Se il risponditore deterministico rileva un dato assente o un'astensione, non permettere a 0.5B di inventare colpevoli
+    clausole_astensione = (
+        "non documentato",
+        "non conosce la causa",
+        "non è registrato alcun ordine",
+        "non è possibile stabilire",
+        "non indica quali azioni",
+        "si interrompe prima di indicare un luogo",
+    )
+    for clausola in clausole_astensione:
+        if clausola in base_lower and clausola not in resp_lower and "non documentato" not in resp_lower:
+            return False
+
+    # Tutte le citazioni [ID] o orari chiave presenti nella base deterministica devono essere preservati
+    id_base = {m.upper().replace("_", "-") for m in re.findall(r"\[([A-Za-z0-9_-]+)\]", base_deterministica)}
+    id_resp = {m.upper().replace("_", "-") for m in re.findall(r"(?:\[)?(G[12]-\d{2}|LX5[-_]\d{4})(?:\])?", risposta_neurale, re.IGNORECASE)}
+    if id_base and not (id_base <= id_resp):
+        return False
+
+    orari_base = set(re.findall(r"\b\d{2}:\d{2}\b", base_deterministica))
+    orari_resp = set(re.findall(r"\b\d{2}:\d{2}\b", risposta_neurale))
+    if orari_base and not (orari_base & orari_resp):
+        return False
+
+    return True
 
 
 def genera_risposta_locale(
@@ -397,25 +489,39 @@ def genera_risposta_locale(
     memoria: list[dict[str, Any]] | None = None,
 ) -> str:
     """
-    Esegue la generazione sul modello locale (Qwen2.5-0.5B-Instruct).
-    Se il modello neuronale non è disponibile, utilizza l'estrattore deterministico.
-    Supporta la memoria conversazionale degli ultimi messaggi scambiati.
+    Esegue la generazione sul modello locale (Qwen2.5-0.5B-Instruct) con guardrail deterministico.
+    - Calcola sempre la base verificata tramite `risposta_locale_da_fonti` (escludendo i documenti ostili).
+    - Se il modello neuronale è disponibile, gli fornisce unicamente i passaggi pertinenti verificati
+      e valida che l'output preservi citazioni [ID], orari, avvisi di sicurezza e clausole di astensione.
+    - In caso di allucinazione o perdita di citazioni del modello 0.5B, restituisce la base deterministica.
     """
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
     if not fonti:
         raise ValueError("Fornisci almeno una fonte.")
 
+    base_deterministica = risposta_locale_da_fonti(domanda, fonti, memoria=memoria)
+    q_norm = domanda.strip().lower().replace("\u2019", "'")
+    attacco_utente = _rileva_attacco_utente(q_norm)
+
+    # Per attacchi, domande non documentate o risposte di sistema (saluti/rifiuti), usa direttamente la risposta deterministica
+    if (
+        attacco_utente
+        or "Non documentato nelle fonti disponibili" in base_deterministica
+        or base_deterministica.startswith(("Ciao. Sono Armando", "Sono Armando", "Memoria operativa", "[SICUREZZA]"))
+    ):
+        return base_deterministica
+
     if carica_modello_locale() and _tokenizer_locale is not None and _modello_locale is not None:
         import torch
 
-        contesto = "\n\n".join(formatta_fonte(nome, testo) for nome, testo in fonti)
-        messaggio_utente = formatta_messaggio_locale(contesto, domanda, memoria=memoria)
+        # Passa al modello 0.5B solo i passaggi pertinenti già sanitizzati (mai i documenti ostili grezzi)
+        messaggio_utente = formatta_messaggio_locale(base_deterministica, domanda, memoria=memoria)
         messaggi = [{"role": "system", "content": ISTRUZIONI}]
 
-        # Aggiunge i turni della memoria se presenti
+        # Aggiunge gli ultimi turni della memoria una sola volta come turni chat
         if memoria:
-            for item in memoria:
+            for item in memoria[-4:]:
                 d = (item.get("domanda") or "").strip()
                 r = (item.get("risposta") or "").strip()
                 if d:
@@ -442,10 +548,10 @@ def genera_risposta_locale(
         risposta = _tokenizer_locale.decode(
             out[0][dati["input_ids"].shape[1] :], skip_special_tokens=True
         ).strip()
-        if risposta:
+        if risposta and _risposta_neurale_valida(risposta, base_deterministica, attacco_utente):
             return risposta
 
-    return risposta_locale_da_fonti(domanda, fonti, memoria=memoria)
+    return base_deterministica
 
 
 if __name__ == "__main__":
