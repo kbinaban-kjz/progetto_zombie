@@ -12,7 +12,7 @@ import sys
 from typing import Any
 
 try:
-    from Backend.config import DOMANDA_ESEMPIO, COMANDO_USCITA
+    from Backend.config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
     from Backend.database import salva_con_instradamento
     from Backend.sources import carica_fonti
     from Backend.router import genera_risposta_ibrida
@@ -23,7 +23,7 @@ try:
         cerca_fonti,
     )
 except ImportError:
-    from config import DOMANDA_ESEMPIO, COMANDO_USCITA
+    from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
     from database import salva_con_instradamento
     from sources import carica_fonti
     from router import genera_risposta_ibrida
@@ -56,6 +56,8 @@ def avvia_cli() -> int:
     print("================================================================================")
     print("=== Investigatore AI — Protocollo Lazzaro (Locale / Cloud / Tools)           ===")
     print("================================================================================")
+    ha_chiavi, prov_str = stato_chiavi_api()
+    print(f"Stato Provider Cloud : {'Attivo (' + prov_str + ')' if ha_chiavi else 'Non configurato (solo Locale)'}")
     print(f"Scrivi una domanda alla volta. Digita '{COMANDO_USCITA}' per terminare o '/help' per i comandi.")
     print(f"Esempio rapido: {DOMANDA_ESEMPIO}")
 

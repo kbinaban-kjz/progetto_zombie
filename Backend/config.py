@@ -53,6 +53,17 @@ DB_PATH = Path(valore_env("SQLITE_DB_PATH", str(BACKEND_DIR / "cronologia.db")))
 # Modello Locale (Investigatore.py)
 MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"
 
+# Modelli Cloud (Google Gemini)
+MODELLO_GEMINI_DEFAULT = valore_env("GEMINI_MODEL", "gemini-3.8-flash-lite")
+MODELLI_GEMINI_RISERVA = [
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-pro-preview",
+]
+
 # Modelli Cloud (OpenAI / NVIDIA NIM)
 NVIDIA_BASE_URL = valore_env("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 MODELLO_NVIDIA_DEFAULT = valore_env("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
@@ -82,12 +93,32 @@ try:
 except ImportError:
     from prompts import ISTRUZIONI, PROMPT_SISTEMA
 
+def get_gemini_api_key() -> str | None:
+    """Restituisce la chiave API di Google Gemini (da GEMINI_API_KEY o GEMINI_API)."""
+    return valore_env("GEMINI_API_KEY") or valore_env("GEMINI_API")
+
+def get_nvidia_api_key() -> str | None:
+    """Restituisce la chiave API di NVIDIA NIM."""
+    return valore_env("NVIDIA_API_KEY")
+
+def get_openai_api_key() -> str | None:
+    """Restituisce la chiave API di OpenAI."""
+    return valore_env("OPENAI_API_KEY")
+
 def stato_chiavi_api() -> tuple[bool, str]:
-    """Verifica se è configurata una chiave per NVIDIA o OpenAI."""
-    chiave_nvidia = valore_env("NVIDIA_API_KEY")
-    chiave_openai = valore_env("OPENAI_API_KEY")
+    """Verifica se è configurata una chiave per Gemini, NVIDIA o OpenAI."""
+    chiave_gemini = get_gemini_api_key()
+    chiave_nvidia = get_nvidia_api_key()
+    chiave_openai = get_openai_api_key()
+
+    provider_attivi: list[str] = []
+    if chiave_gemini:
+        provider_attivi.append("Gemini")
     if chiave_nvidia:
-        return True, "NVIDIA"
+        provider_attivi.append("NVIDIA")
     if chiave_openai:
-        return True, "OpenAI"
+        provider_attivi.append("OpenAI")
+
+    if provider_attivi:
+        return True, " / ".join(provider_attivi)
     return False, "Nessuna (.env non configurato)"

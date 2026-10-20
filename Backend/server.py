@@ -24,11 +24,16 @@ try:
         MODELLO_LOCALE,
         MODELLO_NVIDIA_DEFAULT,
         MODELLI_NVIDIA_RISERVA,
+        MODELLO_GEMINI_DEFAULT,
+        MODELLI_GEMINI_RISERVA,
         ISTRUZIONI,
         DOMANDA_ESEMPIO,
         COMANDO_USCITA,
         valore_env,
         stato_chiavi_api,
+        get_gemini_api_key,
+        get_nvidia_api_key,
+        get_openai_api_key,
     )
     from Backend.database import (
         leggi_cronologia_con_instradamento,
@@ -39,17 +44,23 @@ try:
     from Backend.modello_locale import is_modello_caricato
     from Backend.router import genera_risposta_ibrida
     import Backend.modello_openai as modello_openai
+    import Backend.modello_gemini as modello_gemini
 except ImportError:
     from config import (
         ROOT_DIR,
         MODELLO_LOCALE,
         MODELLO_NVIDIA_DEFAULT,
         MODELLI_NVIDIA_RISERVA,
+        MODELLO_GEMINI_DEFAULT,
+        MODELLI_GEMINI_RISERVA,
         ISTRUZIONI,
         DOMANDA_ESEMPIO,
         COMANDO_USCITA,
         valore_env,
         stato_chiavi_api,
+        get_gemini_api_key,
+        get_nvidia_api_key,
+        get_openai_api_key,
     )
     from database import (
         leggi_cronologia_con_instradamento,
@@ -60,6 +71,7 @@ except ImportError:
     from modello_locale import is_modello_caricato
     from router import genera_risposta_ibrida
     import modello_openai
+    import modello_gemini
 
 
 class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
@@ -103,19 +115,32 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
         if path == "/api/status":
             fonti = carica_fonti()
             ha_key, provider = stato_chiavi_api()
-            modello_default = (
-                os.environ.get("NVIDIA_MODEL") or MODELLO_NVIDIA_DEFAULT
-                if provider == "NVIDIA"
-                else os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-            )
+            chiave_gemini_presente = bool(get_gemini_api_key())
+            chiave_nvidia_presente = bool(get_nvidia_api_key())
+            chiave_openai_presente = bool(get_openai_api_key())
+
+            if chiave_gemini_presente and not chiave_nvidia_presente:
+                modello_default = os.environ.get("GEMINI_MODEL") or MODELLO_GEMINI_DEFAULT
+            elif chiave_nvidia_presente:
+                modello_default = os.environ.get("NVIDIA_MODEL") or MODELLO_NVIDIA_DEFAULT
+            elif chiave_gemini_presente:
+                modello_default = os.environ.get("GEMINI_MODEL") or MODELLO_GEMINI_DEFAULT
+            else:
+                modello_default = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
             return self._send_json(
                 {
                     "ok": True,
-                    "backend": "Ibrido Modulare (Locale + Cloud + Tools)",
+                    "backend": "Ibrido Modulare (Locale + Gemini + NVIDIA/OpenAI + Tools)",
                     "modello_locale": MODELLO_LOCALE,
                     "modello_locale_caricato": is_modello_caricato(),
                     "chiave_configurata": ha_key,
                     "provider": provider,
+                    "chiave_gemini": chiave_gemini_presente,
+                    "chiave_nvidia": chiave_nvidia_presente,
+                    "chiave_openai": chiave_openai_presente,
+                    "modello_gemini_default": MODELLO_GEMINI_DEFAULT,
+                    "modelli_gemini_riserva": MODELLI_GEMINI_RISERVA,
                     "modello_default": modello_default,
                     "modelli_nvidia_riserva": MODELLI_NVIDIA_RISERVA,
                     "istruzioni": ISTRUZIONI,
@@ -246,6 +271,30 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                         "record": record,
                         "cronologia": leggi_cronologia_con_instradamento(),
                     }
+                )
+            except modello_gemini.GeminiAuthError as errore:
+                return self._send_json(
+                    {
+                        "ok": False,
+                        "error": str(errore) or "Google Gemini non ha accettato la chiave API. Controlla GEMINI_API_KEY in .env.",
+                    },
+                    status=401,
+                )
+            except modello_gemini.GeminiQuotaError as errore:
+                return self._send_json(
+                    {
+                        "ok": False,
+                        "error": str(errore) or "Quota o rate limit superato per Google Gemini.",
+                    },
+                    status=429,
+                )
+            except (modello_gemini.GeminiConnectionError, modello_gemini.GeminiError) as errore:
+                return self._send_json(
+                    {
+                        "ok": False,
+                        "error": f"Errore Google Gemini: {errore}",
+                    },
+                    status=502,
                 )
             except modello_openai.AuthenticationError:
                 return self._send_json(

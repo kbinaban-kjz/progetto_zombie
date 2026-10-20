@@ -7,6 +7,7 @@ Questo modulo connette e coordina l'architettura a responsabilità singola:
 - sources.py        -> Caricamento e formattazione dei documenti del dossier (dati/*.txt).
 - tools.py          -> Strumenti invocabili dall'AI e dall'investigatore (fonti, mappa, nodi, stats).
 - modello_locale.py -> Modello Qwen2.5-0.5B-Instruct locale con fallback deterministico.
+- modello_gemini.py -> Client Google Gemini (google-genai / REST) con fallback automatico e tools.
 - modello_openai.py -> Client per modelli cloud OpenAI e NVIDIA NIM con fallback automatico.
 - router.py         -> Classificazione di complessità e instradamento ibrido Locale vs Cloud.
 - server.py         -> Server HTTP e API REST per il Frontend.
@@ -79,6 +80,8 @@ try:
         avvia_server,
     )
     from Backend.cli import avvia_cli
+    import Backend.modello_gemini as modello_gemini
+    import Backend.modello_openai as modello_openai
 except ImportError:
     from config import (
         BACKEND_DIR,
@@ -129,6 +132,8 @@ except ImportError:
         avvia_server,
     )
     from cli import avvia_cli
+    import modello_gemini
+    import modello_openai
 
 # Inizializza il database SQLite all'importazione
 inizializza_db()

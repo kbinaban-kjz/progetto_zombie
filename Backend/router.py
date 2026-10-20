@@ -17,20 +17,30 @@ try:
     from Backend.config import (
         MODELLO_LOCALE,
         MODELLO_NVIDIA_DEFAULT,
+        MODELLO_GEMINI_DEFAULT,
         valore_env,
         stato_chiavi_api,
+        get_gemini_api_key,
+        get_nvidia_api_key,
+        get_openai_api_key,
     )
     from Backend.modello_locale import genera_risposta_locale, is_modello_caricato
     import Backend.modello_openai as modello_openai
+    import Backend.modello_gemini as modello_gemini
 except ImportError:
     from config import (
         MODELLO_LOCALE,
         MODELLO_NVIDIA_DEFAULT,
+        MODELLO_GEMINI_DEFAULT,
         valore_env,
         stato_chiavi_api,
+        get_gemini_api_key,
+        get_nvidia_api_key,
+        get_openai_api_key,
     )
     from modello_locale import genera_risposta_locale, is_modello_caricato
     import modello_openai
+    import modello_gemini
 
 PAROLE_COMPLESSE = {
     "confronta",
@@ -125,9 +135,9 @@ def genera_risposta_ibrida(
     if modalita_norm == "locale":
         usa_cloud = False
         motivo = "Scelta manuale: Modello Locale"
-    elif modalita_norm == "cloud":
+    elif modalita_norm in {"cloud", "gemini", "nvidia", "openai"}:
         usa_cloud = True
-        motivo = "Scelta manuale: Modello Cloud"
+        motivo = f"Scelta manuale: Modello Cloud ({modalita_norm.capitalize()})"
     else:
         usa_cloud = is_complessa
 
@@ -149,38 +159,94 @@ def genera_risposta_ibrida(
             "motivo_routing": motivo,
         }
     else:
-        # Richiesta complessa -> Modello Cloud
-        risposta = modello_openai.genera_risposta(
-            domanda,
-            fonti,
-            api_key=api_key,
-            modello=modello,
-            usa_tools=usa_tools,
-        )
-        _, provider = stato_chiavi_api()
-        usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
-            not api_key and provider == "NVIDIA"
-        )
-        modello_cloud = (
-            modello_openai.ULTIMO_MODELLO_USATO
-            or modello
-            or (
-                os.environ.get("NVIDIA_MODEL")
-                or valore_env("NVIDIA_MODEL")
-                or MODELLO_NVIDIA_DEFAULT
-                if usa_nvidia
-                else os.environ.get("OPENAI_MODEL")
-                or valore_env("OPENAI_MODEL")
-                or "gpt-4o-mini"
+        # Richiesta complessa o forzata -> Modello Cloud (Gemini vs NVIDIA vs OpenAI)
+        chiave_gem = get_gemini_api_key()
+        chiave_nvi = get_nvidia_api_key()
+
+        # Rilevamento provider cloud target
+        usa_gemini = False
+        if modalita_norm == "gemini":
+            usa_gemini = True
+        elif modalita_norm in {"nvidia", "openai"}:
+            usa_gemini = False
+        elif modello and "gemini" in modello.lower():
+            usa_gemini = True
+        elif modello and any(p in modello.lower() for p in ("nvidia", "nemotron", "meta/", "llama")):
+            usa_gemini = False
+        elif api_key:
+            if api_key.startswith("AIza") or api_key.startswith("AQ."):
+                usa_gemini = True
+            elif api_key.startswith("nvapi-") or api_key.startswith("sk-"):
+                usa_gemini = False
+            else:
+                usa_gemini = bool(chiave_gem and not chiave_nvi)
+        else:
+            preferenza_cloud = (valore_env("CLOUD_PROVIDER") or "").lower()
+            if preferenza_cloud == "gemini":
+                usa_gemini = True
+            elif preferenza_cloud in {"nvidia", "openai"}:
+                usa_gemini = False
+            elif chiave_gem and not chiave_nvi:
+                usa_gemini = True
+            elif chiave_nvi:
+                usa_gemini = False
+            elif chiave_gem:
+                usa_gemini = True
+
+        if usa_gemini:
+            risposta = modello_gemini.genera_risposta(
+                domanda,
+                fonti,
+                api_key=api_key,
+                modello=modello,
+                usa_tools=usa_tools,
             )
-        )
-        esito = {
-            "risposta": risposta,
-            "motore": "cloud",
-            "modello_usato": f"{'NVIDIA' if usa_nvidia else 'OpenAI'} • {modello_cloud}",
-            "complessita": livello,
-            "motivo_routing": motivo,
-        }
+            modello_cloud = (
+                modello_gemini.ULTIMO_MODELLO_USATO
+                or modello
+                or os.environ.get("GEMINI_MODEL")
+                or valore_env("GEMINI_MODEL")
+                or MODELLO_GEMINI_DEFAULT
+            )
+            esito = {
+                "risposta": risposta,
+                "motore": "gemini",
+                "modello_usato": f"Gemini • {modello_cloud}",
+                "complessita": livello,
+                "motivo_routing": motivo,
+            }
+        else:
+            risposta = modello_openai.genera_risposta(
+                domanda,
+                fonti,
+                api_key=api_key,
+                modello=modello,
+                usa_tools=usa_tools,
+            )
+            _, provider = stato_chiavi_api()
+            usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
+                not api_key and "NVIDIA" in provider
+            )
+            modello_cloud = (
+                modello_openai.ULTIMO_MODELLO_USATO
+                or modello
+                or (
+                    os.environ.get("NVIDIA_MODEL")
+                    or valore_env("NVIDIA_MODEL")
+                    or MODELLO_NVIDIA_DEFAULT
+                    if usa_nvidia
+                    else os.environ.get("OPENAI_MODEL")
+                    or valore_env("OPENAI_MODEL")
+                    or "gpt-4o-mini"
+                )
+            )
+            esito = {
+                "risposta": risposta,
+                "motore": "cloud",
+                "modello_usato": f"{'NVIDIA' if usa_nvidia else 'OpenAI'} • {modello_cloud}",
+                "complessita": livello,
+                "motivo_routing": motivo,
+            }
 
     esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
     print(
