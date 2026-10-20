@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Investigatore AI — modello_openai.py</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Rendering Markdown standard (GFM) delle risposte del modello + sanitizzazione anti-XSS -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -158,6 +161,77 @@
     .chat-markdown a:hover {
       color: #fda4af;
       text-decoration: none;
+    }
+    /* Blocchi di codice e codice inline (output di marked o del renderer interno) */
+    .chat-markdown code {
+      font-family: "Share Tech Mono", monospace;
+      font-size: 0.75rem;
+      color: #fcd34d;
+      background: #070808;
+      border: 1px solid #1f2422;
+      border-radius: 0.25rem;
+      padding: 0.1rem 0.35rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .chat-markdown pre {
+      font-family: "Share Tech Mono", monospace;
+      font-size: 0.75rem;
+      color: #34d399;
+      background: #070808;
+      border: 1px solid #1f2422;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin: 0.6rem 0;
+      overflow-x: auto;
+      white-space: pre;
+      tab-size: 2;
+    }
+    .chat-markdown pre code {
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+      white-space: inherit;
+      word-break: normal;
+    }
+    /* Il wrapper del blocco di codice fornisce già bordo, sfondo e header "Copia" */
+    .chat-markdown .blocco-codice > pre {
+      border: 0;
+      border-radius: 0;
+      margin: 0;
+    }
+    /* Liste annidate e task list GFM */
+    .chat-markdown ul ul,
+    .chat-markdown ul ol,
+    .chat-markdown ol ul,
+    .chat-markdown ol ol {
+      margin: 0.25rem 0 0.25rem 1rem;
+    }
+    .chat-markdown ul ul {
+      list-style-type: circle;
+    }
+    .chat-markdown li > input[type="checkbox"] {
+      margin-right: 0.4rem;
+      accent-color: #be123c;
+      vertical-align: middle;
+    }
+    .chat-markdown li.task-list-item {
+      list-style: none;
+    }
+    .chat-markdown li > p {
+      margin-bottom: 0.25rem;
+    }
+    .chat-markdown li > p:last-child {
+      margin-bottom: 0;
+    }
+    .chat-markdown blockquote > p:last-child {
+      margin-bottom: 0;
+    }
+    .chat-markdown > :first-child {
+      margin-top: 0;
     }
   </style>
 </head>
@@ -1369,8 +1443,9 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       return s;
     }
 
-    // Parser Markdown completo per le risposte dell'Investigatore AI
-    function renderMarkdown(raw) {
+    // Renderer Markdown interno (fallback offline se le librerie CDN non sono raggiungibili).
+    // Gestisce titoli, liste, citazioni, tabelle, blocchi di codice e formattazione inline.
+    function renderMarkdownBase(raw) {
       if (!raw) return '';
 
       const codeBlocks = [];
@@ -1451,7 +1526,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
           flushAll();
           const block = codeBlocks[Number(cbMatch[1])];
           blocks.push(
-            `<div class="my-2.5 rounded-lg bg-bunker-950 border border-bunker-700 overflow-hidden font-mono text-xs shadow-inner">` +
+            `<div class="blocco-codice my-2.5 rounded-lg bg-bunker-950 border border-bunker-700 overflow-hidden font-mono text-xs shadow-inner">` +
               `<div class="px-3 py-1 bg-bunker-800 border-b border-bunker-700 text-[10px] text-stone-400 flex justify-between items-center">` +
                 `<span class="uppercase tracking-wider text-amber-300 font-semibold">${block.lang}</span>` +
                 `<button type="button" onclick="copiaCodice(this)" class="px-2 py-0.5 rounded bg-bunker-900 hover:bg-bunker-700 border border-bunker-700 hover:border-bunker-600 text-stone-300 hover:text-white transition">Copia</button>` +
@@ -1557,6 +1632,142 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       });
 
       return finalHtml;
+    }
+
+    // =========================================================================
+    // RENDERING MARKDOWN DELLE RISPOSTE DEL MODELLO
+    // Usa marked (GFM: tabelle, task list, liste annidate, code fence, link) e
+    // DOMPurify per la sanitizzazione anti-XSS. Se le CDN non sono disponibili
+    // usa il renderer interno renderMarkdownBase(), così la chat funziona anche offline.
+    // =========================================================================
+    function renderMarkdown(raw) {
+      if (!raw) return '';
+      const testo = String(raw);
+
+      if (window.marked && typeof window.marked.parse === 'function' && window.DOMPurify) {
+        try {
+          const html = window.marked.parse(testo, {
+            gfm: true,
+            breaks: true
+          });
+          const htmlPulito = window.DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+          return decoraHtmlMarkdown(htmlPulito);
+        } catch (errore) {
+          console.warn('Markdown: marked/DOMPurify non disponibili, uso il renderer interno.', errore);
+        }
+      }
+
+      return renderMarkdownBase(testo);
+    }
+
+    // Arricchisce l'HTML Markdown con gli elementi grafici del progetto:
+    // badge per le citazioni delle fonti, tabelle scrollabili, link sicuri e
+    // blocchi di codice con header e pulsante "Copia".
+    function decoraHtmlMarkdown(html) {
+      const template = document.createElement('template');
+      template.innerHTML = html;
+
+      // 1. Citazioni delle fonti ([G1-01.txt], [Fonte: ...]) -> badge, solo nei nodi di testo
+      const schemaFonte = /\[((?:G\d+-\d+(?:\.txt)?)|(?:Fonte:\s*[^\]]+))\]/gi;
+      const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+      const nodiTesto = [];
+      while (walker.nextNode()) nodiTesto.push(walker.currentNode);
+
+      for (const nodo of nodiTesto) {
+        const testo = nodo.nodeValue || '';
+        const genitore = nodo.parentElement;
+        if (!testo.includes('[') || !genitore || genitore.closest('pre, code, a')) continue;
+
+        schemaFonte.lastIndex = 0;
+        if (!schemaFonte.test(testo)) continue;
+        schemaFonte.lastIndex = 0;
+
+        const frammento = document.createDocumentFragment();
+        let indice = 0;
+        let trovato;
+        while ((trovato = schemaFonte.exec(testo)) !== null) {
+          if (trovato.index > indice) {
+            frammento.appendChild(document.createTextNode(testo.slice(indice, trovato.index)));
+          }
+          const badge = document.createElement('span');
+          badge.className = 'inline-flex items-center px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] font-mono text-amber-300 font-semibold mx-0.5';
+          badge.textContent = `[${trovato[1]}]`;
+          frammento.appendChild(badge);
+          indice = trovato.index + trovato[0].length;
+        }
+        if (indice < testo.length) {
+          frammento.appendChild(document.createTextNode(testo.slice(indice)));
+        }
+        nodo.parentNode.replaceChild(frammento, nodo);
+      }
+
+      // 2. Titoli con lo stesso stile del renderer interno
+      const classiTitoli = {
+        1: 'text-base font-display font-bold uppercase text-white tracking-wider mt-3 mb-1 border-b border-bunker-700 pb-1',
+        2: 'text-sm font-display font-bold uppercase text-crimson-400 tracking-wider mt-2.5 mb-1',
+        3: 'text-xs font-mono font-bold uppercase text-phosphor-400 tracking-wider mt-2 mb-0.5',
+        4: 'text-xs font-mono font-bold text-amber-300 mt-1.5 mb-0.5',
+        5: 'text-xs font-mono font-bold text-amber-300 mt-1.5 mb-0.5',
+        6: 'text-xs font-mono font-bold text-amber-300 mt-1.5 mb-0.5'
+      };
+      template.content.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(titolo => {
+        const livello = Number(titolo.tagName.slice(1)) || 4;
+        (classiTitoli[livello] || classiTitoli[4]).split(' ').forEach(classe => titolo.classList.add(classe));
+      });
+
+      // 3. Task list GFM: rimuove il punto elenco dagli item con checkbox
+      template.content.querySelectorAll('li input[type="checkbox"]').forEach(checkbox => {
+        checkbox.closest('li')?.classList.add('task-list-item');
+      });
+
+      // 4. Tabelle: wrapper con scroll orizzontale e bordo del tema
+      template.content.querySelectorAll('table').forEach(tabella => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'overflow-x-auto my-2.5 rounded-lg border border-bunker-700';
+        tabella.classList.add('w-full', 'text-xs', 'font-mono');
+        tabella.replaceWith(wrapper);
+        wrapper.appendChild(tabella);
+      });
+
+      // 5. Link: apertura in nuova scheda in modo sicuro
+      template.content.querySelectorAll('a[href]').forEach(link => {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        link.classList.add('text-crimson-400', 'hover:text-crimson-300', 'underline', 'font-semibold', 'transition');
+      });
+
+      // 6. Blocchi di codice: header con linguaggio e pulsante "Copia"
+      template.content.querySelectorAll('pre').forEach(pre => {
+        const codice = pre.querySelector('code');
+        if (!codice) return;
+
+        const classeLingua = Array.from(codice.classList).find(c => c.startsWith('language-'));
+        const lingua = classeLingua ? classeLingua.slice('language-'.length) : 'codice';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'blocco-codice my-2.5 rounded-lg bg-bunker-950 border border-bunker-700 overflow-hidden font-mono text-xs shadow-inner';
+
+        const intestazione = document.createElement('div');
+        intestazione.className = 'px-3 py-1 bg-bunker-800 border-b border-bunker-700 text-[10px] text-stone-400 flex justify-between items-center';
+
+        const etichetta = document.createElement('span');
+        etichetta.className = 'uppercase tracking-wider text-amber-300 font-semibold';
+        etichetta.textContent = lingua;
+
+        const bottone = document.createElement('button');
+        bottone.type = 'button';
+        bottone.className = 'px-2 py-0.5 rounded bg-bunker-900 hover:bg-bunker-700 border border-bunker-700 hover:border-bunker-600 text-stone-300 hover:text-white transition';
+        bottone.textContent = 'Copia';
+        bottone.addEventListener('click', () => copiaCodice(bottone));
+
+        intestazione.append(etichetta, bottone);
+
+        pre.className = 'p-3 text-emerald-400 overflow-x-auto whitespace-pre leading-relaxed';
+        pre.replaceWith(wrapper);
+        wrapper.append(intestazione, pre);
+      });
+
+      return template.innerHTML;
     }
 
     // Utility per copiare il testo di un blocco di codice negli appunti con feedback visivo
