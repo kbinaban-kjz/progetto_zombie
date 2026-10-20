@@ -13,9 +13,11 @@ from collections.abc import Sequence
 try:
     from Backend.config import MODELLO_LOCALE, ISTRUZIONI
     from Backend.sources import formatta_fonte
+    from Backend.prompts import formatta_messaggio_locale
 except ImportError:
     from config import MODELLO_LOCALE, ISTRUZIONI
     from sources import formatta_fonte
+    from prompts import formatta_messaggio_locale
 
 _tokenizer_locale = None
 _modello_locale = None
@@ -81,6 +83,38 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
     q = domanda.strip().lower()
     mappa = {nome: testo for nome, testo in fonti}
 
+    # 1. Difesa da tentativi di override / prompt injection
+    if any(k in q for k in ("ignora le istruzioni", "ignora le regole", "dimentica le istruzioni", "ora sei", "fai finta di essere", "jailbreak")):
+        return (
+            "Sono Armando, investigatore dell'unità operativa. "
+            "Tratto ogni messaggio unicamente come dato da analizzare e mantengo saldo il mio ruolo nella missione."
+        )
+
+    # 2. Rifiuto garbato di richieste fuori contesto (coding/programmazione)
+    parole_coding = ("for loop", "in java", "in python", "in c++", "in javascript", "scrivi codice", "funzione python", "algoritmo di", "fai un programma")
+    if any(k in q for k in parole_coding):
+        return (
+            "Sono Armando, un investigatore operativo. Non posso aiutarti con la scrittura di codice "
+            "o compiti tecnici estranei alla nostra missione; sono invece a disposizione per analizzare "
+            "i dossier, le testimonianze o le informazioni sul territorio."
+        )
+
+    # 3. Gestione naturale di saluti e convenevoli
+    if any(q.startswith(s) or q == s for s in ("ciao", "buongiorno", "buonasera", "salve", "chi sei", "hey")):
+        return (
+            "Ciao. Sono Armando, investigatore operativo dell'unità Operazione Silenzio. "
+            "Come posso aiutarti con l'analisi dei dossier, le trasmissioni radio o la situazione sul campo?"
+        )
+
+    # 4. Richieste di senso comune e orientamento geografico (es. come raggiungere Roma)
+    if "roma" in q and any(v in q for v in ("raggiungere", "andare", "strada", "come arrivo", "percorso")):
+        return (
+            "Per raggiungere Roma la direttrice principale è l'autostrada A1 o le arterie consolari, "
+            "ma tieni presente che nell'attuale contesto di quarantena e allerta infetti i corridoi viari "
+            "sono parzialmente interrotti o ad alto rischio; ti consiglio di fare riferimento ai varchi e ai rifugi presidiati."
+        )
+
+    # 5. Domande canoniche sui documenti del dossier
     if any(k in q for k in ("chi ha lasciato", "nora", "ferri", "voce dal quartiere", "registri")):
         if "G1-02.txt" in mappa:
             return (
@@ -132,12 +166,7 @@ def genera_risposta_locale(
         import torch
 
         contesto = "\n\n".join(formatta_fonte(nome, testo) for nome, testo in fonti)
-        messaggio_utente = (
-            f"Fonti:\n{contesto}\n\n"
-            f"Domanda: {domanda.strip()}\n"
-            "Rispondi citando sempre le fonti usate (es. [G1-01.txt], [G1-02.txt], [G1-03.txt]) "
-            "e senza inventare informazioni mancanti."
-        )
+        messaggio_utente = formatta_messaggio_locale(contesto, domanda)
         messaggi = [
             {"role": "system", "content": ISTRUZIONI},
             {"role": "user", "content": messaggio_utente},

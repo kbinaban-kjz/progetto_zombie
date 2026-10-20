@@ -15,7 +15,8 @@ Ogni file gestisce un ambito operativo ben definito:
 ```text
 .
 ├── Backend/
-│   ├── config.py             # Configurazione centralizzata (percorsi, variabili .env, prompt e modelli)
+│   ├── config.py             # Configurazione centralizzata (percorsi, variabili .env, costanti e modelli)
+│   ├── prompts.py            # Prompt di sistema dell'investigatore, regole anti-injection e template messaggi
 │   ├── db_config.py          # Wrapper retrocompatibile per il percorso database SQLite
 │   ├── schema.sql            # Schema SQL tabelle (cronologia_chat e instradamento_chat)
 │   ├── database.py           # Gestione SQLite: connessione, persistenza, cronologia e telemetria
@@ -43,6 +44,7 @@ Ogni file gestisce un ambito operativo ben definito:
 
 | File | Responsabilità |
 | :--- | :--- |
+| **`Backend/prompts.py`** | **Prompt e Template**: contiene l'identità dell'assistente (`Armando`), le regole di sicurezza anti-prompt-injection e le funzioni di formattazione del messaggio utente (`formatta_messaggio_cloud`, `formatta_messaggio_locale`). |
 | **`Backend/tools.py`** | **Strumenti (Tools) per l'AI**: implementa le funzioni investigative invocabili dal modello (`cerca_fonti`, `leggi_fonte`, `elenca_fonti`, `ottieni_nodi_mappa`, `ottieni_dettaglio_nodo`, `cerca_cronologia`, `statistiche_missione`). Espone sia le funzioni Python che gli schemi standard OpenAI Function Calling (`TOOLS_OPENAI_SCHEMA`) e il dispatcher sicuro `esegui_tool()`. |
 | **`Backend/config.py`** | **Configurazione globale**: centralizza percorsi (`ROOT_DIR`, `DATI_DIR`, `DB_PATH`), caricamento sicuro da `.env`, costanti di rete, istruzioni di sistema e verifica credenziali API. |
 | **`Backend/database.py`** | **Persistenza dati**: inizializzazione schema, salvataggio e recupero messaggi con metadati di routing, ricerca testuale nella cronologia pregressa. |

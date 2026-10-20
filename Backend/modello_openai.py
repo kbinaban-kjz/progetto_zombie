@@ -29,6 +29,7 @@ try:
     )
     from Backend.sources import formatta_blocco_openai, carica_fonti
     from Backend.tools import TOOLS_OPENAI_SCHEMA, esegui_tool
+    from Backend.prompts import formatta_messaggio_cloud
 except ImportError:
     from config import (
         NVIDIA_BASE_URL,
@@ -44,6 +45,7 @@ except ImportError:
     )
     from sources import formatta_blocco_openai, carica_fonti
     from tools import TOOLS_OPENAI_SCHEMA, esegui_tool
+    from prompts import formatta_messaggio_cloud
 
 # Gestione tollerante dell'importazione di OpenAI
 try:
@@ -179,7 +181,7 @@ def genera_risposta(
         {"role": "system", "content": ISTRUZIONI},
         {
             "role": "user",
-            "content": f"FONTI:\n{contenuto_fonti}\n\nDOMANDA:\n{domanda}",
+            "content": formatta_messaggio_cloud(contenuto_fonti, domanda),
         },
     ]
 

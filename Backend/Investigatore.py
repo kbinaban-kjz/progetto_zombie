@@ -59,6 +59,11 @@ try:
         ottieni_dettaglio_nodo,
         statistiche_missione,
     )
+    from Backend.prompts import (
+        PROMPT_SISTEMA,
+        formatta_messaggio_cloud,
+        formatta_messaggio_locale,
+    )
     from Backend.modello_locale import (
         carica_modello_locale,
         genera_risposta_locale,
