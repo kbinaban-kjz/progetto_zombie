@@ -42,6 +42,7 @@ try:
         leggi_cronologia,
         salva_con_instradamento,
         leggi_cronologia_con_instradamento,
+        cancella_cronologia,
         get_connection,
     )
     from Backend.sources import (
@@ -99,6 +100,7 @@ except ImportError:
         leggi_cronologia,
         salva_con_instradamento,
         leggi_cronologia_con_instradamento,
+        cancella_cronologia,
         get_connection,
     )
     from sources import (

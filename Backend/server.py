@@ -6,6 +6,8 @@ Responsabilità:
 - Esporre gli endpoint REST:
     GET  /api/status         -> Stato del sistema, modelli e chiavi
     GET  /api/history        -> Cronologia completa salvata in SQLite
+    POST /api/history/clear  -> Rimuove tutta la cronologia da SQLite
+    DELETE /api/history      -> Rimuove tutta la cronologia da SQLite
     GET  /api/sources        -> Elenco e contenuto delle fonti del dossier
     GET  /api/tools          -> Catalogo degli strumenti operativi disponibili
     POST /api/chat           -> Esecuzione query ibrida (Locale vs Cloud)
@@ -38,6 +40,7 @@ try:
     from Backend.database import (
         leggi_cronologia_con_instradamento,
         salva_con_instradamento,
+        cancella_cronologia,
     )
     from Backend.sources import carica_fonti, risolvi_cartella_dati
     from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool
@@ -65,6 +68,7 @@ except ImportError:
     from database import (
         leggi_cronologia_con_instradamento,
         salva_con_instradamento,
+        cancella_cronologia,
     )
     from sources import carica_fonti, risolvi_cartella_dati
     from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool
@@ -82,13 +86,27 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
 
     def do_OPTIONS(self):
         self.send_response(204)
         self.end_headers()
+
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        if path in {"/api/history", "/api/history/clear"}:
+            eliminati = cancella_cronologia()
+            return self._send_json(
+                {
+                    "ok": True,
+                    "messaggio": f"Cronologia eliminata con successo ({eliminati} record rimossi).",
+                    "eliminati": eliminati,
+                    "cronologia": [],
+                }
+            )
+        return self._send_json({"ok": False, "error": "Endpoint non trovato."}, status=404)
 
     def _send_json(self, data: dict[str, Any], status: int = 200) -> None:
         raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -196,6 +214,18 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             payload = json.loads(body) if body.strip() else {}
         except json.JSONDecodeError:
             return self._send_json({"ok": False, "error": "JSON non valido."}, status=400)
+
+        # API: Cancellazione intera cronologia da SQLite
+        if path in {"/api/history/clear", "/api/history/delete"}:
+            eliminati = cancella_cronologia()
+            return self._send_json(
+                {
+                    "ok": True,
+                    "messaggio": f"Cronologia eliminata con successo ({eliminati} record rimossi).",
+                    "eliminati": eliminati,
+                    "cronologia": [],
+                }
+            )
 
         # API: Esecuzione diretta di un tool
         if path == "/api/tools/execute":

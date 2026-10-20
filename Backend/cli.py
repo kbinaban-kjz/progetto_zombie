@@ -13,7 +13,7 @@ from typing import Any
 
 try:
     from Backend.config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
-    from Backend.database import salva_con_instradamento
+    from Backend.database import salva_con_instradamento, cancella_cronologia
     from Backend.sources import carica_fonti
     from Backend.router import genera_risposta_ibrida
     from Backend.tools import (
@@ -24,7 +24,7 @@ try:
     )
 except ImportError:
     from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
-    from database import salva_con_instradamento
+    from database import salva_con_instradamento, cancella_cronologia
     from sources import carica_fonti
     from router import genera_risposta_ibrida
     from tools import (
@@ -43,6 +43,7 @@ def stampa_guida_comandi() -> None:
     print("  /stats          : Statistiche operative della missione e del database")
     print("  /nodo <id>      : Intelligence dettagliata su un nodo (es. /nodo ferri)")
     print("  /cerca <testo>  : Cerca nei documenti senza interrogare il modello")
+    print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
 
 
@@ -100,6 +101,11 @@ def avvia_cli() -> int:
             print("\nStatistiche Operative:")
             for k, v in stats.items():
                 print(f"  {k}: {v}")
+            continue
+
+        if cmd_lower in {"/clear-history", "/pulisci-cronologia", "/elimina-cronologia", "/reset-cronologia"}:
+            eliminati = cancella_cronologia()
+            print(f"\nCronologia rimossa con successo ({eliminati} record eliminati dal database SQLite).")
             continue
 
         if cmd_lower.startswith("/nodo"):

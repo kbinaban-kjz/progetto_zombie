@@ -197,6 +197,28 @@ def cerca_in_cronologia(termine: str) -> list[dict[str, Any]]:
     return righe
 
 
+def cancella_cronologia() -> int:
+    """
+    Cancella l'intera cronologia di chat e metadati di instradamento dal database SQLite.
+    Ripristina inoltre il contatore autoincrementale (sqlite_sequence).
+    Restituisce il numero di record rimossi dalla cronologia.
+    """
+    inizializza_db()
+    with get_connection() as conn:
+        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute("DELETE FROM instradamento_chat")
+        cur = conn.execute("DELETE FROM cronologia_chat")
+        eliminati = cur.rowcount
+        try:
+            conn.execute(
+                "DELETE FROM sqlite_sequence WHERE name IN ('cronologia_chat', 'instradamento_chat')"
+            )
+        except sqlite3.OperationalError:
+            pass
+        conn.commit()
+    return eliminati
+
+
 if __name__ == "__main__":
     inizializza_db()
     cronologia = leggi_cronologia_con_instradamento()
