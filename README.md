@@ -6,6 +6,8 @@ L'architettura del progetto è suddivisa in **moduli coerenti a responsabilità 
 
 Tutta la cronologia di domande, risposte e telemetria di routing viene salvata automaticamente in un database **SQLite** locale (`Backend/cronologia.db`, tabelle `cronologia_chat` e `instradamento_chat`).
 
+Il modello riceve come contesto gli ultimi 6 scambi; per contenere il prompt, ogni domanda e risposta ricordata è limitata a 500 caratteri.
+
 ---
 
 ## Architettura Modulare dei File (`Backend/`)

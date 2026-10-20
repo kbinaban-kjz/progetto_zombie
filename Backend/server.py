@@ -169,8 +169,8 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     "cartella_dati": str(risolvi_cartella_dati().relative_to(ROOT_DIR)),
                     "file_fonti": [nome for nome, _ in fonti],
                     "tools_disponibili": list(STRUMENTI_REGISTRATI.keys()),
-                    "limite_memoria": 10,
-                    "memoria_db_attiva": len(leggi_ultimi_messaggi(10)),
+                    "limite_memoria": 6,
+                    "memoria_db_attiva": len(leggi_ultimi_messaggi(6)),
                 }
             )
 
@@ -412,4 +412,3 @@ def avvia_server(host: str = "127.0.0.1", port: int = 8000) -> None:
 if __name__ == "__main__":
     porta = int(valore_env("PORT", "8000"))
     avvia_server(port=porta)
-

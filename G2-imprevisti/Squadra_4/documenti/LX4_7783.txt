@@ -1,0 +1,5 @@
+ARCHIVIO LAZZARO — Unità 4
+Documento: LX4-7783
+Scheda manutenzione orologi — giorno operativo 02, ore 07:20
+
+L’orologio locale di Ripetitore Fosso è indietro di 25 minuti. Per confrontarlo con la centrale bisogna aggiungere 25 minuti. Il guasto dell’orologio era già presente prima delle 06:00. Il ricevitore centrale non presenta scarti.

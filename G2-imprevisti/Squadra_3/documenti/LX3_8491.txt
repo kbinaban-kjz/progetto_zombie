@@ -1,0 +1,5 @@
+ARCHIVIO LAZZARO — Unità 3
+Documento: LX3-8491
+Rapporto intervento — giorno operativo 02, ore 08:00
+
+Il primo guasto della rete secondaria è avvenuto a Ripetitore Ferro, alle 06:40. È un guasto radio, non un nuovo focolaio. L’annotazione deriva dalla scheda di controllo manuale firmata dal tecnico di turno. Gli orari di questa scheda sono sincronizzati con l’orologio centrale.
