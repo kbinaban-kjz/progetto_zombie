@@ -215,6 +215,50 @@
         </div>
       </section>
 
+      <!-- 2b. STRUMENTI AI (Backend/tools.py — Function Calling & Utility Operative) -->
+      <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
+        <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between gap-2">
+          <div>
+            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
+              Strumenti AI (`Backend/tools.py`)
+            </h2>
+            <p class="text-[11px] font-mono text-stone-400">
+              Tool operativi: <span id="tools-count" class="text-phosphor-400 font-bold">7 disponibili</span>
+            </p>
+          </div>
+          <span class="px-2 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-[10px] font-mono text-amber-300">
+            Function Calling
+          </span>
+        </div>
+        <div class="p-3 space-y-2">
+          <div class="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
+            <button onclick="eseguiToolUi('statistiche_missione')" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-amber-600 text-left transition">
+              <span class="text-amber-400 font-bold">📊 statistiche</span>
+              <p class="text-[10px] text-stone-400 truncate">Sintesi missione e dossier</p>
+            </button>
+            <button onclick="eseguiToolUi('ottieni_nodi_mappa')" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-emerald-600 text-left transition">
+              <span class="text-phosphor-400 font-bold">🗺️ nodi_mappa</span>
+              <p class="text-[10px] text-stone-400 truncate">14 nodi teatro operativo</p>
+            </button>
+            <button onclick="eseguiToolUi('elenca_fonti')" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-crimson-600 text-left transition">
+              <span class="text-crimson-300 font-bold">📁 elenca_fonti</span>
+              <p class="text-[10px] text-stone-400 truncate">Testimonianze nel dossier</p>
+            </button>
+            <button onclick="eseguiToolUi('ottieni_dettaglio_nodo', {id_o_codice: 'ferri'})" class="p-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 hover:border-purple-600 text-left transition">
+              <span class="text-purple-300 font-bold">🔍 nodo: ferri</span>
+              <p class="text-[10px] text-stone-400 truncate">Dettaglio Nora Ferri</p>
+            </button>
+          </div>
+          <div id="tool-output-container" class="hidden p-2.5 rounded bg-bunker-950 border border-bunker-700 text-xs font-mono text-stone-300 max-h-48 overflow-y-auto">
+            <div class="flex items-center justify-between pb-1 border-b border-bunker-800 mb-1 text-[10px] text-stone-400">
+              <span id="tool-output-title" class="font-bold text-amber-300">Esito Tool</span>
+              <button onclick="chiudiOutputTool()" class="text-stone-500 hover:text-white">✕ Chiudi</button>
+            </div>
+            <pre id="tool-output-pre" class="whitespace-pre-wrap text-[11px] text-stone-300"></pre>
+          </div>
+        </div>
+      </section>
+
       <!-- 3. CRONOLOGIA DATABASE SQLite (Backend/cronologia.db — tabella cronologia_chat) -->
       <section class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-lg">
         <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex items-center justify-between gap-2">
@@ -533,6 +577,11 @@ Non inventare persone, luoghi, cause o eventi.`;
                 keyBadge.className = 'px-3 py-1.5 rounded-lg bg-bunker-950 border border-amber-700 text-amber-400';
               }
 
+              if (d.tools_disponibili && Array.isArray(d.tools_disponibili)) {
+                const toolsEl = document.getElementById('tools-count');
+                if (toolsEl) toolsEl.textContent = `${d.tools_disponibili.length} attivi (tools.py)`;
+              }
+
               const rSrc = await fetch(`${base}/api/sources`);
               if (rSrc.ok) {
                 const dSrc = await rSrc.json();
@@ -701,6 +750,53 @@ Non inventare persone, luoghi, cause o eventi.`;
         };
         reader.readAsText(file);
       });
+    }
+
+    async function eseguiToolUi(nomeTool, argomenti = {}) {
+      const outBox = document.getElementById('tool-output-container');
+      const outTitle = document.getElementById('tool-output-title');
+      const outPre = document.getElementById('tool-output-pre');
+      if (!outBox || !outPre) return;
+
+      outBox.classList.remove('hidden');
+      outTitle.textContent = `Tool: ${nomeTool}`;
+      outPre.textContent = 'Esecuzione in corso...';
+
+      if (apiBase !== null) {
+        try {
+          const resp = await fetch(`${apiBase}/api/tools/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tool: nomeTool, arguments: argomenti })
+          });
+          const dati = await resp.json();
+          outPre.textContent = JSON.stringify(dati, null, 2);
+          return;
+        } catch (err) {
+          outPre.textContent = `Errore di rete: ${err.message}`;
+          return;
+        }
+      }
+
+      // Esecuzione fallback browser se il server Python non è attivo
+      if (nomeTool === 'statistiche_missione') {
+        outPre.textContent = JSON.stringify({
+          ok: true,
+          missione: "Operazione Silenzio — Protocollo Lazzaro (Modalità Browser)",
+          fonti_dossier: fonti.length,
+          file_dossier: fonti.map(f => f.nome),
+          nodi_teatro_mappa: 14
+        }, null, 2);
+      } else if (nomeTool === 'elenca_fonti') {
+        outPre.textContent = JSON.stringify({ ok: true, totale: fonti.length, fonti: fonti.map(f => ({ file: f.nome, anteprima: f.contenuto.slice(0, 100) + '...' })) }, null, 2);
+      } else {
+        outPre.textContent = `Tool '${nomeTool}' registrato in Backend/tools.py. Avvia il server Python (python Backend/Investigatore.py) per l'esecuzione completa.`;
+      }
+    }
+
+    function chiudiOutputTool() {
+      const outBox = document.getElementById('tool-output-container');
+      if (outBox) outBox.classList.add('hidden');
     }
 
     function usaDomandaEsempio(tipo = 'semplice') {
