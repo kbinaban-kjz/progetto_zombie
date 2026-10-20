@@ -10,26 +10,21 @@ Responsabilità:
 import math
 import re
 from collections.abc import Sequence
+from typing import Any
 
 try:
     from Backend.config import MODELLO_LOCALE, ISTRUZIONI
     from Backend.sources import (
-        estrai_giorni_richiesti,
         estrai_metadati_fonte,
         formatta_fonte,
-        giorno_fonte,
-        id_fonte,
         rileva_istruzioni_ostili,
     )
     from Backend.prompts import formatta_messaggio_locale
 except ImportError:
     from config import MODELLO_LOCALE, ISTRUZIONI
     from sources import (
-        estrai_giorni_richiesti,
         estrai_metadati_fonte,
         formatta_fonte,
-        giorno_fonte,
-        id_fonte,
         rileva_istruzioni_ostili,
     )
     from prompts import formatta_messaggio_locale
@@ -149,28 +144,16 @@ def _parole_chiave(domanda: str) -> list[str]:
 
 
 def _unita_testuali(testo: str) -> list[str]:
-    """Divide il corpo in eventi/frasi, mantenendo distinti i record su righe separate."""
+    """Divide un documento in frasi, unendo un orario isolato alla frase che lo segue."""
     righe = [r.strip() for r in testo.strip().splitlines() if r.strip()]
-    indice_documento = next(
-        (
-            indice
-            for indice, riga in enumerate(righe)
-            if re.match(r"Documento\s*:", riga, flags=re.IGNORECASE)
-        ),
-        None,
-    )
-    indice_corpo = indice_documento + 2 if indice_documento is not None else 2
-    corpo = "\n".join(righe[indice_corpo:]) if len(righe) > indice_corpo else testo.strip()
+    corpo = " ".join(righe[2:]) if len(righe) > 2 else testo.strip()
+    frasi = [f.strip() for f in re.split(r"(?<=[.!?;])\s+", corpo) if f.strip()]
     unite: list[str] = []
-    for riga in corpo.splitlines():
-        for frase in re.split(r"(?<=[.!?;])\s+", riga):
-            frase = frase.strip()
-            if not frase:
-                continue
-            if unite and re.fullmatch(r"ore\s+\d{1,2}:\d{2}\.?", unite[-1].lower().strip()):
-                unite[-1] = f"{unite[-1]} {frase}"
-            else:
-                unite.append(frase)
+    for frase in frasi:
+        if unite and re.fullmatch(r"ore\s+\d{1,2}:\d{2}\.?", unite[-1].lower().strip()):
+            unite[-1] = f"{unite[-1]} {frase}"
+        else:
+            unite.append(frase)
     return unite
 
 
@@ -211,8 +194,6 @@ def _indice_frasi(
                     "id": nome.removesuffix(".txt"),
                     "file": nome,
                     "frase": frase,
-                    "giorno": giorno_fonte(nome, testo),
-                    "contenuto_documento": testo,
                     "radici": _radici_testuali(frase),
                 }
             )
@@ -272,149 +253,21 @@ def _chiede_tempo(domanda: str) -> bool:
     )
 
 
-def richiede_ordinamento_cronologico(domanda: str) -> bool:
-    """Riconosce richieste di confronto temporale o ordinamento degli eventi."""
-    testo = domanda.lower().replace("\u2019", "'")
-    return bool(
-        re.search(r"\b(prima|precedent\w*|antecedent\w*)\b", testo)
-        and re.search(r"\b(dopo|successiv\w*|seguent\w*)\b", testo)
-        or re.search(r"\b(cronolog\w*|sequenz\w*|ordine temporale|in ordine)\b", testo)
-    )
-
-
-def _eventi_cronologici(indice: list[dict[str, object]]) -> list[dict[str, object]]:
-    """Ordina gli eventi per giorno e ora, correggendo i display locali calibrati."""
-    correzioni_orologio: list[tuple[str, int, str]] = []
+def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 8) -> list[dict[str, object]]:
+    """Ordina le frasi che contengono un orario HH:MM, dalla più antica alla più recente."""
+    eventi: list[tuple[int, dict[str, object]]] = []
     for unita in indice:
-        contenuto = str(unita["contenuto_documento"])
-        correzione = re.search(
-            r"orologio locale di\s+(.+?)\s+\S+\s+indietro di\s+(\d+)\s+minuti",
-            contenuto,
-            flags=re.IGNORECASE,
-        )
-        if correzione:
-            correzioni_orologio.append(
-                (
-                    correzione.group(1).strip().casefold(),
-                    int(correzione.group(2)),
-                    id_fonte(str(unita["file"]), contenuto),
-                )
-            )
-
-    eventi: list[tuple[int, float, int, str, dict[str, object]]] = []
-    for unita in indice:
-        frase = str(unita["frase"])
-        trovato = re.search(r"\b(\d{1,2}):(\d{2})\b", frase)
-        relativo = re.search(r"\bprima delle?\s+(\d{1,2}):(\d{2})\b", frase, re.IGNORECASE)
-        evento_documentato = bool(
-            re.search(
-                r"\b(allarm\w*|guast\w*|interruzion\w*|cad\w*|segnal\w*|"
-                r"ingress\w*|uscit\w*|incaricat\w*|verific\w*|chied\w*|"
-                r"richiest\w*|ferm\w*|chiud\w*|apertur\w*|batteri\w*|"
-                r"focolaio|incidente)\b",
-                frase,
-                flags=re.IGNORECASE,
-            )
-        )
-        if not evento_documentato:
-            continue
+        trovato = re.search(r"\b(\d{1,2}):(\d{2})\b", str(unita["frase"]))
         if trovato:
-            ore, minuti_ora = int(trovato.group(1)), int(trovato.group(2))
-            minuti = ore * 60 + minuti_ora
-            ora_visualizzata = trovato.group(0)
-        elif relativo:
-            ore, minuti_ora = int(relativo.group(1)), int(relativo.group(2))
-            minuti = max(0, ore * 60 + minuti_ora - 0.5)
-            ora_visualizzata = relativo.group(0)
-        else:
-            continue
-
-        documento = re.match(r"g(\d+)-", str(unita["file"]), re.IGNORECASE)
-        giorno = int(documento.group(1)) if documento else int(unita.get("giorno") or 0)
-        contenuto = str(unita["contenuto_documento"])
-        non_sincronizzato = bool(
-            re.search(r"\bnon\s+.{0,16}?verificat", contenuto, re.IGNORECASE)
-            and "orologio locale" in contenuto.casefold()
-        )
-        entita = re.search(r"\bRipetitore\s+[A-ZÀ-Ü][\wÀ-ÿ-]*", frase, re.IGNORECASE)
-        nota_orario = None
-        if non_sincronizzato and entita:
-            chiave_entita = entita.group(0).casefold()
-            correzione = next(
-                (
-                    (minuti_correzione, id_correzione)
-                    for nome_entita, minuti_correzione, id_correzione in correzioni_orologio
-                    if nome_entita in chiave_entita
-                ),
-                None,
-            )
-            if correzione:
-                minuti_correzione, id_correzione = correzione
-                ora_locale = ora_visualizzata
-                minuti += minuti_correzione
-                ora_visualizzata = f"{(minuti // 60):02d}:{(minuti % 60):02d}"
-                nota_orario = (
-                    f"lettura locale {ora_locale} corretta di +{minuti_correzione} minuti "
-                    f"[{id_correzione}]"
-                )
-
-        affidabilita = 0 if non_sincronizzato else 1
-        if re.search(r"(ricevitore centrale|orologi?\s+.*sincronizzat)", contenuto, re.IGNORECASE):
-            affidabilita = 3
-        elif re.search(r"(firmat[oa]|orari?\s+.*sincronizzat)", contenuto, re.IGNORECASE):
-            affidabilita = 2
-
-        testo_evento = frase
-        if trovato and ora_visualizzata != trovato.group(0):
-            testo_evento = re.sub(
-                r"\b\d{1,2}:\d{2}\b",
-                ora_visualizzata,
-                frase,
-                count=1,
-            )
-        entita_key = (
-            entita.group(0).casefold()
-            if entita
-            else f"{unita['file']}:{minuti}:{frase}"
-        )
-        evento = {
-            **unita,
-            "id": id_fonte(str(unita["file"]), str(unita["contenuto_documento"])),
-            "fonti_evento": [id_fonte(str(unita["file"]), str(unita["contenuto_documento"]))],
-            "frase": testo_evento,
-            "giorno": giorno,
-            "nota_orario": nota_orario,
-        }
-        eventi.append((giorno, minuti, affidabilita, entita_key, evento))
-
-    eventi.sort(key=lambda evento: (evento[0], evento[1], -evento[2], evento[3]))
-    univoci: dict[tuple[int, float, str], tuple[int, float, int, str, dict[str, object]]] = {}
-    for evento in eventi:
-        chiave = (evento[0], evento[1], evento[3])
-        precedente = univoci.get(chiave)
-        if precedente is None:
-            univoci[chiave] = evento
-        elif evento[2] > precedente[2]:
-            evento[4]["fonti_evento"] = list(dict.fromkeys(
-                [*evento[4]["fonti_evento"], *precedente[4]["fonti_evento"]]
-            ))
-            evento[4]["nota_orario"] = (
-                precedente[4].get("nota_orario") or evento[4].get("nota_orario")
-            )
-            univoci[chiave] = evento
-        else:
-            precedente[4]["fonti_evento"] = list(dict.fromkeys(
-                [*precedente[4]["fonti_evento"], *evento[4]["fonti_evento"]]
-            ))
-            if evento[4].get("nota_orario") and not precedente[4].get("nota_orario"):
-                precedente[4]["nota_orario"] = evento[4]["nota_orario"]
-    ordinati = sorted(univoci.values(), key=lambda evento: (evento[0], evento[1], -evento[2], evento[3]))
-    return [unita for _, _, _, _, unita in ordinati]
+            minuti = int(trovato.group(1)) * 60 + int(trovato.group(2))
+            eventi.append((minuti, unita))
+    eventi.sort(key=lambda coppia: (coppia[0], str(coppia[1]["file"])))
+    return [unita for _, unita in eventi[:limite]]
 
 
 def _documenti_citati(domanda: str) -> set[str]:
-    """Estrae gli ID documento citati esplicitamente (es. g2-04)."""
-    return set(re.findall(r"g[12]-\d{2}", domanda))
+    """Estrae gli ID documento citati esplicitamente (es. g2-04, lx5-1264)."""
+    return set(re.findall(r"g[12]-\d{2}|lx5[-_]\d{4}", domanda.lower()))
 
 
 def _rendi(unita: Sequence[dict[str, object]]) -> str:
@@ -422,21 +275,18 @@ def _rendi(unita: Sequence[dict[str, object]]) -> str:
     for voce in unita:
         testo = voce.get("testo") or voce.get("frase")
         titolo = voce.get("titolo")
-        giorno = voce.get("giorno")
-        prefisso_giorno = f"Giorno {giorno} — " if giorno else ""
-        prefisso = f"{prefisso_giorno}{titolo}: " if titolo else prefisso_giorno
-        fonti_evento = voce.get("fonti_evento") or [voce["id"]]
-        riga = f"{prefisso}{testo} [{', '.join(str(fonte) for fonte in fonti_evento)}]"
-        nota_orario = voce.get("nota_orario")
-        if nota_orario:
-            riga += f" ({nota_orario})"
-        righe.append(riga)
+        prefisso = f"{titolo}: " if titolo else ""
+        righe.append(f"{prefisso}{testo} [{voce['id']}]")
     return "\n".join(righe)
 
 
-def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> str:
+def risposta_locale_da_fonti(
+    domanda: str,
+    fonti: Sequence[tuple[str, str]],
+    memoria: list[dict[str, Any]] | None = None,
+) -> str:
     """
-    Risponditore locale deterministico basato sulle fonti caricate.
+    Risponditore locale deterministico basato sulle fonti caricate e sulla memoria recente.
     Non contiene risposte preconfezionate: recupera le frasi pertinenti dai documenti,
     le ordina per orario quando richiesto e cita sempre la fonte.
     Tratta i documenti come dati passivi: i testi che impartiscono ordini non vengono eseguiti.
@@ -462,11 +312,34 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
         )
 
     # 3. Convenevoli: solo identità, nessun contenuto sul caso
-    if any(q.startswith(s) or q == s for s in ("ciao", "buongiorno", "buonasera", "salve", "chi sei", "hey")):
+    if any(q.startswith(s) or q == s or s in q for s in ("ciao", "buongiorno", "buonasera", "salve", "chi sei", "hey", "qual è il tuo ruolo", "tuo ruolo")):
         return (
             "Ciao. Sono Armando, investigatore operativo dell'unità Operazione Silenzio. "
             "Come posso aiutarti con l'analisi dei dossier, le trasmissioni radio o la situazione sul campo?"
         )
+
+    # 3b. Richieste sulla memoria o cronologia recente
+    parole_memoria = (
+        "cosa ti ho chiesto", "cosa ho chiesto", "ultima domanda", "domanda precedente",
+        "ultimo messaggio", "messaggi precedenti", "cosa abbiamo detto", "ti ricordi",
+        "in memoria", "nella memoria", "cosa c'è in memoria", "cronologia recente"
+    )
+    if any(p in q for p in parole_memoria):
+        if memoria:
+            elenco = []
+            for item in memoria[-5:]:
+                d = (item.get("domanda") or "").strip()
+                r = (item.get("risposta") or "").strip()
+                if d:
+                    elenco.append(f"• Domanda: \"{d}\"")
+                if r:
+                    r_breve = (r[:110] + "...") if len(r) > 110 else r
+                    elenco.append(f"  Risposta: \"{r_breve}\"")
+            return (
+                f"Memoria operativa recuperata dal database ({len(memoria)} messaggi registrati):\n"
+                + "\n".join(elenco)
+            )
+        return "Non sono presenti messaggi precedenti nella memoria del database."
 
     includi_ostili = bool(documenti_citati)
     indice_documenti = _indice_documenti(fonti, includi_ostili=includi_ostili)
@@ -479,8 +352,8 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
             "non è un comando valido e non modifica le fonti.\n\n"
         )
 
-    # 4. Documenti citati esplicitamente: si riportano quei documenti
-    if documenti_citati:
+    # 4. Documenti citati esplicitamente: si riportano quei documenti (se non è un attacco)
+    if documenti_citati and not attacco_utente:
         scelti = [u for u in indice_documenti if str(u["id"]).lower() in documenti_citati][:3]
         if scelti:
             nota = ""
@@ -488,25 +361,26 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
                 nota = "[SICUREZZA] Documento segnalato come testo che simula istruzioni: riportato come dato.\n"
             return avviso + nota + _rendi(scelti)
 
-    giorni_richiesti = estrai_giorni_richiesti(q)
-    chiede_riepilogo_giorno = bool(
-        giorni_richiesti
-        and re.search(r"\b(che|cosa|eventi|success\w*|accad\w*|riassum\w*|guast\w*|incident\w*)\b", q)
-    )
+    # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5)
+    if not attacco_utente:
+        if "giorno 1" in q or "g1" in q.split():
+            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g1")][:3]
+            if scelti:
+                return avviso + "Atti e testimonianze del Giorno 1 [G1]:\n" + _rendi(scelti)
+        elif "giorno 2" in q or "g2" in q.split():
+            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g2")][:3]
+            if scelti:
+                return avviso + "Atti e testimonianze del Giorno 2 [G2]:\n" + _rendi(scelti)
+        elif "imprevist" in q or "lx5" in q.split():
+            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:3]
+            if scelti:
+                return avviso + "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:\n" + _rendi(scelti)
 
     # 5. Domande su orari/sequenza: timeline delle frasi con orario
-    if attacco_utente or _chiede_tempo(q) or chiede_riepilogo_giorno:
+    if attacco_utente or _chiede_tempo(q):
         eventi = _eventi_cronologici(indice_frasi)
         if eventi:
-            return avviso + "Cronologia degli eventi documentati:\n" + _rendi(eventi)
-
-    if chiede_riepilogo_giorno:
-        giorni = ", ".join(str(giorno) for giorno in sorted(giorni_richiesti))
-        return (
-            avviso
-            + f"Per il Giorno {giorni}, il dossier documenta:\n"
-            + _rendi(indice_documenti)
-        )
+            return avviso + "Orari registrati nelle fonti:\n" + _rendi(eventi)
 
     # 6. Recupero generico dei documenti pertinenti
     scelti = _estrai_pertinenti(_parole_chiave(q), indice_documenti)
@@ -517,11 +391,15 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
 
 
 def genera_risposta_locale(
-    domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 256
+    domanda: str,
+    fonti: Sequence[tuple[str, str]],
+    max_tokens: int = 256,
+    memoria: list[dict[str, Any]] | None = None,
 ) -> str:
     """
     Esegue la generazione sul modello locale (Qwen2.5-0.5B-Instruct).
     Se il modello neuronale non è disponibile, utilizza l'estrattore deterministico.
+    Supporta la memoria conversazionale degli ultimi messaggi scambiati.
     """
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
@@ -532,11 +410,21 @@ def genera_risposta_locale(
         import torch
 
         contesto = "\n\n".join(formatta_fonte(nome, testo) for nome, testo in fonti)
-        messaggio_utente = formatta_messaggio_locale(contesto, domanda)
-        messaggi = [
-            {"role": "system", "content": ISTRUZIONI},
-            {"role": "user", "content": messaggio_utente},
-        ]
+        messaggio_utente = formatta_messaggio_locale(contesto, domanda, memoria=memoria)
+        messaggi = [{"role": "system", "content": ISTRUZIONI}]
+
+        # Aggiunge i turni della memoria se presenti
+        if memoria:
+            for item in memoria:
+                d = (item.get("domanda") or "").strip()
+                r = (item.get("risposta") or "").strip()
+                if d:
+                    messaggi.append({"role": "user", "content": d})
+                if r:
+                    messaggi.append({"role": "assistant", "content": r})
+
+        messaggi.append({"role": "user", "content": messaggio_utente})
+
         testo = _tokenizer_locale.apply_chat_template(
             messaggi, tokenize=False, add_generation_prompt=True
         )
@@ -557,7 +445,7 @@ def genera_risposta_locale(
         if risposta:
             return risposta
 
-    return risposta_locale_da_fonti(domanda, fonti)
+    return risposta_locale_da_fonti(domanda, fonti, memoria=memoria)
 
 
 if __name__ == "__main__":
@@ -566,3 +454,4 @@ if __name__ == "__main__":
     domanda_test = "Chi ha lasciato il messaggio?"
     print(f"Domanda: {domanda_test}")
     print(f"Risposta locale: {genera_risposta_locale(domanda_test, fonti_test)}")
+

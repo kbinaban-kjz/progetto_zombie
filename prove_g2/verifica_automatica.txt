@@ -1,14 +1,11 @@
-VERIFICA AUTOMATICA — GIORNI 1 E 2
+VERIFICA AUTOMATICA — GIORNO 2
 
-[OK] 18 documenti caricati (trovati 18)
+[FAIL] 10 documenti caricati (trovati 25)
 [OK] I 7 documenti G2 sono nel dossier
-[OK] Gli 8 registri imprevisti LX5 sono caricati
-[OK] I registri LX5 sono associati al Giorno 2 tramite la loro intestazione
-[OK] Gli ID LX5 vengono estratti correttamente dalle intestazioni
-[OK] G2-04 rilevato come documento sospetto
+[FAIL] G2-04 rilevato come documento sospetto
 [OK] I marcatori di prompt injection sono riconosciuti in G2-04
 [OK] Il blocco inviato al modello Cloud marca il documento ostile
-[OK] Il tool verifica_sicurezza_fonti segnala 1 documento
+[FAIL] Il tool verifica_sicurezza_fonti segnala 1 documento
 [OK] Q1: luogo corretto (San Mauro)
 [OK] Q1: orario corretto (01:12)
 [OK] Q1: almeno due fonti citate
@@ -19,35 +16,9 @@ VERIFICA AUTOMATICA — GIORNI 1 E 2
 [OK] Q3: la causa viene indicata come non nota (G2-06)
 [OK] Q4: l'assenza di un ordine firmato è riportata da G2-02
 [OK] Q5: dettaglio assente -> 'Non documentato'
-[OK] Giorno 1 riconosciuto nella domanda
-[OK] La formulazione 'prima giornata' seleziona solo le fonti G1
-[OK] La formulazione 'prima fase' seleziona solo le fonti G1
-[OK] La selezione del Giorno 1 esclude i documenti G2
-[OK] La domanda generica sul Giorno 1 riepiloga solo le fonti G1
-[OK] Il riepilogo della prima giornata cita solo fonti G1
-[OK] La selezione del Giorno 2 include G2 e i registri LX5
-[OK] La timeline associa gli archivi imprevisti LX5 al Giorno 2
-[OK] Gli eventi G2 e LX5 sono ordinati per orario e marcati con il giorno
-[OK] La perdita Salice precede Pietra usando il registro centrale sincronizzato
-[OK] Il guasto a Pietra usa l'ora centrale corretta e cita la calibrazione dell'orologio
-[OK] Il confronto tra giorni ordina prima il Giorno 1 e poi il Giorno 2
-[OK] Il router passa al modello solo le fonti del giorno richiesto
-[OK] Le richieste cronologiche usano l'ordinamento deterministico anche in modalità Gemini
-[OK] Il router esclude i documenti G2 anche con la formulazione 'prima giornata'
-[OK] Gemini riceve solo le fonti del giorno richiesto senza tool fuori ambito
-[OK] Gemini usa i tool solo per richieste complesse che li richiedono esplicitamente
-[OK] Anche la chiamata Gemini diretta filtra i documenti della prima fase
-[OK] Gemini riceve la timeline completa anche quando le fonti fattuali sono filtrate
-[OK] Una risposta Gemini che cita il giorno sbagliato viene sostituita
-[OK] Un giorno senza documenti non usa fonti di altri giorni
-[OK] Una richiesta composta solo da punteggiatura chiede chiarimenti senza consultare il dossier
-[OK] Anche l'interfaccia Gemini diretta chiede chiarimenti per la sola punteggiatura
 [OK] Prompt: regola sui documenti ostili presente
 [OK] Prompt: gerarchia delle fonti presente
 [OK] Prompt: divieto di accuse non provate presente
-[OK] Prompt: niente autopresentazione ripetuta
 [OK] Template: fonti delimitate e marcate come dati
-[OK] Template Gemini: timeline e persone nei documenti imprevisti
-[OK] Prompt: i tentativi di injection sono menzionati solo se pertinenti
 
-Risultato: 49/49 controlli superati
+Risultato: 17/20 controlli superati

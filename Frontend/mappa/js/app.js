@@ -1076,6 +1076,8 @@
     ui.dossier.innerHTML = renderDefaultDossier();
     ui.nodeCount.textContent = NODES.length;
     ui.visibleCount.textContent = `${NODES.length} / ${NODES.length}`;
+    const bootNodesEl = document.getElementById('bootNodesCount');
+    if (bootNodesEl) bootNodesEl.textContent = `${NODES.length} / ${NODES.length}`;
     document.getElementById('statNodes').textContent = NODES.length;
     document.getElementById('statOutbreak').textContent = countByType('outbreak');
 

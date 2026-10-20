@@ -117,10 +117,12 @@ def genera_risposta(
     api_key: str | None = None,
     modello: str | None = None,
     usa_tools: bool = False,
+    memoria: list[dict[str, Any]] | None = None,
 ) -> str:
     """
     Invia la richiesta al modello Cloud (NVIDIA NIM o OpenAI).
     Se usa_tools è True, abilita gli schemi di function calling definiti in tools.py.
+    Supporta la memoria conversazionale degli ultimi messaggi scambiati.
     """
     global _ultimo_modello_nvidia_valido, ULTIMO_MODELLO_USATO
 
@@ -177,13 +179,24 @@ def genera_risposta(
         base_url=base_url,
         max_retries=0 if usa_nvidia else 1,
     )
-    messaggi = [
-        {"role": "system", "content": ISTRUZIONI},
+    messaggi: list[dict[str, Any]] = [{"role": "system", "content": ISTRUZIONI}]
+
+    # Inietta i turni della memoria passata
+    if memoria:
+        for m in memoria:
+            d = (m.get("domanda") or "").strip()
+            r = (m.get("risposta") or "").strip()
+            if d:
+                messaggi.append({"role": "user", "content": d})
+            if r:
+                messaggi.append({"role": "assistant", "content": r})
+
+    messaggi.append(
         {
             "role": "user",
-            "content": formatta_messaggio_cloud(contenuto_fonti, domanda),
-        },
-    ]
+            "content": formatta_messaggio_cloud(contenuto_fonti, domanda, memoria=memoria),
+        }
+    )
 
     risultato = None
     for indice, modello_corrente in enumerate(modelli):

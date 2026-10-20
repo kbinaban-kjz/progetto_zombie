@@ -1,0 +1,5 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-2549
+Rapporto intervento — giorno operativo 02, ore 08:00
+
+Il primo guasto della rete secondaria è avvenuto a Ripetitore Salice, alle 06:40. È un guasto radio, non un nuovo focolaio. L’annotazione deriva dalla scheda di controllo manuale firmata dal tecnico di turno. Gli orari di questa scheda sono sincronizzati con l’orologio centrale.

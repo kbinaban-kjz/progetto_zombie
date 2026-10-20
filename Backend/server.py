@@ -41,9 +41,10 @@ try:
         leggi_cronologia_con_instradamento,
         salva_con_instradamento,
         cancella_cronologia,
+        leggi_ultimi_messaggi,
     )
-    from Backend.sources import carica_fonti, risolvi_cartella_dati
-    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool
+    from Backend.sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
+    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
     from Backend.modello_locale import is_modello_caricato
     from Backend.router import genera_risposta_ibrida
     import Backend.modello_openai as modello_openai
@@ -69,9 +70,10 @@ except ImportError:
         leggi_cronologia_con_instradamento,
         salva_con_instradamento,
         cancella_cronologia,
+        leggi_ultimi_messaggi,
     )
-    from sources import carica_fonti, risolvi_cartella_dati
-    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool
+    from sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
+    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
     from modello_locale import is_modello_caricato
     from router import genera_risposta_ibrida
     import modello_openai
@@ -167,6 +169,8 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     "cartella_dati": str(risolvi_cartella_dati().relative_to(ROOT_DIR)),
                     "file_fonti": [nome for nome, _ in fonti],
                     "tools_disponibili": list(STRUMENTI_REGISTRATI.keys()),
+                    "limite_memoria": 10,
+                    "memoria_db_attiva": len(leggi_ultimi_messaggi(10)),
                 }
             )
 
@@ -201,6 +205,21 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     "totale": len(STRUMENTI_REGISTRATI),
                     "strumenti": list(STRUMENTI_REGISTRATI.keys()),
                     "schemas": TOOLS_OPENAI_SCHEMA,
+                }
+            )
+
+        # API: Lavagna Investigativa & Relazioni ("Collega i Puntini")
+        if path in {"/api/board", "/api/intelligence"}:
+            board_data = costruisci_intelligence_board()
+            return self._send_json(board_data)
+
+        # API: Mappa Tattica del Teatro Operativo
+        if path in {"/api/map", "/api/mappa"}:
+            return self._send_json(
+                {
+                    "ok": True,
+                    "totale": len(NODI_TEATRO),
+                    "nodi": NODI_TEATRO,
                 }
             )
 
@@ -275,6 +294,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             modello = (payload.get("modello") or "").strip() or None
             modalita = (payload.get("modalita") or "auto").strip().lower()
             usa_tools = bool(payload.get("usa_tools", False))
+            memoria = payload.get("memoria")
 
             try:
                 esito = genera_risposta_ibrida(
@@ -284,6 +304,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     modello=modello,
                     modalita=modalita,
                     usa_tools=usa_tools,
+                    memoria=memoria,
                 )
                 risposta = esito["risposta"]
                 record = salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
@@ -297,6 +318,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                         "complessita": esito["complessita"],
                         "motivo_routing": esito["motivo_routing"],
                         "durata_ms": esito["durata_ms"],
+                        "memoria_usata": esito.get("memoria_usata", 0),
                         "fonti": [nome for nome, _ in fonti],
                         "record": record,
                         "cronologia": leggi_cronologia_con_instradamento(),

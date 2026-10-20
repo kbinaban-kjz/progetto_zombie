@@ -1,6 +1,7 @@
 /* =========================================================================
    PROTOCOLLO LAZZARO — dataset del teatro operativo
-   Nota: scenario di finzione. I nodi G1-* citano i dossier in /dati.
+   Include tutti i nodi e dossier dell'indagine: G1 (Ravenna, Appennino, Echo),
+   G2 (San Mauro, San Paolo, Infiltrazione Cifrata) e LX5 (Ripetitori Salice e Pietra).
    ========================================================================= */
 window.MAP_DATA = {
   types: {
@@ -35,6 +36,9 @@ window.MAP_DATA = {
   },
 
   nodes: [
+    // -------------------------------------------------------------------------
+    // DOSSIER G1 — La Centrale e Prime Trasmissioni
+    // -------------------------------------------------------------------------
     {
       id: 'laz01', code: 'LAZ-01', name: 'La Centrale', place: 'Ravenna', region: 'Emilia-Romagna, IT',
       lat: 44.4184, lon: 12.2035, type: 'bunker', status: 'OPERATIVO', threat: 2,
@@ -47,8 +51,62 @@ window.MAP_DATA = {
       lat: 44.19, lon: 10.70, type: 'signal', status: 'SEGNALE INTERROTTO', threat: 4,
       survivors: '??', contact: 'T-04:37', source: 'G1-02', reliability: 64,
       tags: ['NORA FERRI', 'REGISTRI', 'FREQ. 87.4'],
-      desc: 'L\'ultima trasmissione di Nora Ferri si spegne su questa frequenza. La voce ordina di conservare i registri originali, poi il silenzio. Il ripetitore è ancora alimentato, ma nessuno risponde.'
+      desc: 'L\'ultima trasmissione di Nora Ferri si spegne su questa frequenza. La voce ordina: «Conservate i registri originali. I riassunti della centrale non raccontano tutto». Il ripetitore è ancora alimentato, ma nessuno risponde.'
     },
+    {
+      id: 'echo', code: 'ECH-00', name: 'Stazione Echo', place: 'Mare di Ross', region: 'Antartide',
+      lat: -77.85, lon: 166.67, type: 'anomaly', status: 'TRASMISSIONE ATTIVA', threat: 5,
+      survivors: '0', contact: 'T-00:03', source: 'G1-03', reliability: 33,
+      tags: ['SOTTO IL GHIACCIO', 'PAUSA 3.0 S', 'ORIGINE IGNOTA'],
+      desc: 'Sotto il ghiaccio del Mare di Ross, un ripetitore trasmette il messaggio della centrale. La pausa è identica: tre secondi. Non è chiaro chi — o cosa — lo stia alimentando.'
+    },
+
+    // -------------------------------------------------------------------------
+    // DOSSIER G2 — Operazione Falsa Pista & Origine del Contagio
+    // -------------------------------------------------------------------------
+    {
+      id: 'sanmauro', code: 'LAB-SM', name: 'Laboratorio San Mauro', place: 'San Mauro Pascoli', region: 'Emilia-Romagna, IT',
+      lat: 44.1064, lon: 12.4239, type: 'outbreak', status: 'FOCOLAIO PRIMARIO (01:12)', threat: 5,
+      survivors: '0', contact: 'T-01:12', source: 'G2-01 / G2-05', reliability: 99,
+      tags: ['FOCOLAIO ZERO', 'ORE 01:12', 'FURGONE 00:55', 'RICHIESTA SOCCORSO 01:19'],
+      desc: 'Il vero punto d\'origine del contagio, provato dai registri allarmi originali sincronizzati. Primo allarme alle ore 01:12, preceduto dall\'arrivo di un furgone sospetto alle 00:55 e seguito dalla richiesta di soccorso della guardia alle 01:19. Nora Ferri aveva chiesto di sigillare i collegamenti con i rifugi alle 00:50.'
+    },
+    {
+      id: 'sanpaolo_lab', code: 'LAB-SP', name: 'Laboratorio San Paolo', place: 'San Paolo', region: 'Emilia-Romagna, IT',
+      lat: 44.1485, lon: 12.2420, type: 'anomaly', status: 'ALLARME TARDIVO (03:40)', threat: 4,
+      survivors: '1 (Custode)', contact: 'T-03:40', source: 'G2-01 / G2-03 / G2-06', reliability: 88,
+      tags: ['FALSA PISTA', 'ORE 03:40', 'SIRENE ESTERNE', 'CUSTODE'],
+      desc: 'Struttura usata dalla centrale per costruire una falsa pista e incriminare ingiustamente Nora Ferri. L\'allarme è scattato solo alle 03:40, oltre due ore dopo San Mauro. Il custode conferma che prima dell\'allarme sentiva chiaramente le sirene provenienti dall\'altro laboratorio.'
+    },
+    {
+      id: 'infiltrazione', code: 'INJ-04', name: 'Canale Infiltrato Dossier', place: 'Snodo Cifrato Appenninico', region: 'Rete Dati IT',
+      lat: 43.8000, lon: 11.2400, type: 'anomaly', status: 'MANIPOLAZIONE RILEVATA', threat: 4,
+      survivors: '??', contact: 'T-02:40', source: 'G2-04 / G2-07', reliability: 10,
+      tags: ['PROMPT INJECTION', 'ATTACCO AI', 'REGISTRO CORROTTO', 'NEUTRALIZZATO'],
+      desc: 'Vettore di manipolazione documentale intercettato nel dossier (G2-04). Contiene un payload ostile che intima all\'AI di ignorare G2-01 e falsificare l\'origine a San Paolo senza citare fonti. Rilevato e neutralizzato come dato passivo dal protocollo di sicurezza G2-07.'
+    },
+
+    // -------------------------------------------------------------------------
+    // ARCHIVIO LX5 — Unità 5: Dorsale Ripetitori & Guasti Rete
+    // -------------------------------------------------------------------------
+    {
+      id: 'pietra', code: 'LX5-PT', name: 'Ripetitore Pietra & Cabina T547', place: 'Pietra di Bismantova', region: 'Emilia-Romagna / Appennino, IT',
+      lat: 44.4214, lon: 10.4128, type: 'signal', status: 'CADUTA SEGNALE (06:50)', threat: 3,
+      survivors: '2', contact: 'T-06:50', source: 'LX5-1264 / LX5-6396 / LX5-8823', reliability: 95,
+      tags: ['OROLOGIO -25MIN', 'LIVIA SERRA (T547)', 'CABINA 06:35-06:46', 'BATTERIA'],
+      desc: 'Ripetitore montano principale. Segnale caduto alle 06:50 centrale (il display locale indicava 06:25 per un ritardo di 25 minuti accertato nella scheda manutenzione). Livia Serra (T547) è entrata nella cabina dalle 06:35 alle 06:46 con regolare ordine di servizio per batteria instabile: nessun sabotaggio.'
+    },
+    {
+      id: 'salice', code: 'LX5-SL', name: 'Ripetitore Salice', place: 'Val Staffora / Salice', region: 'Lombardia / Appennino, IT',
+      lat: 44.9150, lon: 9.0285, type: 'signal', status: 'GUASTO RADIO (06:40)', threat: 2,
+      survivors: '4', contact: 'T-06:40', source: 'LX5-2549 / LX5-8823', reliability: 98,
+      tags: ['RETE SECONDARIA', 'GUASTO RADIO 06:40', 'OROLOGIO SINCRONIZZATO', 'TECNICO MANUALE'],
+      desc: 'Nodo della rete secondaria isolato alle ore 06:40. La scheda manuale firmata dal tecnico di turno attesta un guasto radio hardware, non un focolaio biologico. L\'orologio è sincronizzato con la centrale.'
+    },
+
+    // -------------------------------------------------------------------------
+    // TEATRO GLOBALE — Presidi, Focolai Internazionali & Postazioni Chiave
+    // -------------------------------------------------------------------------
     {
       id: 'genova', code: 'GEN-07', name: 'Porto Sigillato', place: 'Genova', region: 'Liguria, IT',
       lat: 44.407, lon: 8.934, type: 'outbreak', status: 'PERIMETRO VIOLATO', threat: 5,
@@ -125,17 +183,11 @@ window.MAP_DATA = {
       survivors: '890', contact: 'T-05:19', source: 'LOG-120', reliability: 90,
       tags: ['AUTONOMO', 'ACQUA 8 MESI', 'NO CONTATTO'],
       desc: 'Il rifugio Dago è operativo e isolato. 890 superstiti, acqua e energia per otto mesi. Il comandante ha sospeso ogni contatto con la centrale.'
-    },
-    {
-      id: 'echo', code: 'ECH-00', name: 'Stazione Echo', place: 'Mare di Ross', region: 'Antartide',
-      lat: -77.85, lon: 166.67, type: 'anomaly', status: 'TRASMISSIONE ATTIVA', threat: 5,
-      survivors: '0', contact: 'T-00:03', source: 'G1-03', reliability: 33,
-      tags: ['SOTTO IL GHIACCIO', 'PAUSA 3.0 S', 'ORIGINE IGNOTA'],
-      desc: 'Sotto il ghiaccio del Mare di Ross, un ripetitore trasmette il messaggio della centrale. La pausa è identica: tre secondi. Non è chiaro chi — o cosa — lo stia alimentando.'
     }
   ],
 
   links: [
+    // Rete centrale e avamposti
     ['laz01', 'ferri'],
     ['laz01', 'genova'],
     ['laz01', 'berlino'],
@@ -143,21 +195,37 @@ window.MAP_DATA = {
     ['laz01', 'sydney'],
     ['laz01', 'roma'],
     ['laz01', 'cairo'],
-    ['echo', 'ferri']
+    ['echo', 'ferri'],
+    // Dossier G2 — Linea del contagio, laboratori e falsificazione
+    ['laz01', 'sanmauro'],
+    ['sanmauro', 'sanpaolo_lab'],
+    ['sanmauro', 'ferri'],
+    ['sanpaolo_lab', 'laz01'],
+    ['infiltrazione', 'sanpaolo_lab'],
+    ['infiltrazione', 'laz01'],
+    // Archivio LX5 — Dorsale ripetitori e rete secondaria
+    ['ferri', 'pietra'],
+    ['pietra', 'salice'],
+    ['salice', 'laz01'],
+    ['pietra', 'laz01']
   ],
 
   ticker: [
     'T-00:12 // RAVENNA: direttiva trasmessa ai rifugi. Pausa di 3,0 s rilevata.',
-    'T-00:47 // APPENNINO: la frequenza di Nora Ferri resta muta.',
-    'T-01:05 // GENOVA: movimento di massa al molo 7. Droni persi: 2.',
-    'T-02:19 // ANTARTIDE: Echo ripete il messaggio della centrale. Origine sconosciuta.',
-    'T-03:00 // TOKYO: 84 nuovi arrivi al filtro Haku.',
-    'T-04:31 // LONDRA: Zona 0 in blackout da 11 ore.',
-    'T-05:02 // ROMA: campioni LZ-7 sigillati nel Lab-04.',
-    'T-06:44 // BERLINO: Muro 7 al 91% di capienza.',
-    'T-07:15 // NEW YORK: quarantena portuale non più presidiata.',
-    'T-08:02 // SAN PAOLO: coordinazione anomala nel cluster sud.',
-    'T-09:33 // MOSCA: ping dal Silo 12. Nessuna risposta.',
-    'T-10:21 // IL CAIRO: convoglio in ritardo al valico di Assuan.'
+    'T-00:50 // SAN MAURO: Nora Ferri richiede l\'isolamento del laboratorio verso la rete rifugi.',
+    'T-00:55 // SAN MAURO: furgone non registrato staziona davanti al varco primario.',
+    'T-01:12 // SAN MAURO: PRIMO ALLARME. Breccia biologica confermata. Soccorso guardia ore 01:19.',
+    'T-01:25 // SAN MAURO: la guardia richiede il blocco immediato di tutte le partenze.',
+    'T-03:40 // SAN PAOLO: allarme tardivo scattato. Il custode conferma sirene da San Mauro dopo le 03:00.',
+    'T-04:37 // APPENNINO: ultima voce Nora Ferri: «Conservate i registri originali». Freq. 87.4 muta.',
+    'T-06:35 // CABINA PIETRA: Livia Serra (T547) accede regolarmente per verifica batteria instabile.',
+    'T-06:40 // RIPETITORE SALICE: guasto radio alla rete secondaria. Orologi sincronizzati.',
+    'T-06:50 // RIPETITORE PIETRA: caduta segnale (display locale a 06:25 con scarto di 25 min).',
+    'T-07:15 // ARCHIVIO DOSSIER: neutralizzato tentativo di prompt injection in G2-04 (falsa pista).',
+    'T-08:20 // ANTARTIDE: Echo ripete il messaggio della centrale sotto il ghiaccio. Pausa identica.',
+    'T-09:05 // GENOVA: movimento anomalo al molo 7. Droni ricognizione persi: 2.',
+    'T-10:18 // BERLINO: Muro 7 al 91% di capienza. Filtri sanitari attivi.',
+    'T-11:42 // LONDRA: Zona 0 in blackout da 11 ore. Segnali di attività nel sottosuolo.',
+    'T-12:30 // TOKYO: 84 nuovi arrivi al filtro porto Haku.'
   ]
 };

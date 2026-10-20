@@ -24,15 +24,10 @@ try:
         get_nvidia_api_key,
         get_openai_api_key,
     )
-    from Backend.modello_locale import (
-        genera_risposta_locale,
-        is_modello_caricato,
-        richiede_ordinamento_cronologico,
-        risposta_locale_da_fonti,
-    )
+    from Backend.modello_locale import genera_risposta_locale, is_modello_caricato
+    from Backend.database import leggi_ultimi_messaggi
     import Backend.modello_openai as modello_openai
     import Backend.modello_gemini as modello_gemini
-    from Backend.sources import id_fonte, seleziona_fonti_per_giorno
 except ImportError:
     from config import (
         MODELLO_LOCALE,
@@ -44,15 +39,10 @@ except ImportError:
         get_nvidia_api_key,
         get_openai_api_key,
     )
-    from modello_locale import (
-        genera_risposta_locale,
-        is_modello_caricato,
-        richiede_ordinamento_cronologico,
-        risposta_locale_da_fonti,
-    )
+    from modello_locale import genera_risposta_locale, is_modello_caricato
+    from database import leggi_ultimi_messaggi
     import modello_openai
     import modello_gemini
-    from sources import id_fonte, seleziona_fonti_per_giorno
 
 PAROLE_COMPLESSE = {
     "confronta",
@@ -135,13 +125,24 @@ def genera_risposta_ibrida(
     modello: str | None = None,
     modalita: str = "auto",
     usa_tools: bool = False,
+    memoria: list[dict[str, Any]] | None = None,
+    limite_memoria: int = 10,
 ) -> dict[str, Any]:
     """
     Smista la richiesta tra:
     - Modello locale (per richieste semplici o modalita='locale')
     - Modello cloud (per richieste complesse o modalita='cloud')
+    Carica automaticamente gli ultimi `limite_memoria` messaggi dal database SQLite
+    per garantire la continuità conversazionale dell'agente.
     """
-    fonti, giorni_richiesti = seleziona_fonti_per_giorno(domanda, fonti)
+    # Carica la memoria degli ultimi messaggi dal database se non passata esplicitamente
+    if memoria is None:
+        try:
+            memoria = leggi_ultimi_messaggi(limite=limite_memoria)
+        except Exception as exc:
+            print(f"(Avviso recupero memoria database SQLite: {exc})")
+            memoria = []
+
     is_complessa, motivo = valuta_complessita(domanda)
     modalita_norm = (modalita or "auto").strip().lower()
 
@@ -157,42 +158,8 @@ def genera_risposta_ibrida(
     livello = "complessa" if is_complessa else "semplice"
     inizio = time.perf_counter()
 
-    if not re.search(r"\w", domanda, flags=re.UNICODE):
-        return {
-            "risposta": "Non ho capito la richiesta. Puoi formulare una domanda o indicare quale aspetto del dossier vuoi analizzare?",
-            "motore": "input",
-            "modello_usato": "Validazione della richiesta",
-            "complessita": livello,
-            "motivo_routing": "Richiesta priva di testo significativo",
-            "durata_ms": int((time.perf_counter() - inizio) * 1000),
-        }
-
-    if giorni_richiesti and not fonti:
-        giorni = ", ".join(str(giorno) for giorno in sorted(giorni_richiesti))
-        return {
-            "risposta": f"Non sono disponibili fonti del Giorno {giorni} nel dossier caricato.",
-            "motore": "fonti",
-            "modello_usato": "Ricerca nel dossier",
-            "complessita": livello,
-            "motivo_routing": f"Nessuna fonte disponibile per il Giorno {giorni}",
-            "durata_ms": int((time.perf_counter() - inizio) * 1000),
-        }
-
-    if richiede_ordinamento_cronologico(domanda):
-        esito = {
-            "risposta": risposta_locale_da_fonti(domanda, fonti),
-            "motore": "locale",
-            "modello_usato": "Ordinamento deterministico degli eventi documentati",
-            "complessita": livello,
-            "motivo_routing": "Cronologia ordinata per giorno e orario registrato",
-            "durata_ms": int((time.perf_counter() - inizio) * 1000),
-        }
-        return esito
-
-    usa_tools_richiesti = usa_tools and is_complessa and not giorni_richiesti
-
     if not usa_cloud:
-        risposta = genera_risposta_locale(domanda, fonti)
+        risposta = genera_risposta_locale(domanda, fonti, memoria=memoria)
         if is_modello_caricato():
             modello_effettivo = MODELLO_LOCALE
         else:
@@ -246,7 +213,8 @@ def genera_risposta_ibrida(
                 fonti,
                 api_key=api_key,
                 modello=modello,
-                usa_tools=usa_tools_richiesti,
+                usa_tools=usa_tools,
+                memoria=memoria,
             )
             modello_cloud = (
                 modello_gemini.ULTIMO_MODELLO_USATO
@@ -268,7 +236,8 @@ def genera_risposta_ibrida(
                 fonti,
                 api_key=api_key,
                 modello=modello,
-                usa_tools=usa_tools_richiesti,
+                usa_tools=usa_tools,
+                memoria=memoria,
             )
             _, provider = stato_chiavi_api()
             usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
@@ -295,29 +264,11 @@ def genera_risposta_ibrida(
                 "motivo_routing": motivo,
             }
 
-    if giorni_richiesti:
-        id_fonti_giorno = {
-            id_fonte(nome, testo).casefold().replace("_", "-")
-            for nome, testo in fonti
-        }
-        id_citati = {
-            citazione.casefold().replace("_", "-")
-            for citazione in re.findall(
-                r"\b(?:g\d+-\d+|lx\d+[-_]\d+)\b", esito["risposta"], re.IGNORECASE
-            )
-        }
-        if id_citati - id_fonti_giorno:
-            esito["risposta"] = risposta_locale_da_fonti(domanda, fonti)
-            esito["motore"] = "locale"
-            esito["modello_usato"] = "Estrattore deterministico sulle fonti del giorno richiesto"
-            esito["motivo_routing"] = (
-                "Risposta Cloud scartata: citava documenti di un giorno diverso"
-            )
-
+    esito["memoria_usata"] = len(memoria)
     esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
     print(
         f"[ROUTING] {esito['motore'].upper()} | {esito['modello_usato']} | "
-        f"{livello} ({motivo}) | {esito['durata_ms']} ms"
+        f"{livello} ({motivo}) | memoria: {len(memoria)} msg | {esito['durata_ms']} ms"
     )
     return esito
 
@@ -336,3 +287,4 @@ if __name__ == "__main__":
 
     res = genera_risposta_ibrida(d1, fonti_demo)
     print(f"Esito ibrido: {res['motore']} -> {res['risposta']}")
+
