@@ -126,7 +126,7 @@ def genera_risposta_ibrida(
     modalita: str = "auto",
     usa_tools: bool = False,
     memoria: list[dict[str, Any]] | None = None,
-    limite_memoria: int = 10,
+    limite_memoria: int = 6,
 ) -> dict[str, Any]:
     """
     Smista la richiesta tra:
@@ -142,6 +142,18 @@ def genera_risposta_ibrida(
         except Exception as exc:
             print(f"(Avviso recupero memoria database SQLite: {exc})")
             memoria = []
+    limite = max(0, int(limite_memoria))
+    memoria_limitata = []
+    for messaggio in memoria[-limite:] if limite else []:
+        if not isinstance(messaggio, dict):
+            continue
+        messaggio_limitato = dict(messaggio)
+        for chiave in ("domanda", "risposta"):
+            valore = messaggio.get(chiave)
+            testo = valore.strip() if isinstance(valore, str) else ""
+            messaggio_limitato[chiave] = testo[:497] + "..." if len(testo) > 500 else testo
+        memoria_limitata.append(messaggio_limitato)
+    memoria = memoria_limitata
 
     is_complessa, motivo = valuta_complessita(domanda)
     modalita_norm = (modalita or "auto").strip().lower()
@@ -287,4 +299,3 @@ if __name__ == "__main__":
 
     res = genera_risposta_ibrida(d1, fonti_demo)
     print(f"Esito ibrido: {res['motore']} -> {res['risposta']}")
-
