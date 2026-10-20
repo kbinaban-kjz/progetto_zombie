@@ -11,7 +11,7 @@ Se preferisci servire la cartella in locale:
 
 ```bash
 python -m http.server 8080
-# poi apri http://127.0.0.1:8080/mappa/
+# poi apri http://127.0.0.1:8080/Frontend/mappa/
 ```
 
 ## Interazioni
@@ -27,7 +27,7 @@ python -m http.server 8080
 ## File
 
 ```text
-mappa/
+Frontend/mappa/
 ├── index.html          # struttura HUD, pannelli, ticker
 ├── css/style.css       # estetica apocalittica, responsive, animazioni
 ├── js/data.js          # nodi, collegamenti, testi del ticker
@@ -67,4 +67,4 @@ I collegamenti tra nodi stanno in `links`:
 
 I colori dei tipi e le etichette sono in `types`, sempre in `js/data.js`.
 
-> Scenario e contenuti sono di finzione. I riferimenti `G1-*` richiamano i dossier presenti in `../dati/`.
+> Scenario e contenuti sono di finzione. I riferimenti `G1-*` richiamano i dossier presenti in `../../dati/`.

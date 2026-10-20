@@ -352,7 +352,7 @@
       <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white">
-            🌍 Mappa Interattiva — Protocollo Lazzaro (<code class="text-amber-300 font-mono text-xs">mappa/index.html</code>)
+            🌍 Mappa Interattiva — Protocollo Lazzaro (<code class="text-amber-300 font-mono text-xs">Frontend/mappa/index.html</code>)
           </h2>
           <p class="text-[11px] font-mono text-stone-400">
             Globo interattivo del teatro operativo (14 nodi di rete: Rifugi, Focolai, Segnali e Anomalie • Dossier G1-01, G1-02, G1-03).
@@ -364,15 +364,15 @@
             class="px-2.5 py-1.5 rounded bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition">
             ⛶ Schermo intero
           </button>
-          <a id="mappa-external-link" href="../mappa/index.html" target="_blank" rel="noopener"
-            class="px-2.5 py-1.5 rounded bg-crimson-900/70 hover:bg-crimson-800 text-white border border-crimson-700 text-xs font-mono transition">
+          <a id="mappa-external-link" href="mappa/index.html" target="_blank" rel="noopener"
+            class="px-2.5 py-1.5 rounded bg-crimson-900/70 hover:bg-crimson-800 text-white border border-crimson-600 text-xs font-mono transition">
             ↗ Apri in scheda dedicata
           </a>
         </div>
       </div>
 
       <div id="mappa-wrapper" class="relative w-full h-[680px] bg-bunker-950">
-        <iframe id="mappa-iframe" src="../mappa/index.html" title="Protocollo Lazzaro — Mappa Teatro Globale"
+        <iframe id="mappa-iframe" src="mappa/index.html" title="Protocollo Lazzaro — Mappa Teatro Globale"
           class="w-full h-full border-0" allowfullscreen loading="lazy"></iframe>
       </div>
     </section>
@@ -446,8 +446,8 @@ Non inventare persone, luoghi, cause o eventi.`;
 
     function inizializzaMappa() {
       const urlMappa = (window.location.protocol === 'file:' || window.location.pathname.includes('/Frontend/'))
-        ? '../mappa/index.html'
-        : '/mappa/index.html';
+        ? 'mappa/index.html'
+        : '/Frontend/mappa/index.html';
       const iframe = document.getElementById('mappa-iframe');
       const link = document.getElementById('mappa-external-link');
       if (iframe && iframe.getAttribute('src') !== urlMappa) {

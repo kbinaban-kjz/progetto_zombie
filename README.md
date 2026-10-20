@@ -29,8 +29,8 @@ Ogni file gestisce un ambito operativo ben definito:
 │   ├── Investigatore.py      # Entry point principale dell'applicazione (avvio server o CLI; re-export modulare)
 │   └── Missione.xlsx         # Specifiche e obiettivi operativi della missione
 ├── Frontend/
-│   └── index.html            # Dashboard web investigativa (Chat, Routing, Fonti, Strumenti AI, SQLite)
-├── mappa/                    # Visualizzatore 3D e teatro operativo globale (14 nodi strategici)
+│   ├── index.html            # Dashboard web investigativa (Chat, Routing, Fonti, Strumenti AI, SQLite)
+│   └── mappa/                # Visualizzatore 3D Canvas del teatro operativo globale (14 nodi strategici)
 ├── dati/                     # Dossier e testimonianze (.txt)
 │   ├── G1-01.txt
 │   ├── G1-02.txt

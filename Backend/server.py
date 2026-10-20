@@ -94,6 +94,11 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             self.path = "/Frontend/index.html"
             return super().do_GET()
 
+        # Compatibilità percorsi mappa: mappa/ ora risiede in Frontend/mappa/
+        if path.startswith("/mappa"):
+            self.path = "/Frontend" + path
+            return super().do_GET()
+
         # API: Stato complessivo
         if path == "/api/status":
             fonti = carica_fonti()
