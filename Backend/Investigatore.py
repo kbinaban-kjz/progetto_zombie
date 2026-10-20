@@ -12,15 +12,17 @@ Avvio da terminale interattivo:
     python Backend/Investigatore.py --cli
 """
 
-from collections.abc import Sequence
+from collections import OrderedDict
+from collections.abc import Iterator, Sequence
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
-import importlib
+import hashlib
 import json
 import os
 import re
 import sys
+import threading
 import time
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -37,68 +39,77 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import modello_openai
-from database import inizializza_db, salva_messaggio, leggi_cronologia, get_connection
+from database import inizializza_db, salva_messaggio, leggi_cronologia
 
-_modello_openai_mtime: int | None = None
-
-
-def _ricarica_modello_openai_se_modificato() -> None:
-    global _modello_openai_mtime
-    percorso = Path(modello_openai.__file__).resolve()
-    if percorso.is_file():
-        mtime = percorso.stat().st_mtime_ns
-        if _modello_openai_mtime is not None and mtime != _modello_openai_mtime:
-            importlib.reload(modello_openai)
-        _modello_openai_mtime = mtime
-
-
-_ricarica_modello_openai_se_modificato()
 inizializza_db()
 
 # ==============================================================================
 # 1. MODELLO LOCALE DI INVESTIGATORE.PY (Qwen/Qwen2.5-0.5B-Instruct)
 # ==============================================================================
 MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"
+# Un modello da 0.5B su CPU è lento soprattutto in generazione: meno token = meno secondi.
+MAX_TOKEN_LOCALE = int(os.environ.get("LOCAL_MAX_TOKENS", 120))
+# Prompt BREVE per il modello locale: ogni token di prompt costa tempo di calcolo su CPU.
+ISTRUZIONI_LOCALE = (
+    "Sei un investigatore. Rispondi in italiano, in al massimo 3 frasi, usando le fonti "
+    "e citandole (es. [G1-01.txt]). Per consigli pratici (sopravvivenza, rifugi) puoi usare "
+    "conoscenze generali, ma distinguile da ciò che dicono le fonti. Se un fatto del caso "
+    "non è nelle fonti scrivi: Non documentato nelle fonti disponibili. Non inventare."
+)
 _tokenizer_locale = None
 _modello_locale = None
-_dispositivo_locale = "cpu"
 _modello_locale_tentato = False
+_lock_caricamento = threading.Lock()
+_lock_generazione = threading.Lock()
 
 
 def carica_modello_locale() -> bool:
-    """Carica il modello locale Qwen/Qwen2.5-0.5B-Instruct (GPU MPS/CUDA se disponibile, altrimenti CPU)."""
-    global _tokenizer_locale, _modello_locale, _dispositivo_locale, _modello_locale_tentato
-    if _modello_locale_tentato:
-        return _modello_locale is not None
-    _modello_locale_tentato = True
-    try:
-        import torch
-        from transformers import AutoTokenizer, AutoModelForCausalLM
+    """Carica il modello locale Qwen/Qwen2.5-0.5B-Instruct su CPU (Cella 3 di Investigatore.ipynb).
 
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            _dispositivo_locale = "mps"
-            dtype = torch.float16
-        elif torch.cuda.is_available():
-            _dispositivo_locale = "cuda"
-            dtype = torch.float16
-        else:
-            _dispositivo_locale = "cpu"
-            dtype = torch.float32
+    Thread-safe: se il caricamento è già in corso in background, chi chiama aspetta che finisca.
+    """
 
-        print(f"[Locale] Caricamento modello {MODELLO_LOCALE} su {_dispositivo_locale.upper()}...")
-        _tokenizer_locale = AutoTokenizer.from_pretrained(MODELLO_LOCALE)
-        _modello_locale = AutoModelForCausalLM.from_pretrained(
-            MODELLO_LOCALE,
-            torch_dtype=dtype,
-            low_cpu_mem_usage=True,
-        ).to(_dispositivo_locale)
-        _modello_locale.eval()
-        print(f"[Locale] Modello {MODELLO_LOCALE} pronto su {_dispositivo_locale.upper()}.")
-        return True
-    except Exception as exc:
-        print(f"[Locale] Impossibile caricare {MODELLO_LOCALE} con transformers/torch ({exc}).")
-        print("[Locale] Verrà usato il risponditore locale diretto sulle fonti .txt.")
+    global _tokenizer_locale, _modello_locale, _modello_locale_tentato
+    if modello_openai._config("LOCALE_SENZA_TORCH") == "1":
         return False
+
+    with _lock_caricamento:
+        if _modello_locale_tentato:
+            return _modello_locale is not None
+        _modello_locale_tentato = True
+        try:
+            import torch
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+
+            torch.set_num_threads(max(1, os.cpu_count() or 1))
+            print(f"[Locale] Caricamento modello {MODELLO_LOCALE} su CPU...")
+            _tokenizer_locale = AutoTokenizer.from_pretrained(MODELLO_LOCALE)
+            _modello_locale = AutoModelForCausalLM.from_pretrained(MODELLO_LOCALE).to("cpu")
+            _modello_locale.eval()
+            try:  # riscaldamento: la prima generazione è sempre la più lenta
+                with torch.inference_mode():
+                    dati = _tokenizer_locale("Ciao", return_tensors="pt")
+                    _modello_locale.generate(
+                        **dati,
+                        max_new_tokens=1,
+                        do_sample=False,
+                        pad_token_id=_tokenizer_locale.eos_token_id,
+                    )
+            except Exception:
+                pass
+            print(f"[Locale] Modello {MODELLO_LOCALE} pronto.")
+            return True
+        except Exception as exc:
+            _modello_locale = None
+            print(f"[Locale] Impossibile caricare {MODELLO_LOCALE} con transformers/torch ({exc}).")
+            print("[Locale] Verrà usato il risponditore locale diretto sulle fonti .txt.")
+            return False
+
+
+def precarica_modello_locale() -> None:
+    """Avvia il caricamento di Qwen in background, così la prima domanda non lo aspetta."""
+    if os.environ.get("PRECARICA_LOCALE", "1") != "0":
+        threading.Thread(target=carica_modello_locale, daemon=True).start()
 
 
 def formatta_fonte_locale(nome: str, testo: str) -> str:
@@ -150,12 +161,13 @@ def _risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) ->
     return "Non documentato nelle fonti disponibili."
 
 
-def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 256) -> str:
+def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int | None = None) -> str:
     """Esegue la generazione sul modello locale di Investigatore.py (Qwen/Qwen2.5-0.5B-Instruct)."""
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
     if not fonti:
         raise ValueError("Fornisci almeno una fonte.")
+    max_tokens = max_tokens or MAX_TOKEN_LOCALE
 
     if carica_modello_locale() and _tokenizer_locale is not None and _modello_locale is not None:
         import torch
@@ -164,25 +176,23 @@ def genera_risposta_locale(domanda: str, fonti: Sequence[tuple[str, str]], max_t
         messaggio_utente = (
             f"Fonti:\n{contesto}\n\n"
             f"Domanda: {domanda.strip()}\n"
-            "Rispondi citando sempre le fonti usate (es. [G1-01.txt], [G1-02.txt], [G1-03.txt]) "
-            "e senza inventare informazioni mancanti."
+            "Rispondi in modo breve citando le fonti usate (es. [G1-01.txt])."
         )
         messaggi = [
-            {"role": "system", "content": modello_openai.ISTRUZIONI},
+            {"role": "system", "content": ISTRUZIONI_LOCALE},
             {"role": "user", "content": messaggio_utente},
         ]
         testo = _tokenizer_locale.apply_chat_template(
             messaggi, tokenize=False, add_generation_prompt=True
         )
-        dati = _tokenizer_locale(testo, return_tensors="pt").to(_dispositivo_locale)
+        dati = _tokenizer_locale(testo, return_tensors="pt")
         if dati["input_ids"].shape[1] > 6000:
             raise ValueError("Troppi documenti: seleziona le fonti con il RAG.")
-        with torch.inference_mode():
+        with _lock_generazione, torch.inference_mode():
             out = _modello_locale.generate(
                 **dati,
                 max_new_tokens=max_tokens,
                 do_sample=False,
-                use_cache=True,
                 pad_token_id=_tokenizer_locale.eos_token_id,
             )
         risposta = _tokenizer_locale.decode(
@@ -238,6 +248,29 @@ PAROLE_COMPLESSE = {
 }
 
 
+# Domande pratiche/generali ("come sopravvivere?", "dove ripararsi?"): la risposta
+# NON sta nelle fonti, quindi il modello locale/estrattore non può rispondere -> cloud.
+PAROLE_GENERALI = (
+    "sopravviv",
+    "al riparo",
+    "stare al sicuro",
+    "cosa devo fare",
+    "cosa posso fare",
+    "cosa dovrei fare",
+    "dove devo andare",
+    "dove posso andare",
+    "dove andare",
+    "come posso",
+    "come faccio",
+    "consigli",
+    "consiglio",
+    "proteggermi",
+    "difendermi",
+    "scappare",
+    "nascondermi",
+)
+
+
 def valuta_complessita(domanda: str) -> tuple[bool, str]:
     """
     Determina se la domanda è semplice (False -> modello locale Investigatore.py)
@@ -263,11 +296,163 @@ def valuta_complessita(domanda: str) -> tuple[bool, str]:
         if indicatore.strip() in testo_lower:
             return True, f"Richiesta di ragionamento/analisi ('{indicatore.strip()}')"
 
+    # 3b. Domande pratiche/generali: servono conoscenze oltre le fonti
+    for indicatore in PAROLE_GENERALI:
+        if indicatore in testo_lower:
+            return True, "Domanda pratica/generale (serve conoscenza oltre le fonti)"
+
     # 4. Domande lunghe o strutturate in più frasi
     if num_parole > 14 or len(testo) > 95:
         return True, f"Domanda articolata ({num_parole} parole)"
 
     return False, f"Domanda diretta e concisa ({num_parole} parole)"
+
+
+# Cache delle risposte: la stessa domanda sulle stesse fonti torna in pochi millisecondi.
+# Si disattiva con la variabile d'ambiente CACHE_RISPOSTE=0.
+CACHE_MAX = 128
+_cache_risposte: "OrderedDict[str, tuple[str, str]]" = OrderedDict()
+_lock_cache = threading.Lock()
+
+
+def _cache_attiva() -> bool:
+    return os.environ.get("CACHE_RISPOSTE", "1") != "0"
+
+
+def _chiave_cache(domanda: str, fonti: Sequence[tuple[str, str]], motore: str, modello: str | None) -> str:
+    h = hashlib.sha1()
+    h.update(" ".join(domanda.casefold().split()).encode("utf-8"))
+    h.update(f"|{motore}|{modello or ''}|".encode("utf-8"))
+    for nome, testo in fonti:
+        h.update(nome.encode("utf-8"))
+        h.update(testo.encode("utf-8"))
+    return h.hexdigest()
+
+
+def _cache_leggi(chiave: str):
+    if not _cache_attiva():
+        return None
+    with _lock_cache:
+        voce = _cache_risposte.get(chiave)
+        if voce is not None:
+            _cache_risposte.move_to_end(chiave)
+        return voce
+
+
+def _cache_scrivi(chiave: str, risposta: str, modello: str) -> None:
+    if not _cache_attiva():
+        return
+    with _lock_cache:
+        _cache_risposte[chiave] = (risposta, modello)
+        _cache_risposte.move_to_end(chiave)
+        while len(_cache_risposte) > CACHE_MAX:
+            _cache_risposte.popitem(last=False)
+
+
+def _flusso_ibrido(
+    domanda: str,
+    fonti: Sequence[tuple[str, str]],
+    *,
+    api_key: str | None = None,
+    modello: str | None = None,
+    modalita: str = "auto",
+) -> Iterator[dict]:
+    """
+    Smista la richiesta tra:
+    - Modello locale di Investigatore.py (per richieste semplici o modalita='locale')
+    - Modello cloud di modello_openai.py (per richieste complesse o modalita='cloud')
+
+    Produce eventi: {"tipo": "meta"}, poi {"tipo": "delta", "testo": ...} (uno o più),
+    infine {"tipo": "fine", "risposta", "modello_usato", "tempo_ms", "ttft_ms", "da_cache"}.
+    """
+    inizio = time.perf_counter()
+    is_complessa, motivo = valuta_complessita(domanda)
+    modalita_norm = (modalita or "auto").strip().lower()
+    ha_key, provider = _ha_chiave_configurata()
+    cloud_disponibile = bool(api_key) or ha_key
+
+    if modalita_norm == "locale":
+        usa_cloud = False
+        motivo = "Scelta manuale: Modello Locale (Investigatore.py)"
+    elif modalita_norm == "cloud":
+        usa_cloud = True
+        motivo = "Scelta manuale: Modello Cloud (modello_openai.py)"
+    else:
+        usa_cloud = cloud_disponibile
+        if usa_cloud and not cloud_disponibile:
+            usa_cloud = False
+            motivo += " — cloud non configurato, risponde il locale"
+
+    livello = "complessa" if is_complessa else "semplice"
+    motore = "cloud" if usa_cloud else "locale"
+    if usa_cloud:
+        modello_previsto = modello or modello_openai.modello_predefinito(
+            modello_openai.rileva_provider(api_key)
+        )
+    else:
+        modello_previsto = MODELLO_LOCALE
+
+    yield {
+        "tipo": "meta",
+        "motore": motore,
+        "modello_usato": modello_previsto,
+        "complessita": livello,
+        "motivo_routing": motivo,
+    }
+
+    chiave = _chiave_cache(domanda, fonti, motore, modello)
+    voce = _cache_leggi(chiave)
+    if voce is not None:
+        risposta, modello_reale = voce
+        tempo = round((time.perf_counter() - inizio) * 1000)
+        yield {"tipo": "delta", "testo": risposta}
+        yield {
+            "tipo": "fine",
+            "risposta": risposta,
+            "modello_usato": modello_reale,
+            "tempo_ms": tempo,
+            "ttft_ms": tempo,
+            "da_cache": True,
+        }
+        return
+
+    parti: list[str] = []
+    primo = None
+    modello_reale = modello_previsto
+    if usa_cloud:
+        # Richiesta complessa -> Modello Cloud (modello_openai.py), risposta in streaming
+        for evento in modello_openai.genera_risposta_stream(
+            domanda, fonti, api_key=api_key, modello=modello
+        ):
+            if "delta" in evento:
+                if primo is None:
+                    primo = time.perf_counter()
+                parti.append(evento["delta"])
+                yield {"tipo": "delta", "testo": evento["delta"]}
+            elif evento.get("fine"):
+                modello_reale = evento["modello"]  # il modello che ha risposto davvero
+    else:
+        testo = genera_risposta_locale(domanda, fonti)
+        primo = time.perf_counter()
+        parti.append(testo)
+        modello_reale = (
+            MODELLO_LOCALE if _modello_locale is not None else f"{MODELLO_LOCALE} (estrattore locale)"
+        )
+        yield {"tipo": "delta", "testo": testo}
+
+    risposta = "".join(parti).strip()
+    if not risposta:
+        raise RuntimeError("Il modello ha restituito una risposta vuota.")
+    _cache_scrivi(chiave, risposta, modello_reale)
+    fine = time.perf_counter()
+    yield {
+        "tipo": "fine",
+        "risposta": risposta,
+        "modello_usato": modello_reale,
+        "tempo_ms": round((fine - inizio) * 1000),
+        "ttft_ms": round(((primo or fine) - inizio) * 1000),
+        "da_cache": False,
+    }
 
 
 def genera_risposta_ibrida(
@@ -278,165 +463,29 @@ def genera_risposta_ibrida(
     modello: str | None = None,
     modalita: str = "auto",
 ) -> dict:
-    """
-    Smista la richiesta tra:
-    - Modello locale di Investigatore.py (per richieste semplici o modalita='locale')
-    - Modello cloud di modello_openai.py (per richieste complesse o modalita='cloud')
-    """
-    is_complessa, motivo = valuta_complessita(domanda)
-    modalita_norm = (modalita or "auto").strip().lower()
-
-    if modalita_norm == "locale":
-        usa_cloud = False
-        motivo = "Scelta manuale: Modello Locale (Investigatore.py)"
-    elif modalita_norm == "cloud":
-        usa_cloud = True
-        motivo = "Scelta manuale: Modello Cloud (modello_openai.py)"
-    else:
-        usa_cloud = is_complessa
-
-    livello = "complessa" if is_complessa else "semplice"
-    inizio = time.perf_counter()
-
-    if not usa_cloud:
-        risposta = genera_risposta_locale(domanda, fonti)
-        if _modello_locale is not None:
-            modello_effettivo = MODELLO_LOCALE
-        else:
-            modello_effettivo = "Estrattore locale sulle fonti (torch/transformers non disponibili)"
-        esito = {
-            "risposta": risposta,
-            "motore": "locale",
-            "modello_usato": modello_effettivo,
-            "complessita": livello,
-            "motivo_routing": motivo,
-        }
-    else:
-        # Richiesta complessa -> Modello Cloud (modello_openai.py)
-        _ricarica_modello_openai_se_modificato()
-        risposta = modello_openai.genera_risposta(
-            domanda,
-            fonti,
-            api_key=api_key,
-            modello=modello,
-        )
-        _, provider = _ha_chiave_configurata()
-        usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (not api_key and provider == "NVIDIA")
-        modello_cloud = (
-            modello_openai.ULTIMO_MODELLO_USATO
-            or modello
-            or (
-                os.environ.get("NVIDIA_MODEL")
-                or modello_openai._valore_env_file("NVIDIA_MODEL")
-                or modello_openai.MODELLO_NVIDIA_DEFAULT
-                if usa_nvidia
-                else os.environ.get("OPENAI_MODEL")
-                or modello_openai._valore_env_file("OPENAI_MODEL")
-                or "gpt-4o-mini"
-            )
-        )
-        esito = {
-            "risposta": risposta,
-            "motore": "cloud",
-            "modello_usato": f"{'NVIDIA' if usa_nvidia else 'OpenAI'} • {modello_cloud}",
-            "complessita": livello,
-            "motivo_routing": motivo,
-        }
-
-    esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
-    print(
-        f"[ROUTING] {esito['motore'].upper()} | {esito['modello_usato']} | "
-        f"{livello} ({motivo}) | {esito['durata_ms']} ms"
-    )
-    return esito
-
-
-# ==============================================================================
-# 2b. METADATI DI INSTRADAMENTO SU SQLITE (tabella separata, non modifica schema.sql)
-# ==============================================================================
-def _inizializza_tabella_instradamento() -> None:
-    with get_connection() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS instradamento_chat (
-                id_messaggio INTEGER PRIMARY KEY,
-                motore TEXT NOT NULL,
-                modello_usato TEXT NOT NULL,
-                complessita TEXT NOT NULL,
-                motivo_routing TEXT NOT NULL,
-                durata_ms INTEGER NOT NULL DEFAULT 0
-            )
-            """
-        )
-        conn.commit()
-
-
-def salva_con_instradamento(domanda: str, fonti_nomi: list[str], esito: dict) -> dict:
-    """Salva il messaggio in cronologia_chat (salva_messaggio) e il motore usato in instradamento_chat."""
-    riga = salva_messaggio(domanda, esito["risposta"], fonti_nomi)
-    try:
-        _inizializza_tabella_instradamento()
-        with get_connection() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO instradamento_chat
-                    (id_messaggio, motore, modello_usato, complessita, motivo_routing, durata_ms)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    riga["id"],
-                    esito["motore"],
-                    esito["modello_usato"],
-                    esito["complessita"],
-                    esito["motivo_routing"],
-                    esito.get("durata_ms", 0),
-                ),
-            )
-            conn.commit()
-    except Exception as exc:
-        print(f"(Avviso salvataggio instradamento SQLite: {exc})")
-    riga.update(
-        {k: esito[k] for k in ("motore", "modello_usato", "complessita", "motivo_routing", "durata_ms") if k in esito}
-    )
-    return riga
-
-
-def leggi_cronologia_con_instradamento() -> list[dict]:
-    """Restituisce leggi_cronologia() arricchita con il motore effettivamente usato (se registrato)."""
-    righe = leggi_cronologia()
-    try:
-        _inizializza_tabella_instradamento()
-        with get_connection() as conn:
-            meta = {
-                r["id_messaggio"]: dict(r)
-                for r in conn.execute("SELECT * FROM instradamento_chat").fetchall()
-            }
-    except Exception:
-        meta = {}
-    for r in righe:
-        m = meta.get(r["id"])
-        if m:
-            r.update(
-                {
-                    "motore": m["motore"],
-                    "modello_usato": m["modello_usato"],
-                    "complessita": m["complessita"],
-                    "motivo_routing": m["motivo_routing"],
-                    "durata_ms": m["durata_ms"],
-                }
-            )
-        else:
-            r["motore"] = None  # messaggio salvato prima del routing ibrido: motore sconosciuto
-    return righe
+    """Versione non in streaming di _flusso_ibrido: restituisce la risposta completa."""
+    meta: dict = {}
+    fine: dict = {}
+    for evento in _flusso_ibrido(domanda, fonti, api_key=api_key, modello=modello, modalita=modalita):
+        if evento["tipo"] == "meta":
+            meta = evento
+        elif evento["tipo"] == "fine":
+            fine = evento
+    return {
+        "risposta": fine["risposta"],
+        "motore": meta["motore"],
+        "modello_usato": fine["modello_usato"],
+        "complessita": meta["complessita"],
+        "motivo_routing": meta["motivo_routing"],
+        "tempo_ms": fine["tempo_ms"],
+        "ttft_ms": fine["ttft_ms"],
+        "da_cache": fine["da_cache"],
+    }
 
 
 # ==============================================================================
 # 3. GESTIONE FONTI E STATO CHIAVI API
 # ==============================================================================
-_cache_fonti_chiave: tuple[tuple[str, int], ...] | None = None
-_cache_fonti_valore: list[tuple[str, str]] = []
-
-
 def _risolvi_cartella_dati() -> Path:
     if modello_openai.DATA_DIR.is_dir():
         return modello_openai.DATA_DIR
@@ -446,32 +495,40 @@ def _risolvi_cartella_dati() -> Path:
 
 
 def carica_fonti() -> list[tuple[str, str]]:
-    global _cache_fonti_chiave, _cache_fonti_valore
     cartella = _risolvi_cartella_dati()
     if not cartella.is_dir():
         return []
     percorsi = sorted(cartella.glob("*.txt"))
-    chiave = tuple((p.name, p.stat().st_mtime_ns) for p in percorsi)
-    if chiave != _cache_fonti_chiave:
-        _cache_fonti_valore = [(p.name, p.read_text(encoding="utf-8")) for p in percorsi]
-        _cache_fonti_chiave = chiave
-    return _cache_fonti_valore
+    return [(p.name, p.read_text(encoding="utf-8")) for p in percorsi]
 
 
 def _ha_chiave_configurata() -> tuple[bool, str]:
-    chiave_nvidia = os.environ.get("NVIDIA_API_KEY") or modello_openai._valore_env_file("NVIDIA_API_KEY")
-    chiave_openai = os.environ.get("OPENAI_API_KEY") or modello_openai._valore_env_file("OPENAI_API_KEY")
-    if chiave_nvidia:
-        return True, "NVIDIA"
-    if chiave_openai:
-        return True, "OpenAI"
+    provider = modello_openai.rileva_provider(None)
+    if provider:
+        return True, {"nvidia": "NVIDIA", "gemini": "Gemini", "openai": "OpenAI"}[provider]
     return False, "Nessuna (.env non configurato)"
 
 
 # ==============================================================================
 # 4. SERVER HTTP PER IL FRONTEND (Frontend/index.html)
 # ==============================================================================
+def _errore_http(errore: Exception) -> tuple[int, str]:
+    """Codice HTTP e messaggio per l'utente a partire da un'eccezione."""
+    if isinstance(errore, modello_openai.AuthenticationError):
+        return 401, "La chiave API non è stata accettata dal provider. Controlla la chiave (NVIDIA_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY) nel file .env della cartella Backend."
+    if isinstance(errore, modello_openai.OpenAIError):
+        return 502, (
+            f"Chiamata al modello cloud non riuscita ({type(errore).__name__}). "
+            "Controlla la connessione, il modello e la quota API."
+        )
+    if isinstance(errore, (RuntimeError, ValueError)):
+        return 400, f"Impossibile ottenere una risposta: {errore}"
+    return 500, f"Errore interno: {errore}"
+
+
 class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
+    disable_nagle_algorithm = True  # invia subito i pacchetti piccoli (niente ritardi di ~40 ms)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT_DIR), **kwargs)
 
@@ -493,6 +550,64 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def _chat_stream(self, payload: dict):
+        """POST /api/chat/stream: risposta a pezzi (una riga JSON per evento), il testo appare subito."""
+        domanda = (payload.get("domanda") or "").strip()
+        if not domanda:
+            return self._send_json(
+                {"ok": False, "error": "La domanda è vuota: scrivi una domanda oppure digita 'esci'."},
+                status=400,
+            )
+        if domanda.casefold() == modello_openai.COMANDO_USCITA:
+            return self._send_json({"ok": True, "terminato": True, "risposta": "Programma terminato."})
+
+        fonti_payload = payload.get("fonti")
+        if isinstance(fonti_payload, list) and fonti_payload:
+            fonti = [
+                (str(f.get("nome", "")), str(f.get("contenuto", "")))
+                for f in fonti_payload
+                if f.get("nome") and f.get("contenuto")
+            ]
+        else:
+            fonti = carica_fonti()
+        api_key = (payload.get("api_key") or "").strip() or None
+        modello = (payload.get("modello") or "").strip() or None
+        modalita = (payload.get("modalita") or "auto").strip().lower()
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        def invia(evento: dict):
+            self.wfile.write((json.dumps(evento, ensure_ascii=False) + "\n").encode("utf-8"))
+            self.wfile.flush()
+
+        try:
+            for evento in _flusso_ibrido(
+                domanda, fonti, api_key=api_key, modello=modello, modalita=modalita
+            ):
+                if evento["tipo"] == "fine":
+                    # Il testo è già a schermo: il salvataggio su SQLite non ritarda la risposta
+                    evento["fonti"] = [nome for nome, _ in fonti]
+                    evento["record"] = None
+                    try:
+                        salva_messaggio(domanda, evento["risposta"], evento["fonti"])
+                        cronologia = leggi_cronologia()
+                        evento["record"] = cronologia[-1] if cronologia else None
+                    except Exception as exc_db:
+                        evento["avviso_db"] = str(exc_db)
+                invia(evento)
+        except (BrokenPipeError, ConnectionResetError):
+            return  # il browser ha chiuso la connessione
+        except Exception as errore:
+            codice, messaggio = _errore_http(errore)
+            try:
+                invia({"tipo": "errore", "status": codice, "error": messaggio})
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
     def do_GET(self):
         path = urlparse(self.path).path
 
@@ -503,11 +618,7 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
         if path == "/api/status":
             fonti = carica_fonti()
             ha_key, provider = _ha_chiave_configurata()
-            modello_default = (
-                os.environ.get("NVIDIA_MODEL") or modello_openai.MODELLO_NVIDIA_DEFAULT
-                if provider == "NVIDIA"
-                else os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-            )
+            modello_default = modello_openai.modello_predefinito(modello_openai.rileva_provider(None))
             return self._send_json(
                 {
                     "ok": True,
@@ -527,7 +638,7 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
             )
 
         if path == "/api/history":
-            return self._send_json({"ok": True, "cronologia": leggi_cronologia_con_instradamento()})
+            return self._send_json({"ok": True, "cronologia": leggi_cronologia()})
 
         if path == "/api/sources":
             fonti = carica_fonti()
@@ -555,6 +666,9 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
             payload = json.loads(body) if body.strip() else {}
         except json.JSONDecodeError:
             return self._send_json({"ok": False, "error": "JSON non valido."}, status=400)
+
+        if path == "/api/chat/stream":
+            return self._chat_stream(payload)
 
         if path == "/api/chat":
             domanda = (payload.get("domanda") or "").strip()
@@ -600,7 +714,7 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
                     modalita=modalita,
                 )
                 risposta = esito["risposta"]
-                record = salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
+                salva_messaggio(domanda, risposta, [nome for nome, _ in fonti])
                 return self._send_json(
                     {
                         "ok": True,
@@ -610,17 +724,18 @@ class ModelloOpenAIHandler(SimpleHTTPRequestHandler):
                         "modello_usato": esito["modello_usato"],
                         "complessita": esito["complessita"],
                         "motivo_routing": esito["motivo_routing"],
-                        "durata_ms": esito["durata_ms"],
+                        "tempo_ms": esito["tempo_ms"],
+                        "ttft_ms": esito["ttft_ms"],
+                        "da_cache": esito["da_cache"],
                         "fonti": [nome for nome, _ in fonti],
-                        "record": record,
-                        "cronologia": leggi_cronologia_con_instradamento(),
+                        "cronologia": leggi_cronologia(),
                     }
                 )
             except modello_openai.AuthenticationError:
                 return self._send_json(
                     {
                         "ok": False,
-                        "error": "NVIDIA non ha accettato la chiave API. Controlla NVIDIA_API_KEY in .env.",
+                        "error": "La chiave API non è stata accettata dal provider. Controlla la chiave (NVIDIA_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY) nel file .env della cartella Backend.",
                     },
                     status=401,
                 )
@@ -654,6 +769,7 @@ def avvia_cli() -> int:
         print("Impossibile avviare la chat: Nessun file .txt trovato in dati/.")
         return 1
 
+    precarica_modello_locale()
     print("=== Investigatore AI — Routing Ibrido (Locale: Investigatore.py | Cloud: modello_openai.py) ===")
     print(f"Scrivi una domanda alla volta. Digita '{modello_openai.COMANDO_USCITA}' per terminare.")
 
@@ -679,9 +795,10 @@ def avvia_cli() -> int:
                 if esito["motore"] == "locale"
                 else f"[CLOUD • {esito['modello_usato']}]"
             )
-            print(f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']}, {esito['durata_ms']} ms)")
+            print(f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']})")
             print(f"Risposta:\n{esito['risposta']}")
-            salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
+            print(f"(⏱ {esito['tempo_ms'] / 1000:.2f} s{' • cache' if esito['da_cache'] else ''})")
+            salva_messaggio(domanda, esito["risposta"], [nome for nome, _ in fonti])
         except Exception as exc:
             print(f"Errore: {exc}")
 
@@ -689,6 +806,7 @@ def avvia_cli() -> int:
 
 
 def avvia_server(host: str = "127.0.0.1", port: int = 8000):
+    precarica_modello_locale()
     server = ThreadingHTTPServer((host, port), ModelloOpenAIHandler)
     print(f"Server ibrido (Locale Investigatore.py + Cloud modello_openai.py) attivo su http://{host}:{port}/")
     print(f"Scrivi una domanda alla volta. Digita '{modello_openai.COMANDO_USCITA}' per terminare.")

@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 2
+Documento: LX2-5471
+Registro di servizio — giorno operativo 02
+
+06:40 centrale: cade il segnale da Ripetitore Rovo.
+06:50 centrale: cade il segnale da Ripetitore Cripta. Sul display locale compare 06:25.
+I due guasti sono distinti. Il registro è compilato dal ricevitore centrale, che risulta sincronizzato.

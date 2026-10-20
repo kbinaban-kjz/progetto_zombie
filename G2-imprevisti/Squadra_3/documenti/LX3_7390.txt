@@ -1,0 +1,5 @@
+ARCHIVIO LAZZARO — Unità 3
+Documento: LX3-7390
+Aggiornamento direzione rete — giorno operativo 02, ore 09:10
+
+La prima interruzione risulterebbe presso Ripetitore Velo, alle 06:25. Questo aggiornamento sostituisce il riepilogo delle ore 08:00. Il dato proviene esclusivamente dall’orologio locale del ripetitore; la sincronizzazione non è ancora stata verificata.

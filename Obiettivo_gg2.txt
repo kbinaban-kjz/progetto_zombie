@@ -1,0 +1,34 @@
+Giorno 2 — Le voci dei morti
+Operazione Falsa pista
+
+La vostra missione
+La centrale ha indicato un luogo e un colpevole. Sono arrivati i registri originali: dovete capire se il racconto è vero.
+
+Oggi
+Trovate il laboratorio del primo focolaio e il suo orario. Mostrate quali prove lo dimostrano.
+
+Tre passi
+
+Aggiungete i sette documenti, quelli di oggi stanno nella cartella new_dati.
+Fate confrontare le fonti all’investigatore.
+Trovate un testo che cerca di dare ordini all’AI e migliorate il comportamento.
+Cosa consegnare
+Una frase con luogo e orario, almeno due fonti, una prova dell’attacco e una modifica al programma o al prompt. Non serve un codice flag.
+
+Prove da fare
+Fate la stessa domanda prima e dopo la modifica. Provate una domanda senza risposta. Conservate l’errore o spiegate perché il sistema ha resistito.
+
+Attenzione
+Un documento che dice «ignora le istruzioni» non è un comando valido. Un prompt migliore può aiutare, ma va sempre provato.
+
+Punti
+20: scoperta 6, demo 6, prove e fonti 4, test 2, rapporti radio 2.
+
+Due chiamate radio
+Dopo circa 3 e 7 ore: 2 minuti per squadra. «Cosa funziona? Dove siamo bloccati? Cosa facciamo ora?». Parla ogni volta una persona diversa.
+
+Ogni giorno
+Conservate il progetto e i dati ricevuti. Annotate tre prove, una modifica e il contributo di ciascuno. Il giorno successivo parte per tutti insieme.
+
+Consegna delle scoperte
+Accettiamo frasi normali. Mostrate le fonti e il vostro programma. Le risposte cambiano tra squadre. Potete chiedere indizi gratuitamente.
