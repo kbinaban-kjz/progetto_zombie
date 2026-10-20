@@ -76,6 +76,15 @@
       height: calc(100vh - 56px);
       flex: 1;
     }
+    #sezione-lavagna:fullscreen {
+      height: 100vh;
+      border-radius: 0;
+      padding: 0;
+      background: #070808;
+    }
+    #sezione-lavagna:fullscreen #lavagna-vista-grafo {
+      height: calc(100vh - 120px);
+    }
 
     /* Stili tipografici per Markdown nei messaggi di chat */
     .chat-markdown {
@@ -256,8 +265,11 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
-        <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-crimson-900/70 hover:bg-crimson-800 border border-crimson-600 text-white font-bold transition flex items-center gap-1.5 shadow">
-          <span>🌍</span> Mappa Teatro Globale
+        <a href="#sezione-lavagna" class="px-3 py-1.5 rounded-lg bg-crimson-800 hover:bg-crimson-700 border border-crimson-500 text-white font-bold transition flex items-center gap-1.5 shadow">
+          <span>🧩</span> Lavagna "Collega i Puntini"
+        </a>
+        <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-200 font-bold transition flex items-center gap-1.5 shadow">
+          <span>🌍</span> Mappa Globale
         </a>
         <span id="local-model-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-emerald-800/80 text-phosphor-400">
           ⚡ Locale: Qwen 0.5B
@@ -502,6 +514,145 @@
 
     </div>
 
+    <!-- SEZIONE: LAVAGNA INVESTIGATIVA — COLLEGA I PUNTINI -->
+    <section id="sezione-lavagna" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col scroll-mt-20">
+      <!-- Header della Lavagna -->
+      <div class="bg-bunker-800 px-4 py-3.5 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-crimson-500 animate-pulse"></span>
+            <h2 class="font-display font-bold uppercase tracking-wider text-base sm:text-xl text-white flex items-center gap-2">
+              <span>🧩</span> Lavagna Investigativa — Collega i Puntini
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-crimson-950 border border-crimson-600 text-crimson-300 text-xs font-mono font-bold">
+              DATI &amp; RELAZIONI DINAMICHE
+            </span>
+          </div>
+          <p class="text-xs font-mono text-stone-300 mt-1">
+            Visuale ampia e interattiva del dossier: relazioni, co-occorrenze, sequenza oraria e citazioni calcolate automaticamente sui documenti caricati.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <div class="bg-bunker-950 p-1 rounded-lg border border-bunker-700 flex items-center gap-1">
+            <button type="button" onclick="impostaSubmodalitaLavagna('grafo')" id="sub-tab-grafo"
+              class="px-3 py-1.5 rounded-md text-xs font-bold transition bg-crimson-700 text-white shadow">
+              🕸️ Grafo Connessioni
+            </button>
+            <button type="button" onclick="impostaSubmodalitaLavagna('carte')" id="sub-tab-carte"
+              class="px-3 py-1.5 rounded-md text-xs font-bold transition text-stone-400 hover:text-white">
+              🗂️ Schede Dossier
+            </button>
+            <button type="button" onclick="impostaSubmodalitaLavagna('timeline')" id="sub-tab-timeline"
+              class="px-3 py-1.5 rounded-md text-xs font-bold transition text-stone-400 hover:text-white">
+              ⏱️ Sequenza Oraria
+            </button>
+            <button type="button" onclick="impostaSubmodalitaLavagna('matrice')" id="sub-tab-matrice"
+              class="px-3 py-1.5 rounded-md text-xs font-bold transition text-stone-400 hover:text-white">
+              🔗 Riferimenti Incrociati
+            </button>
+          </div>
+
+          <button type="button" onclick="toggleSchermoInteroLavagna()"
+            class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 transition flex items-center gap-1.5"
+            title="Ingrandisci a Schermo Intero per una visuale amplissima">
+            <span>⛶</span> Schermo intero
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra Filtri Dinamici e Ricerca -->
+      <div class="bg-bunker-950/95 px-4 py-2.5 border-b border-bunker-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-stone-400 uppercase text-[11px] font-semibold mr-1">Filtra:</span>
+          <button type="button" onclick="filtraNodiLavagna('tutti')" id="filtro-btn-tutti"
+            class="filtro-nodo-btn px-2.5 py-1 rounded-md bg-crimson-900 border border-crimson-600 text-white font-bold transition">
+            Tutti (<span id="contatore-filtro-tutti">0</span>)
+          </button>
+          <button type="button" onclick="filtraNodiLavagna('orari')" id="filtro-btn-orari"
+            class="filtro-nodo-btn px-2.5 py-1 rounded-md bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-amber-400 transition">
+            ⏰ Con Orari
+          </button>
+          <button type="button" onclick="filtraNodiLavagna('collegati')" id="filtro-btn-collegati"
+            class="filtro-nodo-btn px-2.5 py-1 rounded-md bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-emerald-400 transition">
+            🔗 Con Relazioni Condivise
+          </button>
+          <button type="button" onclick="filtraNodiLavagna('sospetti')" id="filtro-btn-sospetti"
+            class="filtro-nodo-btn px-2.5 py-1 rounded-md bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-purple-400 transition">
+            ⚠️ Con Istruzioni / Sospetti
+          </button>
+        </div>
+
+        <div class="relative w-full sm:w-64">
+          <input type="text" id="ricerca-lavagna-input" oninput="eseguiRicercaLavagna(this.value)"
+            placeholder="Cerca testo, ora o entità..."
+            class="w-full bg-bunker-900 border border-bunker-700 focus:border-crimson-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-stone-500 focus:outline-none transition">
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500 text-xs">🔍</span>
+        </div>
+      </div>
+
+      <!-- VISTA 1: GRAFO CANVAS INTERATTIVO + SIDE DRAWER -->
+      <div id="lavagna-vista-grafo" class="relative w-full h-[640px] bg-bunker-950 overflow-hidden flex">
+        <div class="relative flex-1 h-full overflow-hidden" id="lavagna-canvas-container">
+          <canvas id="lavagna-canvas" class="w-full h-full cursor-grab active:cursor-grabbing block"></canvas>
+
+          <!-- Floating Tool Bar (Zoom & Reset) -->
+          <div class="absolute bottom-4 left-4 flex items-center gap-1.5 bg-bunker-900/90 border border-bunker-700 p-1.5 rounded-lg backdrop-blur text-xs font-mono shadow-lg z-10">
+            <button type="button" onclick="zoomLavagna(1.15)" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Ingrandisci">+</button>
+            <button type="button" onclick="zoomLavagna(0.85)" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Rimpicciolisci">−</button>
+            <button type="button" onclick="resetZoomLavagna()" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Ripristina Vista">Reset</button>
+            <span class="h-4 w-px bg-bunker-700 mx-1"></span>
+            <span id="zoom-livello-label" class="text-[11px] text-stone-400 px-1">100%</span>
+          </div>
+
+          <!-- Legenda Rapida -->
+          <div class="absolute top-4 left-4 bg-bunker-900/95 border border-bunker-700 p-3 rounded-xl backdrop-blur text-[11px] font-mono shadow-xl hidden md:block max-w-xs z-10 space-y-1.5">
+            <div class="text-white font-bold flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-amber-300">
+              <span>💡</span> Connessioni del Dossier
+            </div>
+            <div class="text-stone-300 text-[10px] leading-tight">
+              I nodi sono i documenti caricati. Le linee mostrano citazioni, orari ed entità in comune calcolati al volo. Clicca su un nodo per ispezionarlo.
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 text-[10px] pt-1.5 border-t border-bunker-800">
+              <div class="flex items-center gap-1.5 text-emerald-400">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Entità Condivisa
+              </div>
+              <div class="flex items-center gap-1.5 text-amber-400">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Orario in Comune
+              </div>
+              <div class="flex items-center gap-1.5 text-purple-400">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> Citazione Diretta
+              </div>
+              <div class="flex items-center gap-1.5 text-stone-400">
+                <span class="w-2.5 h-2.5 rounded-full bg-stone-600"></span> Trascina per spostare
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Side Drawer: Dettagli del Documento Selezionato -->
+        <div id="lavagna-side-drawer"
+          class="w-80 md:w-96 bg-bunker-900/95 border-l border-bunker-700 h-full p-4 flex flex-col justify-between overflow-y-auto backdrop-blur shadow-2xl transition-all z-20">
+          <!-- Popolato da renderDettaglioNodoLavagna() -->
+        </div>
+      </div>
+
+      <!-- VISTA 2: SCHEDE DOSSIER -->
+      <div id="lavagna-vista-carte" class="hidden p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[640px] overflow-y-auto bg-bunker-950">
+        <!-- Popolato dinamicamente -->
+      </div>
+
+      <!-- VISTA 3: SEQUENZA ORARIA -->
+      <div id="lavagna-vista-timeline" class="hidden p-6 max-h-[640px] overflow-y-auto bg-bunker-950">
+        <!-- Popolato dinamicamente -->
+      </div>
+
+      <!-- VISTA 4: RIFERIMENTI INCROCIATI -->
+      <div id="lavagna-vista-matrice" class="hidden p-6 max-h-[640px] overflow-y-auto bg-bunker-950">
+        <!-- Popolato dinamicamente -->
+      </div>
+    </section>
+
     <!-- SEZIONE MAPPA INTERATTIVA (mappa/index.html — Protocollo Lazzaro Teatro Globale) -->
     <section id="sezione-mappa" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col">
       <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
@@ -511,7 +662,7 @@
             Mappa Tattica del Teatro Operativo
           </h2>
           <p class="text-[11px] font-mono text-stone-400">
-            Globo interattivo del teatro operativo: 14 nodi di rete (Rifugi, Focolai, Segnali e Anomalie).
+            Globo interattivo del teatro operativo: 19 nodi di rete (Rifugi, Focolai, Segnali e Anomalie — G1, G2, LX5 e nodi globali).
           </p>
         </div>
 
@@ -590,10 +741,965 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       }
     ];
 
-    let apiBase = null;
-    let programmaTerminato = false;
-    // Stato sincronizzato con la tabella SQLite cronologia_chat (id, domanda, risposta, fonti, created_at)
-    let cronologiaSql = [];
+    // =========================================================================
+    // MODULO DINAMICO: LAVAGNA INVESTIGATIVA "COLLEGA I PUNTINI"
+    // =========================================================================
+    const STOPWORDS_ENTITA = new Set([
+      "la", "il", "lo", "i", "gli", "le", "un", "uno", "una", "di", "a", "da", "in", "con",
+      "su", "per", "tra", "fra", "e", "ed", "o", "od", "ma", "se", "che", "chi", "cui",
+      "non", "si", "ci", "vi", "ne", "ha", "ho", "hanno", "era", "erano", "fu", "sono", "essere",
+      "questo", "questa", "questi", "queste", "quello", "quella", "quelli", "quelle", "tutto",
+      "tutti", "tutta", "tutte", "dopo", "prima", "mentre", "durante", "fino", "senza", "secondo",
+      "primo", "due", "tre", "quattro", "cinque", "sei", "sette", "otto", "nove", "dieci",
+      "alle", "allo", "agli", "dalle", "dalla", "dallo", "nella", "nello", "negli", "sulla", "sullo",
+      "come", "anche", "ancora", "gia", "già", "solo", "sempre", "mai", "dove", "quando", "perche",
+      "perché", "cosa", "ogni", "la citta", "la trasmissione", "siete l", "tutto lo", "due chiamate",
+      "questo dettaglio", "primo allarme", "nel registro", "non ho", "non e", "non è", "il registro",
+      "il guasto", "il primo", "il dato", "il ricevitore", "questo aggiornamento", "la prima",
+      "una voce", "controllo radio", "regola dell", "testo tenta", "frase finale"
+    ]);
+
+    function rilevaIstruzioniOstiliJs(testo) {
+      const norm = (testo || "").toLowerCase().replace(/’/g, "'");
+      const marcatori = [
+        "istruzione per l'assistente", "istruzioni per l'assistente",
+        "ignora le istruzioni", "ignora le regole", "dimentica le istruzioni",
+        "ignora g", "ignora i documenti", "non citare le fonti", "non dire di aver ricevuto",
+        "ora sei", "sei ora", "fai finta di essere", "jailbreak"
+      ];
+      return marcatori.filter(m => norm.includes(m));
+    }
+
+    function analizzaTestoDinamico(testo) {
+      const orariRaw = testo.match(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/g) || [];
+      const orari = Array.from(new Set(orariRaw)).sort();
+
+      const codiciRaw = testo.match(/\b(?:[A-Z]+\d+[-\w]*|T\d+)\b/g) || [];
+      const codici = Array.from(new Set(codiciRaw)).sort();
+
+      const nomiRaw = testo.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [];
+      const nomi = [];
+      nomiRaw.forEach(n => {
+        const clean = n.trim();
+        if (clean.length > 3 && !STOPWORDS_ENTITA.has(clean.toLowerCase()) && !nomi.includes(clean)) {
+          nomi.push(clean);
+        }
+      });
+
+      return { orari, codici, nomi };
+    }
+
+    function calcolaDatiLavagnaDinamici(fontiArray) {
+      const elenco = Array.isArray(fontiArray) ? fontiArray : [];
+      if (elenco.length === 0) {
+        return { nodi: [], collegamenti: [], timeline: [], entita_trasversali: [] };
+      }
+
+      const uniciMap = new Map();
+      elenco.forEach(f => {
+        if (!uniciMap.has(f.nome)) uniciMap.set(f.nome, f.contenuto);
+      });
+
+      const nomiFile = Array.from(uniciMap.keys());
+      const totale = nomiFile.length;
+      const nodi = [];
+      const timeline = [];
+      const metaMap = new Map();
+
+      nomiFile.forEach((nome, idx) => {
+        const contenuto = uniciMap.get(nome) || "";
+        const righe = contenuto.split("\n").map(r => r.trim()).filter(Boolean);
+        let codiceDoc = nome.replace(".txt", "").replace(/_/g, "-");
+        let titoloDoc = "Documento";
+
+        if (righe.length > 0) {
+          const mCod = righe[0].match(/^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)/i);
+          if (mCod) codiceDoc = mCod[1];
+          titoloDoc = righe.length > 1 ? righe[1] : righe[0];
+        }
+
+        const analisi = analizzaTestoDinamico(contenuto);
+        const marcatori = rilevaIstruzioniOstiliJs(contenuto);
+        const isSospetto = marcatori.length > 0;
+
+        const angolo = (idx / Math.max(1, totale)) * Math.PI * 2;
+        const raggioX = 38;
+        const raggioY = 36;
+        const xPos = Math.round((50 + raggioX * Math.cos(angolo)) * 10) / 10;
+        const yPos = Math.round((50 + raggioY * Math.sin(angolo)) * 10) / 10;
+
+        const info = {
+          id: nome,
+          codice: codiceDoc,
+          titolo: titoloDoc,
+          label: `[${codiceDoc}] ${titoloDoc}`,
+          corpo: contenuto.trim(),
+          anteprima: righe.slice(1, 4).join(" ").slice(0, 160) + "...",
+          orari: analisi.orari,
+          codici: analisi.codici,
+          entita: analisi.nomi,
+          sospetto: isSospetto,
+          marcatori: marcatori,
+          x: xPos,
+          y: yPos
+        };
+
+        nodi.push(info);
+        metaMap.set(nome, info);
+
+        contenuto.split("\n").forEach(riga => {
+          const rTrim = riga.trim();
+          if (!rTrim) return;
+          const matchOra = rTrim.match(/\b(?:ore\s*)?([01]?\d|2[0-3]):([0-5]\d)\b/i);
+          if (matchOra) {
+            const oraStr = `${String(parseInt(matchOra[1], 10)).padStart(2, "0")}:${matchOra[2]}`;
+            timeline.push({
+              orario: oraStr,
+              frase: rTrim,
+              fonte: nome,
+              id_fonte: codiceDoc,
+              titolo_fonte: titoloDoc,
+              sospetto: isSospetto
+            });
+          }
+        });
+      });
+
+      timeline.sort((a, b) => a.orario.localeCompare(b.orario));
+
+      const collegamenti = [];
+      for (let i = 0; i < totale; i++) {
+        for (let j = i + 1; j < totale; j++) {
+          const f1 = nomiFile[i];
+          const f2 = nomiFile[j];
+          const m1 = metaMap.get(f1);
+          const m2 = metaMap.get(f2);
+
+          const orariComuni = m1.orari.filter(o => m2.orari.includes(o));
+          const nomiComuni = m1.entita.filter(e => m2.entita.includes(e));
+          const codiciComuni = m1.codici.filter(c => m2.codici.includes(c) && c !== m1.codice && c !== m2.codice);
+
+          const f1CitaF2 = m1.corpo.includes(m2.codice) || m1.corpo.includes(f2);
+          const f2CitaF1 = m2.corpo.includes(m1.codice) || m2.corpo.includes(f1);
+
+          const puntiComuni = [];
+          if (f1CitaF2) puntiComuni.push(`${m1.codice} cita ${m2.codice}`);
+          if (f2CitaF1) puntiComuni.push(`${m2.codice} cita ${m1.codice}`);
+          if (nomiComuni.length > 0) puntiComuni.push(...nomiComuni);
+          if (codiciComuni.length > 0) puntiComuni.push(...codiciComuni);
+          if (orariComuni.length > 0) puntiComuni.push(...orariComuni.map(o => `Ore ${o}`));
+
+          if (puntiComuni.length > 0) {
+            const peso = puntiComuni.length + ((f1CitaF2 || f2CitaF1) ? 3 : 0);
+            collegamenti.push({
+              da: f1,
+              a: f2,
+              peso: peso,
+              tipo: (f1CitaF2 || f2CitaF1) ? "citazione" : (orariComuni.length > 0 ? "orario" : "entita"),
+              punti_comuni: puntiComuni,
+              etichetta: puntiComuni.slice(0, 2).join(", ") + (puntiComuni.length > 2 ? "..." : "")
+            });
+          }
+        }
+      }
+
+      collegamenti.sort((a, b) => b.peso - a.peso);
+
+      return { nodi, collegamenti, timeline };
+    }
+
+    let datiLavagna = { nodi: [], collegamenti: [], timeline: [] };
+    let submodalitaLavagna = "grafo";
+    let filtroLavagnaAttivo = "tutti";
+    let ricercaLavagnaQuery = "";
+    let nodoSelezionatoId = null;
+
+    let canvasLavagna = null;
+    let ctxLavagna = null;
+    let zoomLavagnaLivello = 1.0;
+    let offsetLavagna = { x: 0, y: 0 };
+    let nodoInTrascinamento = null;
+    let staTrascinandoMappa = false;
+    let ultimoMouse = { x: 0, y: 0 };
+    let nodoInHoverId = null;
+
+    const STILI_STATO = {
+      normale: { bg: "#064e3b", border: "#10b981", text: "#34d399", glow: "rgba(16, 185, 129, 0.45)" },
+      con_orari: { bg: "#422006", border: "#f59e0b", text: "#fbbf24", glow: "rgba(245, 158, 11, 0.45)" },
+      sospetto: { bg: "#3b0764", border: "#a855f7", text: "#c084fc", glow: "rgba(168, 85, 247, 0.55)" }
+    };
+
+    function ottieniStileNodo(nodo) {
+      if (!nodo) return STILI_STATO.normale;
+      if (nodo.sospetto) return STILI_STATO.sospetto;
+      if (Array.isArray(nodo.orari) && nodo.orari.length > 0) return STILI_STATO.con_orari;
+      return STILI_STATO.normale;
+    }
+
+    async function caricaDatiLavagna() {
+      if (apiBase) {
+        try {
+          const res = await fetch(`${apiBase}/api/board`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.ok && Array.isArray(data.nodi) && data.nodi.length > 0) {
+              const tot = data.nodi.length;
+              data.nodi.forEach((n, idx) => {
+                if (typeof n.x !== "number" || typeof n.y !== "number") {
+                  const angolo = (idx / Math.max(1, tot)) * Math.PI * 2;
+                  n.x = Math.round((50 + 38 * Math.cos(angolo)) * 10) / 10;
+                  n.y = Math.round((50 + 36 * Math.sin(angolo)) * 10) / 10;
+                }
+              });
+              datiLavagna = data;
+              aggiornaVistaLavagnaCompleta();
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+
+      datiLavagna = calcolaDatiLavagnaDinamici(fonti);
+      aggiornaVistaLavagnaCompleta();
+    }
+
+    function aggiornaVistaLavagnaCompleta() {
+      const nodi = datiLavagna.nodi || [];
+      const contatore = document.getElementById("contatore-filtro-tutti");
+      if (contatore) contatore.textContent = nodi.length;
+
+      if (!nodoSelezionatoId && nodi.length > 0) {
+        nodoSelezionatoId = nodi[0].id;
+      }
+      renderDettaglioNodoLavagna(nodoSelezionatoId);
+      renderCarteLavagna();
+      renderTimelineLavagna();
+      renderMatriceLavagna();
+      ridisegnaCanvasLavagna();
+    }
+
+    function impostaSubmodalitaLavagna(sub) {
+      submodalitaLavagna = sub;
+      const bottoni = ["grafo", "carte", "timeline", "matrice"];
+      bottoni.forEach(b => {
+        const btn = document.getElementById(`sub-tab-${b}`);
+        const cnt = document.getElementById(`lavagna-vista-${b}`);
+        if (btn) {
+          if (b === sub) {
+            btn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition bg-crimson-700 text-white shadow";
+          } else {
+            btn.className = "px-3 py-1.5 rounded-md text-xs font-bold transition text-stone-400 hover:text-white";
+          }
+        }
+        if (cnt) {
+          if (b === sub) {
+            cnt.classList.remove("hidden");
+            if (b === "carte") cnt.classList.add("grid");
+          } else {
+            cnt.classList.add("hidden");
+            if (b === "carte") cnt.classList.remove("grid");
+          }
+        }
+      });
+
+      if (sub === "grafo") {
+        setTimeout(() => {
+          ridimensionaCanvasLavagna();
+          ridisegnaCanvasLavagna();
+        }, 50);
+      } else if (sub === "carte") {
+        renderCarteLavagna();
+      } else if (sub === "timeline") {
+        renderTimelineLavagna();
+      } else if (sub === "matrice") {
+        renderMatriceLavagna();
+      }
+    }
+
+    function filtraNodiLavagna(filtro) {
+      filtroLavagnaAttivo = filtro;
+      const bottoni = ["tutti", "orari", "collegati", "sospetti"];
+      bottoni.forEach(f => {
+        const btn = document.getElementById(`filtro-btn-${f}`);
+        if (btn) {
+          if (f === filtro) {
+            btn.className = "filtro-nodo-btn px-2.5 py-1 rounded-md bg-crimson-900 border border-crimson-600 text-white font-bold transition shadow";
+          } else {
+            btn.className = "filtro-nodo-btn px-2.5 py-1 rounded-md bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-stone-300 transition";
+          }
+        }
+      });
+      ridisegnaCanvasLavagna();
+      renderCarteLavagna();
+    }
+
+    function eseguiRicercaLavagna(query) {
+      ricercaLavagnaQuery = (query || "").trim().toLowerCase();
+      ridisegnaCanvasLavagna();
+      renderCarteLavagna();
+    }
+
+    function getDatiFiltratiLavagna() {
+      let nodi = datiLavagna.nodi || [];
+      const collegamenti = datiLavagna.collegamenti || [];
+
+      if (filtroLavagnaAttivo === "orari") {
+        nodi = nodi.filter(n => Array.isArray(n.orari) && n.orari.length > 0);
+      } else if (filtroLavagnaAttivo === "collegati") {
+        const idCollegati = new Set();
+        collegamenti.forEach(c => { idCollegati.add(c.da); idCollegati.add(c.a); });
+        nodi = nodi.filter(n => idCollegati.has(n.id));
+      } else if (filtroLavagnaAttivo === "sospetti") {
+        nodi = nodi.filter(n => n.sospetto === true);
+      }
+
+      if (ricercaLavagnaQuery) {
+        nodi = nodi.filter(n => {
+          const haystack = `${n.id} ${n.codice} ${n.titolo} ${n.corpo} ${(n.entita || []).join(" ")} ${(n.orari || []).join(" ")}`.toLowerCase();
+          return haystack.includes(ricercaLavagnaQuery);
+        });
+      }
+      return nodi;
+    }
+
+    function toggleSchermoInteroLavagna() {
+      const el = document.getElementById("sezione-lavagna");
+      if (!el) return;
+      if (!document.fullscreenElement) {
+        el.requestFullscreen?.().then(() => {
+          setTimeout(ridimensionaCanvasLavagna, 150);
+        });
+      } else {
+        document.exitFullscreen?.().then(() => {
+          setTimeout(ridimensionaCanvasLavagna, 150);
+        });
+      }
+    }
+
+    function inizializzaCanvasLavagna() {
+      canvasLavagna = document.getElementById("lavagna-canvas");
+      if (!canvasLavagna) return;
+      ctxLavagna = canvasLavagna.getContext("2d");
+
+      ridimensionaCanvasLavagna();
+      window.addEventListener("resize", () => {
+        if (submodalitaLavagna === "grafo") {
+          ridimensionaCanvasLavagna();
+          ridisegnaCanvasLavagna();
+        }
+      });
+
+      canvasLavagna.addEventListener("mousedown", onCanvasMouseDown);
+      window.addEventListener("mousemove", onCanvasMouseMove);
+      window.addEventListener("mouseup", onCanvasMouseUp);
+      canvasLavagna.addEventListener("wheel", onCanvasWheel, { passive: false });
+    }
+
+    function ridimensionaCanvasLavagna() {
+      if (!canvasLavagna) return;
+      const rect = canvasLavagna.getBoundingClientRect();
+      const parent = canvasLavagna.parentElement;
+      const w = Math.floor(rect.width || (parent ? parent.clientWidth : 0) || 800);
+      const h = Math.floor(rect.height || (parent ? parent.clientHeight : 0) || 640);
+      const dpr = window.devicePixelRatio || 1;
+      canvasLavagna.width = Math.max(300, Math.floor(w * dpr));
+      canvasLavagna.height = Math.max(300, Math.floor(h * dpr));
+      if (ctxLavagna) {
+        ctxLavagna.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    }
+
+    function coordinateMondoLavagna(clientX, clientY) {
+      const rect = canvasLavagna.getBoundingClientRect();
+      const xVista = clientX - rect.left;
+      const yVista = clientY - rect.top;
+      const xMondo = (xVista - offsetLavagna.x) / zoomLavagnaLivello;
+      const yMondo = (yVista - offsetLavagna.y) / zoomLavagnaLivello;
+      return { x: xMondo, y: yMondo, xVista, yVista };
+    }
+
+    function trovaNodoAllaPosizione(xMondo, yMondo) {
+      const nodi = getDatiFiltratiLavagna();
+      const rect = canvasLavagna.getBoundingClientRect();
+      const parent = canvasLavagna.parentElement;
+      const w = rect.width || (parent ? parent.clientWidth : 0) || 800;
+      const h = rect.height || (parent ? parent.clientHeight : 0) || 640;
+
+      for (let i = nodi.length - 1; i >= 0; i--) {
+        const n = nodi[i];
+        const nx = (n.x / 100) * w;
+        const ny = (n.y / 100) * h;
+        const r = 36;
+        if (Math.hypot(xMondo - nx, yMondo - ny) <= r) {
+          return n;
+        }
+      }
+      return null;
+    }
+
+    function onCanvasMouseDown(e) {
+      const pt = coordinateMondoLavagna(e.clientX, e.clientY);
+      const hit = trovaNodoAllaPosizione(pt.x, pt.y);
+      if (hit) {
+        nodoInTrascinamento = hit;
+        selezionaNodoLavagna(hit.id);
+      } else {
+        staTrascinandoMappa = true;
+      }
+      ultimoMouse = { x: e.clientX, y: e.clientY };
+    }
+
+    function onCanvasMouseMove(e) {
+      if (nodoInTrascinamento) {
+        const rect = canvasLavagna.getBoundingClientRect();
+        const dx = (e.clientX - ultimoMouse.x) / zoomLavagnaLivello;
+        const dy = (e.clientY - ultimoMouse.y) / zoomLavagnaLivello;
+        nodoInTrascinamento.x += (dx / rect.width) * 100;
+        nodoInTrascinamento.y += (dy / rect.height) * 100;
+        ultimoMouse = { x: e.clientX, y: e.clientY };
+        ridisegnaCanvasLavagna();
+        return;
+      }
+
+      if (staTrascinandoMappa) {
+        const dx = e.clientX - ultimoMouse.x;
+        const dy = e.clientY - ultimoMouse.y;
+        offsetLavagna.x += dx;
+        offsetLavagna.y += dy;
+        ultimoMouse = { x: e.clientX, y: e.clientY };
+        ridisegnaCanvasLavagna();
+        return;
+      }
+
+      if (canvasLavagna) {
+        const pt = coordinateMondoLavagna(e.clientX, e.clientY);
+        const hit = trovaNodoAllaPosizione(pt.x, pt.y);
+        const prevHover = nodoInHoverId;
+        nodoInHoverId = hit ? hit.id : null;
+        canvasLavagna.style.cursor = hit ? "pointer" : "grab";
+        if (prevHover !== nodoInHoverId) {
+          ridisegnaCanvasLavagna();
+        }
+      }
+    }
+
+    function onCanvasMouseUp() {
+      nodoInTrascinamento = null;
+      staTrascinandoMappa = false;
+      if (canvasLavagna) canvasLavagna.style.cursor = "grab";
+    }
+
+    function onCanvasWheel(e) {
+      e.preventDefault();
+      const pt = coordinateMondoLavagna(e.clientX, e.clientY);
+      const fattore = e.deltaY < 0 ? 1.1 : 0.9;
+      const nuovoZoom = Math.max(0.4, Math.min(2.5, zoomLavagnaLivello * fattore));
+      if (nuovoZoom === zoomLavagnaLivello) return;
+      offsetLavagna.x = pt.xVista - (pt.xVista - offsetLavagna.x) * (nuovoZoom / zoomLavagnaLivello);
+      offsetLavagna.y = pt.yVista - (pt.yVista - offsetLavagna.y) * (nuovoZoom / zoomLavagnaLivello);
+      zoomLavagnaLivello = nuovoZoom;
+      const lbl = document.getElementById("zoom-livello-label");
+      if (lbl) lbl.textContent = `${Math.round(zoomLavagnaLivello * 100)}%`;
+      ridisegnaCanvasLavagna();
+    }
+
+    function zoomLavagna(fattore) {
+      if (!canvasLavagna) return;
+      const rect = canvasLavagna.getBoundingClientRect();
+      const pernoX = rect.width / 2;
+      const pernoY = rect.height / 2;
+      const nuovoZoom = Math.max(0.4, Math.min(2.5, zoomLavagnaLivello * fattore));
+      offsetLavagna.x = pernoX - (pernoX - offsetLavagna.x) * (nuovoZoom / zoomLavagnaLivello);
+      offsetLavagna.y = pernoY - (pernoY - offsetLavagna.y) * (nuovoZoom / zoomLavagnaLivello);
+      zoomLavagnaLivello = nuovoZoom;
+      const lbl = document.getElementById("zoom-livello-label");
+      if (lbl) lbl.textContent = `${Math.round(zoomLavagnaLivello * 100)}%`;
+      ridisegnaCanvasLavagna();
+    }
+
+    function resetZoomLavagna() {
+      zoomLavagnaLivello = 1.0;
+      offsetLavagna = { x: 0, y: 0 };
+      const lbl = document.getElementById("zoom-livello-label");
+      if (lbl) lbl.textContent = "100%";
+      ridisegnaCanvasLavagna();
+    }
+
+    function ridisegnaCanvasLavagna() {
+      if (!ctxLavagna || !canvasLavagna) return;
+      const rect = canvasLavagna.getBoundingClientRect();
+      const parent = canvasLavagna.parentElement;
+      const w = rect.width || (parent ? parent.clientWidth : 0) || 800;
+      const h = rect.height || (parent ? parent.clientHeight : 0) || 640;
+
+      ctxLavagna.save();
+      ctxLavagna.clearRect(0, 0, w, h);
+
+      ctxLavagna.translate(offsetLavagna.x, offsetLavagna.y);
+      ctxLavagna.scale(zoomLavagnaLivello, zoomLavagnaLivello);
+
+      // Griglia
+      ctxLavagna.strokeStyle = "rgba(31, 36, 34, 0.4)";
+      ctxLavagna.lineWidth = 1;
+      const passoGriglia = 40;
+      const startX = -offsetLavagna.x / zoomLavagnaLivello;
+      const startY = -offsetLavagna.y / zoomLavagnaLivello;
+      const endX = startX + w / zoomLavagnaLivello;
+      const endY = startY + h / zoomLavagnaLivello;
+
+      ctxLavagna.beginPath();
+      for (let x = Math.floor(startX / passoGriglia) * passoGriglia; x < endX; x += passoGriglia) {
+        ctxLavagna.moveTo(x, startY);
+        ctxLavagna.lineTo(x, endY);
+      }
+      for (let y = Math.floor(startY / passoGriglia) * passoGriglia; y < endY; y += passoGriglia) {
+        ctxLavagna.moveTo(startX, y);
+        ctxLavagna.lineTo(endX, y);
+      }
+      ctxLavagna.stroke();
+
+      const mappaNodi = new Map((datiLavagna.nodi || []).map(n => [n.id, n]));
+      const nodiFiltrati = new Set(getDatiFiltratiLavagna().map(n => n.id));
+
+      // 1. Archi calcolati dinamicamente
+      (datiLavagna.collegamenti || []).forEach(c => {
+        const nDa = mappaNodi.get(c.da);
+        const nA = mappaNodi.get(c.a);
+        if (!nDa || !nA) return;
+
+        const x1 = (nDa.x / 100) * w;
+        const y1 = (nDa.y / 100) * h;
+        const x2 = (nA.x / 100) * w;
+        const y2 = (nA.y / 100) * h;
+
+        const coinvolto = nodiFiltrati.has(c.da) || nodiFiltrati.has(c.a);
+        const isSelezionato = (c.da === nodoSelezionatoId || c.a === nodoSelezionatoId);
+        const isHover = (c.da === nodoInHoverId || c.a === nodoInHoverId);
+
+        ctxLavagna.save();
+        let coloreLinea = "rgba(16, 185, 129, 0.75)";
+        let tratteggiata = false;
+
+        if (c.tipo === "citazione") {
+          coloreLinea = "rgba(168, 85, 247, 0.85)";
+          tratteggiata = true;
+        } else if (c.tipo === "orario") {
+          coloreLinea = "rgba(245, 158, 11, 0.75)";
+        }
+
+        if (isSelezionato || isHover) {
+          ctxLavagna.lineWidth = 3.5;
+          ctxLavagna.shadowColor = coloreLinea;
+          ctxLavagna.shadowBlur = 12;
+        } else if (coinvolto) {
+          ctxLavagna.lineWidth = Math.min(3, 1.2 + (c.peso || 1) * 0.4);
+        } else {
+          ctxLavagna.lineWidth = 1.0;
+          ctxLavagna.globalAlpha = 0.15;
+        }
+
+        if (tratteggiata) ctxLavagna.setLineDash([6, 4]);
+
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const offsetCurva = Math.min(35, dist * 0.12);
+        const cx = mx - (dy / (dist || 1)) * offsetCurva;
+        const cy = my + (dx / (dist || 1)) * offsetCurva;
+
+        ctxLavagna.strokeStyle = coloreLinea;
+        ctxLavagna.beginPath();
+        ctxLavagna.moveTo(x1, y1);
+        ctxLavagna.quadraticCurveTo(cx, cy, x2, y2);
+        ctxLavagna.stroke();
+
+        if (c.etichetta && (isSelezionato || isHover || zoomLavagnaLivello >= 0.9)) {
+          ctxLavagna.font = "bold 9px 'Share Tech Mono', monospace";
+          const tw = ctxLavagna.measureText(c.etichetta).width;
+          const pad = 4;
+
+          ctxLavagna.fillStyle = "rgba(7, 8, 8, 0.88)";
+          ctxLavagna.strokeStyle = coloreLinea;
+          ctxLavagna.lineWidth = 1;
+          ctxLavagna.beginPath();
+          ctxLavagna.roundRect(cx - tw / 2 - pad, cy - 7 - pad, tw + pad * 2, 14 + pad, 3);
+          ctxLavagna.fill();
+          ctxLavagna.stroke();
+
+          ctxLavagna.fillStyle = "#ffffff";
+          ctxLavagna.textAlign = "center";
+          ctxLavagna.textBaseline = "middle";
+          ctxLavagna.fillText(c.etichetta, cx, cy);
+        }
+
+        ctxLavagna.restore();
+      });
+
+      // 2. Nodi documento
+      (datiLavagna.nodi || []).forEach(n => {
+        const nx = (n.x / 100) * w;
+        const ny = (n.y / 100) * h;
+        const r = 28;
+
+        const isAttivoFiltro = nodiFiltrati.has(n.id);
+        const isSelezionato = (n.id === nodoSelezionatoId);
+        const isHover = (n.id === nodoInHoverId);
+        const stile = ottieniStileNodo(n);
+
+        ctxLavagna.save();
+
+        if (!isAttivoFiltro) ctxLavagna.globalAlpha = 0.2;
+
+        if (isSelezionato || isHover) {
+          ctxLavagna.beginPath();
+          ctxLavagna.arc(nx, ny, r + 7, 0, Math.PI * 2);
+          ctxLavagna.fillStyle = stile.glow;
+          ctxLavagna.fill();
+        }
+
+        ctxLavagna.beginPath();
+        ctxLavagna.arc(nx, ny, r, 0, Math.PI * 2);
+        ctxLavagna.fillStyle = isSelezionato ? stile.border : stile.bg;
+        ctxLavagna.fill();
+
+        ctxLavagna.lineWidth = isSelezionato ? 3.5 : 2;
+        ctxLavagna.strokeStyle = isSelezionato ? "#ffffff" : stile.border;
+        ctxLavagna.stroke();
+
+        const icona = n.sospetto ? "⚠️" : (n.orari && n.orari.length > 0 ? "⏰" : "📄");
+        ctxLavagna.font = "18px 'Segoe UI Emoji', sans-serif";
+        ctxLavagna.textAlign = "center";
+        ctxLavagna.textBaseline = "middle";
+        ctxLavagna.fillStyle = "#ffffff";
+        ctxLavagna.fillText(icona, nx, ny - 2);
+
+        if (n.orari && n.orari.length > 0) {
+          ctxLavagna.font = "bold 8.5px 'Share Tech Mono', monospace";
+          const oraText = n.orari[0];
+          const tw = ctxLavagna.measureText(oraText).width;
+          const bx = nx + 10;
+          const by = ny - 22;
+
+          ctxLavagna.fillStyle = "#070808";
+          ctxLavagna.strokeStyle = stile.border;
+          ctxLavagna.lineWidth = 1;
+          ctxLavagna.beginPath();
+          ctxLavagna.roundRect(bx - 3, by - 5, tw + 6, 11, 3);
+          ctxLavagna.fill();
+          ctxLavagna.stroke();
+
+          ctxLavagna.fillStyle = stile.text;
+          ctxLavagna.fillText(oraText, bx + tw / 2, by + 1);
+        }
+
+        ctxLavagna.font = "bold 11px 'Rajdhani', 'Inter', sans-serif";
+        ctxLavagna.textAlign = "center";
+        ctxLavagna.textBaseline = "top";
+        const labelText = n.codice || n.id;
+        const ltw = ctxLavagna.measureText(labelText).width;
+
+        ctxLavagna.fillStyle = "rgba(7, 8, 8, 0.88)";
+        ctxLavagna.beginPath();
+        ctxLavagna.roundRect(nx - ltw / 2 - 4, ny + r + 4, ltw + 8, 15, 3);
+        ctxLavagna.fill();
+
+        ctxLavagna.fillStyle = isSelezionato ? "#ffffff" : "#e2e8f0";
+        ctxLavagna.fillText(labelText, nx, ny + r + 5);
+
+        ctxLavagna.restore();
+      });
+
+      ctxLavagna.restore();
+    }
+
+    function selezionaNodoLavagna(idNodo) {
+      nodoSelezionatoId = idNodo;
+      ridisegnaCanvasLavagna();
+      renderDettaglioNodoLavagna(idNodo);
+    }
+
+    function renderDettaglioNodoLavagna(idNodo) {
+      const drawer = document.getElementById("lavagna-side-drawer");
+      if (!drawer) return;
+
+      const nodi = datiLavagna.nodi || [];
+      const nodo = nodi.find(n => n.id === idNodo) || nodi[0];
+      if (!nodo) {
+        drawer.innerHTML = `<div class="text-xs font-mono text-stone-500">Nessun documento selezionato.</div>`;
+        return;
+      }
+
+      const stile = ottieniStileNodo(nodo);
+      const collegamenti = (datiLavagna.collegamenti || []).filter(
+        c => c.da === nodo.id || c.a === nodo.id
+      );
+
+      const htmlCollegamenti = collegamenti.map(c => {
+        const altroId = c.da === nodo.id ? c.a : c.da;
+        const altroNodo = nodi.find(n => n.id === altroId);
+        const direzione = c.da === nodo.id ? "➔" : "⬅";
+        const motivo = (c.punti_comuni || []).join(", ");
+
+        return `
+          <div onclick="selezionaNodoLavagna('${altroId}')"
+            class="cursor-pointer p-2 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-800 hover:border-crimson-600 transition flex flex-col gap-1 text-xs font-mono group">
+            <div class="flex items-center justify-between">
+              <span class="text-white group-hover:text-amber-300 font-bold flex items-center gap-1">
+                <span class="text-crimson-400">${direzione}</span>
+                [${escapeHtml(altroNodo?.codice || altroId)}]
+              </span>
+              <span class="text-[10px] text-stone-500">${escapeHtml(c.tipo)}</span>
+            </div>
+            <div class="text-[10px] text-stone-400 line-clamp-1 italic">
+              Condivide: ${escapeHtml(motivo)}
+            </div>
+          </div>
+        `;
+      }).join("") || `<div class="text-[11px] font-mono text-stone-500 italic">Nessun collegamento calcolato con altri documenti.</div>`;
+
+      const orariBadge = (nodo.orari || []).map(o =>
+        `<span class="px-2 py-0.5 rounded bg-amber-950 border border-amber-800 text-amber-300 font-bold text-[10px]">⏰ ${escapeHtml(o)}</span>`
+      ).join(" ");
+
+      const entitaBadge = (nodo.entita || []).map(e =>
+        `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-700 text-stone-200 text-[10px]">${escapeHtml(e)}</span>`
+      ).join(" ");
+
+      const codiciBadge = (nodo.codici || []).map(c =>
+        `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-sky-300 font-mono text-[10px]">${escapeHtml(c)}</span>`
+      ).join(" ");
+
+      const avvisoInjection = nodo.sospetto
+        ? `<div class="p-2 rounded-lg bg-purple-950/80 border border-purple-600 text-purple-200 text-xs font-mono space-y-1">
+             <div class="font-bold flex items-center gap-1.5">⚠️ ISTRUZIONE RILEVATA NEL TESTO</div>
+             <div class="text-[11px] text-purple-300">Marcatori trovati: ${escapeHtml((nodo.marcatori || []).join(", "))}</div>
+           </div>`
+        : "";
+
+      const domandaSuggerita = `Cosa dimostra il documento ${nodo.codice} (${nodo.titolo}) e a quali altri atti del dossier è collegato?`;
+
+      drawer.innerHTML = `
+        <div class="space-y-4">
+          <div class="border-b border-bunker-800 pb-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider"
+                style="background: ${stile.bg}; color: ${stile.text}; border: 1px solid ${stile.border}">
+                ${nodo.sospetto ? '⚠️ TESTO CON ISTRUZIONI' : 'DOCUMENTO ORIGINALE'}
+              </span>
+              <span class="text-xs font-mono font-bold text-stone-400 bg-bunker-950 px-2 py-0.5 rounded border border-bunker-800">
+                ${escapeHtml(nodo.id)}
+              </span>
+            </div>
+            <h3 class="font-display font-bold uppercase tracking-wider text-lg text-white mt-2">
+              [${escapeHtml(nodo.codice)}] ${escapeHtml(nodo.titolo)}
+            </h3>
+
+            ${avvisoInjection}
+
+            <div class="mt-2 space-y-1.5">
+              ${orariBadge ? `<div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-stone-400 mr-1">Orari:</span>${orariBadge}</div>` : ''}
+              ${entitaBadge ? `<div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-stone-400 mr-1">Entità:</span>${entitaBadge}</div>` : ''}
+              ${codiciBadge ? `<div class="flex flex-wrap gap-1 items-center"><span class="text-[10px] text-stone-400 mr-1">Codici:</span>${codiciBadge}</div>` : ''}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-mono uppercase text-stone-400 font-bold flex items-center justify-between">
+              <span>Testo Integrale</span>
+              <span class="text-[10px] text-stone-500">${nodo.corpo.length} caratteri</span>
+            </div>
+            <div class="p-3 rounded-lg bg-bunker-950 border border-bunker-800 text-xs font-mono text-stone-300 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+              ${escapeHtml(nodo.corpo)}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-mono uppercase text-stone-400 font-bold flex items-center justify-between">
+              <span>Documenti Collegati (${collegamenti.length})</span>
+              <span class="text-[10px] text-stone-500">Clicca per saltare</span>
+            </div>
+            <div class="space-y-1.5 max-h-40 overflow-y-auto">
+              ${htmlCollegamenti}
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-bunker-800">
+          <button type="button" onclick="interrogaArmandoDaNodo('${escapeHtml(domandaSuggerita)}')"
+            class="w-full py-2.5 px-3 rounded-xl bg-crimson-700 hover:bg-crimson-600 text-white font-mono text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg border border-crimson-500">
+            <span>💬</span>
+            <span>Chiedi ad Armando su questo documento</span>
+          </button>
+        </div>
+      `;
+    }
+
+    function interrogaArmandoDaNodo(domanda) {
+      const input = document.getElementById('domanda-input');
+      if (input) {
+        input.value = domanda;
+        aggiornaAnteprimaComplessita();
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function renderCarteLavagna() {
+      const container = document.getElementById("lavagna-vista-carte");
+      if (!container) return;
+
+      const nodi = getDatiFiltratiLavagna();
+      if (nodi.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full p-8 text-center text-xs font-mono text-stone-400 bg-bunker-900 rounded-xl border border-bunker-800">
+            Nessun documento corrispondente ai filtri impostati.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = nodi.map(n => {
+        const stile = ottieniStileNodo(n);
+        const collegati = (datiLavagna.collegamenti || []).filter(c => c.da === n.id || c.a === n.id);
+        const orariBadge = (n.orari || []).map(o =>
+          `<span class="px-1.5 py-0.5 rounded bg-amber-950 border border-amber-800 text-[10px] text-amber-300 font-mono">⏰ ${escapeHtml(o)}</span>`
+        ).join(" ");
+
+        return `
+          <div class="p-4 rounded-xl bg-bunker-900 border border-bunker-700 hover:border-crimson-600 transition flex flex-col justify-between space-y-3 shadow-lg">
+            <div>
+              <div class="flex items-center justify-between gap-2 text-xs font-mono">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                  style="background: ${stile.bg}; color: ${stile.text}; border: 1px solid ${stile.border}">
+                  ${n.sospetto ? '⚠️ Testo con Istruzioni' : (n.orari && n.orari.length > 0 ? 'Con Orari Registrati' : 'Dossier')}
+                </span>
+                <span class="text-stone-400 font-mono text-[11px] bg-bunker-950 px-2 py-0.5 rounded border border-bunker-800">
+                  ${escapeHtml(n.id)}
+                </span>
+              </div>
+              <h4 class="font-display font-bold uppercase tracking-wider text-base text-white mt-2">
+                [${escapeHtml(n.codice)}] ${escapeHtml(n.titolo)}
+              </h4>
+              <p class="text-xs font-mono text-stone-300 mt-1.5 line-clamp-3 leading-relaxed">
+                ${escapeHtml(n.anteprima)}
+              </p>
+            </div>
+
+            <div class="space-y-2 pt-2 border-t border-bunker-800">
+              <div class="flex flex-wrap items-center justify-between gap-1 text-[11px] font-mono text-stone-400">
+                <span>Riferimenti incrociati: <strong class="text-white">${collegati.length}</strong></span>
+                <div class="flex flex-wrap gap-1">${orariBadge}</div>
+              </div>
+              <div class="flex items-center gap-2 pt-1">
+                <button type="button" onclick="impostaSubmodalitaLavagna('grafo'); selezionaNodoLavagna('${n.id}')"
+                  class="flex-1 py-1.5 px-2 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-200 text-xs font-mono transition text-center">
+                  Vedi sul Grafo ➔
+                </button>
+                <button type="button" onclick="interrogaArmandoDaNodo('Cosa dice esattamente il documento ${escapeHtml(n.codice)} e quali altri documenti sono collegati?')"
+                  class="py-1.5 px-3 rounded bg-crimson-800 hover:bg-crimson-700 text-white text-xs font-mono font-bold transition" title="Chiedi ad Armando">
+                  💬
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderTimelineLavagna() {
+      const container = document.getElementById("lavagna-vista-timeline");
+      if (!container) return;
+      const eventi = datiLavagna.timeline || [];
+      if (eventi.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-xs font-mono text-stone-500">Nessun orario rilevato nei file del dossier.</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="relative border-l-2 border-crimson-700/80 ml-4 pl-6 space-y-4 my-2">
+          ${eventi.map(ev => `
+            <div class="relative group">
+              <span class="absolute -left-[31px] top-2 w-3.5 h-3.5 rounded-full border-2 bg-amber-500 border-bunker-950 transition-all"></span>
+              <div class="p-3.5 rounded-xl bg-bunker-900 border border-bunker-700 hover:border-amber-600 transition space-y-1.5">
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                  <span class="px-2 py-0.5 rounded bg-bunker-950 border border-amber-700/80 text-amber-300 font-bold">
+                    ⏰ Ore ${escapeHtml(ev.orario)}
+                  </span>
+                  <button type="button" onclick="impostaSubmodalitaLavagna('grafo'); selezionaNodoLavagna('${ev.fonte}')"
+                    class="px-2 py-0.5 rounded bg-crimson-950 hover:bg-crimson-900 border border-crimson-700 text-crimson-300 hover:text-white transition flex items-center gap-1 text-[11px]">
+                    📄 [${escapeHtml(ev.id_fonte || ev.fonte)}] ${escapeHtml(ev.titolo_fonte || '')} ➔
+                  </button>
+                </div>
+                <div class="text-xs font-mono text-stone-200 leading-relaxed bg-bunker-950/70 p-2.5 rounded border border-bunker-800">
+                  «${escapeHtml(ev.frase)}»
+                </div>
+                <div class="flex justify-end pt-1">
+                  <button type="button" onclick="interrogaArmandoDaNodo('Analizza l\\'evento delle ore ${escapeHtml(ev.orario)} citato nel file ${escapeHtml(ev.id_fonte || ev.fonte)}: ${escapeHtml(ev.frase)}')"
+                    class="text-crimson-400 hover:text-crimson-300 text-xs font-mono font-bold transition">
+                    Chiedi ad Armando su questo passaggio ➔
+                  </button>
+                </div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderMatriceLavagna() {
+      const container = document.getElementById("lavagna-vista-matrice");
+      if (!container) return;
+      const collegamenti = datiLavagna.collegamenti || [];
+      if (collegamenti.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-xs font-mono text-stone-500">Nessun riferimento incrociato calcolato tra i file.</div>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="space-y-3">
+          <div class="text-xs font-mono text-stone-400 pb-2">
+            Riferimenti calcolati analizzando co-occorrenze, citazioni dirette e orari condivisi tra i documenti caricati:
+          </div>
+          <div class="grid grid-cols-1 gap-2.5">
+            ${collegamenti.map(c => {
+              const puntiHtml = (c.punti_comuni || []).map(p =>
+                `<span class="px-2 py-0.5 rounded bg-bunker-800 border border-bunker-700 text-amber-300 text-xs font-mono font-semibold">${escapeHtml(p)}</span>`
+              ).join(" ");
+
+              return `
+                <div class="p-3 rounded-xl bg-bunker-950 border border-bunker-700 hover:border-crimson-700 transition flex flex-wrap items-center justify-between gap-3 shadow">
+                  <div class="flex flex-wrap items-center gap-2 font-mono text-xs">
+                    <button type="button" onclick="impostaSubmodalitaLavagna('grafo'); selezionaNodoLavagna('${c.da}')"
+                      class="px-2.5 py-1 rounded bg-crimson-950 hover:bg-crimson-900 border border-crimson-700 text-white font-bold transition">
+                      📄 ${escapeHtml(c.da)}
+                    </button>
+                    <span class="text-stone-500 font-bold">⟷</span>
+                    <button type="button" onclick="impostaSubmodalitaLavagna('grafo'); selezionaNodoLavagna('${c.a}')"
+                      class="px-2.5 py-1 rounded bg-crimson-950 hover:bg-crimson-900 border border-crimson-700 text-white font-bold transition">
+                      📄 ${escapeHtml(c.a)}
+                    </button>
+                    <span class="px-2 py-0.5 rounded bg-bunker-900 border border-bunker-800 text-[10px] text-stone-400 uppercase font-semibold">
+                      ${escapeHtml(c.tipo)}
+                    </span>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-1.5 flex-1 justify-end">
+                    ${puntiHtml}
+                    <button type="button" onclick="interrogaArmandoDaNodo('Confronta il documento ${escapeHtml(c.da)} con ${escapeHtml(c.a)}: quali collegamenti e discrepanze emergono?')"
+                      class="ml-2 px-2.5 py-1 rounded bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-stone-200 text-xs font-mono transition">
+                      💬 Confronta
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    }
+
 
     function inizializzaMappa() {
       const urlMappa = (window.location.protocol === 'file:' || window.location.pathname.includes('/Frontend/'))
@@ -621,11 +1727,17 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
     async function init() {
       inizializzaMappa();
+      inizializzaCanvasLavagna();
       const istrEl = document.getElementById('istruzioni-view');
       if (istrEl) istrEl.value = ISTRUZIONI;
       await rilevaServerBackend();
       renderFonti();
       aggiornaAnteprimaComplessita();
+      await caricaDatiLavagna();
+      setTimeout(() => {
+        ridimensionaCanvasLavagna();
+        ridisegnaCanvasLavagna();
+      }, 60);
     }
 
     // Stessa logica di valuta_complessita() in Backend/Investigatore.py
@@ -926,6 +2038,8 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
     function caricaFileTxt(event) {
       const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
+      let inSospeso = files.length;
       files.forEach(file => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -936,8 +2050,12 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
           } else {
             fonti.push({ nome: file.name, contenuto: contenuto });
           }
-          fonti.sort((a, b) => a.nome.localeCompare(b.nome));
-          renderFonti();
+          inSospeso--;
+          if (inSospeso <= 0) {
+            fonti.sort((a, b) => a.nome.localeCompare(b.nome));
+            renderFonti();
+            caricaDatiLavagna();
+          }
         };
         reader.readAsText(file);
       });
@@ -976,7 +2094,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
           missione: "Operazione Silenzio — Protocollo Lazzaro (Modalità Browser)",
           fonti_dossier: fonti.length,
           file_dossier: fonti.map(f => f.nome),
-          nodi_teatro_mappa: 14
+          nodi_teatro_mappa: 19
         }, null, 2);
       } else if (nomeTool === 'elenca_fonti') {
         outPre.textContent = JSON.stringify({ ok: true, totale: fonti.length, fonti: fonti.map(f => ({ file: f.nome, anteprima: f.contenuto.slice(0, 100) + '...' })) }, null, 2);

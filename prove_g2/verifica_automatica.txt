@@ -1,6 +1,6 @@
 VERIFICA AUTOMATICA — GIORNO 2
 
-[FAIL] 10 documenti caricati (trovati 17)
+[FAIL] 10 documenti caricati (trovati 25)
 [OK] I 7 documenti G2 sono nel dossier
 [FAIL] G2-04 rilevato come documento sospetto
 [OK] I marcatori di prompt injection sono riconosciuti in G2-04

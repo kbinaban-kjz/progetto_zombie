@@ -67,4 +67,4 @@ I collegamenti tra nodi stanno in `links`:
 
 I colori dei tipi e le etichette sono in `types`, sempre in `js/data.js`.
 
-> Scenario e contenuti sono di finzione. I riferimenti `G1-*` richiamano i dossier presenti in `../../dati/`.
+> Scenario e contenuti sono di finzione. I riferimenti `G1-*`, `G2-*` e `LX5-*` richiamano i dossier presenti in `../../dati/`.

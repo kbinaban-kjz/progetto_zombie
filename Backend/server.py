@@ -42,8 +42,8 @@ try:
         salva_con_instradamento,
         cancella_cronologia,
     )
-    from Backend.sources import carica_fonti, risolvi_cartella_dati
-    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool
+    from Backend.sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
+    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
     from Backend.modello_locale import is_modello_caricato
     from Backend.router import genera_risposta_ibrida
     import Backend.modello_openai as modello_openai
@@ -70,8 +70,8 @@ except ImportError:
         salva_con_instradamento,
         cancella_cronologia,
     )
-    from sources import carica_fonti, risolvi_cartella_dati
-    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool
+    from sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
+    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
     from modello_locale import is_modello_caricato
     from router import genera_risposta_ibrida
     import modello_openai
@@ -201,6 +201,21 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     "totale": len(STRUMENTI_REGISTRATI),
                     "strumenti": list(STRUMENTI_REGISTRATI.keys()),
                     "schemas": TOOLS_OPENAI_SCHEMA,
+                }
+            )
+
+        # API: Lavagna Investigativa & Relazioni ("Collega i Puntini")
+        if path in {"/api/board", "/api/intelligence"}:
+            board_data = costruisci_intelligence_board()
+            return self._send_json(board_data)
+
+        # API: Mappa Tattica del Teatro Operativo
+        if path in {"/api/map", "/api/mappa"}:
+            return self._send_json(
+                {
+                    "ok": True,
+                    "totale": len(NODI_TEATRO),
+                    "nodi": NODI_TEATRO,
                 }
             )
 
