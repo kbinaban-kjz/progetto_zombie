@@ -32,7 +32,7 @@ TIMEOUT_SECONDI = 30.0
 _client_cache: dict[tuple[str, str | None, int], OpenAI] = {}
 _ultimo_modello_nvidia_valido: str | None = None
 ULTIMO_MODELLO_USATO: str | None = None
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 DATA_DIR = BASE_DIR / "dati" if (BASE_DIR / "dati").is_dir() else BASE_DIR / "data"
 DOMANDA_ESEMPIO = "Chi ha lasciato il messaggio? Rispondi citando la fonte."
@@ -241,7 +241,10 @@ def main() -> int:
 
         print(f"\nRisposta:\n{risposta}")
         try:
-            from Backend.database import salva_messaggio
+            try:
+                from Backend.database import salva_messaggio
+            except ImportError:
+                from database import salva_messaggio
 
             salva_messaggio(domanda, risposta, [nome for nome, _ in fonti])
         except Exception as exc_db:

@@ -11,7 +11,7 @@ Assistente investigativo basato su LLM (`Qwen/Qwen2.5-0.5B-Instruct` o modelli r
 │   ├── schema.sql            # Schema SQL della tabella cronologia_chat (id, domanda, risposta, fonti, created_at)
 │   ├── database.py           # Inizializzazione dello schema e funzioni di lettura/scrittura su SQLite
 │   ├── Investigatore.py      # Script Python del Backend (collegato a SQLite + server HTTP / CLI)
-│   ├── Investigatore.ipynb   # Notebook collegato al database SQLite
+│   ├── modello_openai.py     # Modulo per interrogazioni via API OpenAI / NVIDIA
 │   └── Missione.xlsx         # Specifiche e obiettivi della missione
 ├── Frontend/
 │   └── index.html            # Interfaccia web collegata al Backend
@@ -19,7 +19,6 @@ Assistente investigativo basato su LLM (`Qwen/Qwen2.5-0.5B-Instruct` o modelli r
 │   ├── G1-01.txt
 │   ├── G1-02.txt
 │   └── G1-03.txt
-├── modello_openai.py         # Modulo alternativo per interrogazioni via API OpenAI / NVIDIA
 ├── requirements.txt          # Dipendenze Python (torch, transformers)
 └── .gitignore
 ```
