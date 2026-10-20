@@ -578,7 +578,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "cerca_fonti",
-            "description": "Cerca parole chiave, testimonianze o frasi nei documenti ufficiali del dossier (dati/ e new_dati/).",
+            "description": "Cerca parole chiave o testimonianze nel dossier. USARE SOLO SE i documenti pertinenti non sono già presenti nel testo fornito. NON usare se hai già le fonti nel contesto.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -599,7 +599,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "leggi_fonte",
-            "description": "Recupera il contenuto integrale di un file di testimonianza specifico (es. 'G1-01.txt', 'G1-02.txt', 'G1-03.txt').",
+            "description": "Recupera il testo integrale di un file specifico. USARE SOLO SE il testo integrale del file manca dal contesto fornito. NON usare se il file è già presente.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -616,7 +616,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "elenca_fonti",
-            "description": "Elenca tutti i file di testimonianze presenti nel dossier con identificativi e titoli.",
+            "description": "Elenca tutti i file del dossier. USARE SOLO SE l'utente chiede esplicitamente l'elenco completo o il censimento dei file in archivio.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -625,8 +625,8 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "function": {
             "name": "verifica_sicurezza_fonti",
             "description": (
-                "Controlla i documenti del dossier e segnala quelli che contengono testi "
-                "che simulano istruzioni all'AI (prompt injection)."
+                "Verifica la presenza di documenti manomessi o ostili con prompt injection. "
+                "USARE ESCLUSIVAMENTE SE l'utente richiede espressamente un audit di sicurezza o scansione anti-manomissione delle fonti."
             ),
             "parameters": {"type": "object", "properties": {}},
         },
@@ -635,7 +635,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "ottieni_nodi_mappa",
-            "description": "Interroga la mappa tattica globale per ottenere informazioni sui nodi di rete (bunker, focolai, segnali radio, anomalie — dossier G1, G2, LX5 e presidi globali).",
+            "description": "Restituisce i nodi tattici della mappa (bunker, focolai, segnali, anomalie). USARE SOLO SE l'utente chiede una lista o panoramica delle installazioni della mappa per tipologia o livello minaccia.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -656,13 +656,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "ottieni_dettaglio_nodo",
-            "description": "Recupera il fascicolo di intelligence completo su un nodo specifico della mappa (es. 'laz01' / Centrale, 'ferri' / Nora Ferri, 'echo').",
+            "description": "Recupera la scheda di intelligence su un nodo specifico della mappa (es. 'laz01', 'ferri', 'echo', 'sanmauro'). USARE SOLO SE l'utente chiede coordinate, status, superstiti o intelligence specifica di quell'installazione.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "id_o_codice": {
                         "type": "string",
-                        "description": "ID o codice del nodo (es. 'laz01', 'ferri', 'echo', 'roma', 'berlino').",
+                        "description": "ID o codice del nodo (es. 'laz01', 'ferri', 'echo', 'sanmauro', 'roma', 'berlino').",
                     }
                 },
                 "required": ["id_o_codice"],
@@ -673,7 +673,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "cerca_cronologia",
-            "description": "Cerca nel database SQLite locale domande e risposte passate dell'investigatore.",
+            "description": "Cerca conversazioni passate nel database SQLite. USARE SOLO SE l'utente chiede di recuperare decisioni, domande o risposte di sessioni precedenti.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -690,7 +690,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "statistiche_missione",
-            "description": "Restituisce un resoconto globale sullo stato della missione, fonti caricate e nodi operativi.",
+            "description": "Restituisce metriche numeriche e riassunto globale della missione. USARE SOLO SE l'utente chiede statistiche o conteggi quantitativi globali.",
             "parameters": {"type": "object", "properties": {}},
         },
     },

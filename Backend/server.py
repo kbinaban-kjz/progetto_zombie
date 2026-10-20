@@ -41,6 +41,7 @@ try:
         leggi_cronologia_con_instradamento,
         salva_con_instradamento,
         cancella_cronologia,
+        leggi_ultimi_messaggi,
     )
     from Backend.sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
     from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
@@ -69,6 +70,7 @@ except ImportError:
         leggi_cronologia_con_instradamento,
         salva_con_instradamento,
         cancella_cronologia,
+        leggi_ultimi_messaggi,
     )
     from sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
     from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
@@ -167,6 +169,8 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     "cartella_dati": str(risolvi_cartella_dati().relative_to(ROOT_DIR)),
                     "file_fonti": [nome for nome, _ in fonti],
                     "tools_disponibili": list(STRUMENTI_REGISTRATI.keys()),
+                    "limite_memoria": 10,
+                    "memoria_db_attiva": len(leggi_ultimi_messaggi(10)),
                 }
             )
 
@@ -290,6 +294,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             modello = (payload.get("modello") or "").strip() or None
             modalita = (payload.get("modalita") or "auto").strip().lower()
             usa_tools = bool(payload.get("usa_tools", False))
+            memoria = payload.get("memoria")
 
             try:
                 esito = genera_risposta_ibrida(
@@ -299,6 +304,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     modello=modello,
                     modalita=modalita,
                     usa_tools=usa_tools,
+                    memoria=memoria,
                 )
                 risposta = esito["risposta"]
                 record = salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
@@ -312,6 +318,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                         "complessita": esito["complessita"],
                         "motivo_routing": esito["motivo_routing"],
                         "durata_ms": esito["durata_ms"],
+                        "memoria_usata": esito.get("memoria_usata", 0),
                         "fonti": [nome for nome, _ in fonti],
                         "record": record,
                         "cronologia": leggi_cronologia_con_instradamento(),

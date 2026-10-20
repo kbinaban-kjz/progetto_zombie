@@ -106,6 +106,83 @@ def leggi_cronologia() -> list[dict[str, Any]]:
     return righe
 
 
+def leggi_ultimi_messaggi(limite: int = 10) -> list[dict[str, Any]]:
+    """
+    Legge gli ultimi `limite` messaggi registrati nel database SQLite (cronologia_chat).
+    Restituisce i record in ordine cronologico crescente (dal più vecchio al più recente)
+    in modo che l'agente possa utilizzarli come memoria operativa di contesto.
+    """
+    inizializza_db()
+    with get_connection() as conn:
+        cur = conn.execute(
+            """
+            SELECT id, domanda, risposta, fonti, created_at
+            FROM cronologia_chat
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (max(1, int(limite)),),
+        )
+        righe = [dict(r) for r in cur.fetchall()]
+
+    for r in righe:
+        if isinstance(r.get("fonti"), str):
+            try:
+                r["fonti"] = json.loads(r["fonti"])
+            except json.JSONDecodeError:
+                r["fonti"] = []
+
+    righe.reverse()
+    return righe
+
+
+def formatta_memoria_chat(
+    cronologia: list[dict[str, Any]] | None = None,
+    limite: int = 10,
+) -> list[dict[str, str]]:
+    """
+    Converte i messaggi passati nel formato standard di turni di dialogo per LLM:
+    [{"role": "user", "content": domanda}, {"role": "assistant", "content": risposta}, ...]
+    Se `cronologia` è None, legge gli ultimi `limite` messaggi dal database SQLite.
+    """
+    if cronologia is None:
+        cronologia = leggi_ultimi_messaggi(limite=limite)
+
+    messaggi: list[dict[str, str]] = []
+    for r in cronologia:
+        domanda = (r.get("domanda") or "").strip()
+        risposta = (r.get("risposta") or "").strip()
+        if domanda:
+            messaggi.append({"role": "user", "content": domanda})
+        if risposta:
+            messaggi.append({"role": "assistant", "content": risposta})
+
+    return messaggi
+
+
+def formatta_memoria_testo(
+    cronologia: list[dict[str, Any]] | None = None,
+    limite: int = 10,
+) -> str:
+    """
+    Restituisce una rappresentazione testuale chiara della memoria degli ultimi messaggi
+    estratti dal database, adatta per l'inserimento nel prompt o per visualizzazione.
+    """
+    if cronologia is None:
+        cronologia = leggi_ultimi_messaggi(limite=limite)
+    if not cronologia:
+        return ""
+
+    blocchi: list[str] = []
+    for r in cronologia:
+        domanda = (r.get("domanda") or "").strip()
+        risposta = (r.get("risposta") or "").strip()
+        if domanda or risposta:
+            blocchi.append(f"- Utente: {domanda}\n- Armando: {risposta}")
+
+    return "\n".join(blocchi)
+
+
 def salva_con_instradamento(domanda: str, fonti_nomi: list[str], esito: dict[str, Any]) -> dict[str, Any]:
     """
     Salva il messaggio in cronologia_chat e i metadati del motore usato in instradamento_chat.

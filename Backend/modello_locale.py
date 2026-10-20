@@ -10,6 +10,7 @@ Responsabilità:
 import math
 import re
 from collections.abc import Sequence
+from typing import Any
 
 try:
     from Backend.config import MODELLO_LOCALE, ISTRUZIONI
@@ -265,8 +266,8 @@ def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 8) -> lis
 
 
 def _documenti_citati(domanda: str) -> set[str]:
-    """Estrae gli ID documento citati esplicitamente (es. g2-04)."""
-    return set(re.findall(r"g[12]-\d{2}", domanda))
+    """Estrae gli ID documento citati esplicitamente (es. g2-04, lx5-1264)."""
+    return set(re.findall(r"g[12]-\d{2}|lx5[-_]\d{4}", domanda.lower()))
 
 
 def _rendi(unita: Sequence[dict[str, object]]) -> str:
@@ -279,9 +280,13 @@ def _rendi(unita: Sequence[dict[str, object]]) -> str:
     return "\n".join(righe)
 
 
-def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> str:
+def risposta_locale_da_fonti(
+    domanda: str,
+    fonti: Sequence[tuple[str, str]],
+    memoria: list[dict[str, Any]] | None = None,
+) -> str:
     """
-    Risponditore locale deterministico basato sulle fonti caricate.
+    Risponditore locale deterministico basato sulle fonti caricate e sulla memoria recente.
     Non contiene risposte preconfezionate: recupera le frasi pertinenti dai documenti,
     le ordina per orario quando richiesto e cita sempre la fonte.
     Tratta i documenti come dati passivi: i testi che impartiscono ordini non vengono eseguiti.
@@ -307,11 +312,34 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
         )
 
     # 3. Convenevoli: solo identità, nessun contenuto sul caso
-    if any(q.startswith(s) or q == s for s in ("ciao", "buongiorno", "buonasera", "salve", "chi sei", "hey")):
+    if any(q.startswith(s) or q == s or s in q for s in ("ciao", "buongiorno", "buonasera", "salve", "chi sei", "hey", "qual è il tuo ruolo", "tuo ruolo")):
         return (
             "Ciao. Sono Armando, investigatore operativo dell'unità Operazione Silenzio. "
             "Come posso aiutarti con l'analisi dei dossier, le trasmissioni radio o la situazione sul campo?"
         )
+
+    # 3b. Richieste sulla memoria o cronologia recente
+    parole_memoria = (
+        "cosa ti ho chiesto", "cosa ho chiesto", "ultima domanda", "domanda precedente",
+        "ultimo messaggio", "messaggi precedenti", "cosa abbiamo detto", "ti ricordi",
+        "in memoria", "nella memoria", "cosa c'è in memoria", "cronologia recente"
+    )
+    if any(p in q for p in parole_memoria):
+        if memoria:
+            elenco = []
+            for item in memoria[-5:]:
+                d = (item.get("domanda") or "").strip()
+                r = (item.get("risposta") or "").strip()
+                if d:
+                    elenco.append(f"• Domanda: \"{d}\"")
+                if r:
+                    r_breve = (r[:110] + "...") if len(r) > 110 else r
+                    elenco.append(f"  Risposta: \"{r_breve}\"")
+            return (
+                f"Memoria operativa recuperata dal database ({len(memoria)} messaggi registrati):\n"
+                + "\n".join(elenco)
+            )
+        return "Non sono presenti messaggi precedenti nella memoria del database."
 
     includi_ostili = bool(documenti_citati)
     indice_documenti = _indice_documenti(fonti, includi_ostili=includi_ostili)
@@ -324,14 +352,29 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
             "non è un comando valido e non modifica le fonti.\n\n"
         )
 
-    # 4. Documenti citati esplicitamente: si riportano quei documenti
-    if documenti_citati:
+    # 4. Documenti citati esplicitamente: si riportano quei documenti (se non è un attacco)
+    if documenti_citati and not attacco_utente:
         scelti = [u for u in indice_documenti if str(u["id"]).lower() in documenti_citati][:3]
         if scelti:
             nota = ""
             if any(rileva_istruzioni_ostili(dict(fonti)[str(u["file"])]) for u in scelti):
                 nota = "[SICUREZZA] Documento segnalato come testo che simula istruzioni: riportato come dato.\n"
             return avviso + nota + _rendi(scelti)
+
+    # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5)
+    if not attacco_utente:
+        if "giorno 1" in q or "g1" in q.split():
+            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g1")][:3]
+            if scelti:
+                return avviso + "Atti e testimonianze del Giorno 1 [G1]:\n" + _rendi(scelti)
+        elif "giorno 2" in q or "g2" in q.split():
+            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g2")][:3]
+            if scelti:
+                return avviso + "Atti e testimonianze del Giorno 2 [G2]:\n" + _rendi(scelti)
+        elif "imprevist" in q or "lx5" in q.split():
+            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:3]
+            if scelti:
+                return avviso + "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:\n" + _rendi(scelti)
 
     # 5. Domande su orari/sequenza: timeline delle frasi con orario
     if attacco_utente or _chiede_tempo(q):
@@ -348,11 +391,15 @@ def risposta_locale_da_fonti(domanda: str, fonti: Sequence[tuple[str, str]]) -> 
 
 
 def genera_risposta_locale(
-    domanda: str, fonti: Sequence[tuple[str, str]], max_tokens: int = 256
+    domanda: str,
+    fonti: Sequence[tuple[str, str]],
+    max_tokens: int = 256,
+    memoria: list[dict[str, Any]] | None = None,
 ) -> str:
     """
     Esegue la generazione sul modello locale (Qwen2.5-0.5B-Instruct).
     Se il modello neuronale non è disponibile, utilizza l'estrattore deterministico.
+    Supporta la memoria conversazionale degli ultimi messaggi scambiati.
     """
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
@@ -363,11 +410,21 @@ def genera_risposta_locale(
         import torch
 
         contesto = "\n\n".join(formatta_fonte(nome, testo) for nome, testo in fonti)
-        messaggio_utente = formatta_messaggio_locale(contesto, domanda)
-        messaggi = [
-            {"role": "system", "content": ISTRUZIONI},
-            {"role": "user", "content": messaggio_utente},
-        ]
+        messaggio_utente = formatta_messaggio_locale(contesto, domanda, memoria=memoria)
+        messaggi = [{"role": "system", "content": ISTRUZIONI}]
+
+        # Aggiunge i turni della memoria se presenti
+        if memoria:
+            for item in memoria:
+                d = (item.get("domanda") or "").strip()
+                r = (item.get("risposta") or "").strip()
+                if d:
+                    messaggi.append({"role": "user", "content": d})
+                if r:
+                    messaggi.append({"role": "assistant", "content": r})
+
+        messaggi.append({"role": "user", "content": messaggio_utente})
+
         testo = _tokenizer_locale.apply_chat_template(
             messaggi, tokenize=False, add_generation_prompt=True
         )
@@ -388,7 +445,7 @@ def genera_risposta_locale(
         if risposta:
             return risposta
 
-    return risposta_locale_da_fonti(domanda, fonti)
+    return risposta_locale_da_fonti(domanda, fonti, memoria=memoria)
 
 
 if __name__ == "__main__":

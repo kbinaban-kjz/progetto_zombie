@@ -140,6 +140,7 @@ def _genera_risposta_rest(
     fonti: Sequence[tuple[str, str]],
     api_key: str,
     modello: str,
+    memoria: list[dict[str, Any]] | None = None,
 ) -> str:
     """
     Fallback REST nativo via urllib: esegue la chiamata a Gemini senza librerie esterne.
@@ -147,21 +148,28 @@ def _genera_risposta_rest(
     """
     global ULTIMO_MODELLO_USATO
     contenuto_fonti = formatta_blocco_openai(fonti)
-    messaggio_completo = formatta_messaggio_cloud(contenuto_fonti, domanda)
+    messaggio_completo = formatta_messaggio_cloud(contenuto_fonti, domanda, memoria=memoria)
 
     # Assicura formato corretto del modello per la REST API
     id_modello = modello.split("/")[-1] if "/" in modello else modello
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{id_modello}:generateContent?key={api_key.strip()}"
 
+    contents_rest: list[dict[str, Any]] = []
+    if memoria:
+        for m in memoria:
+            d = (m.get("domanda") or "").strip()
+            r = (m.get("risposta") or "").strip()
+            if d:
+                contents_rest.append({"role": "user", "parts": [{"text": d}]})
+            if r:
+                contents_rest.append({"role": "model", "parts": [{"text": r}]})
+    contents_rest.append({"role": "user", "parts": [{"text": messaggio_completo}]})
+
     payload = {
         "system_instruction": {
             "parts": [{"text": ISTRUZIONI}]
         },
-        "contents": [
-            {
-                "parts": [{"text": messaggio_completo}]
-            }
-        ],
+        "contents": contents_rest,
         "generationConfig": {
             "temperature": 0.0
         }
@@ -207,12 +215,14 @@ def genera_risposta(
     api_key: str | None = None,
     modello: str | None = None,
     usa_tools: bool = False,
+    memoria: list[dict[str, Any]] | None = None,
 ) -> str:
     """
     Invia la richiesta al modello Google Gemini.
     - Se usa_tools è True, abilita i tools definiti in tools.py.
     - Gestisce il fallback automatico tra i modelli Gemini configurati.
     - Utilizza google.genai se installato, altrimenti ripiega sulla REST API nativa.
+    - Supporta la memoria conversazionale degli ultimi messaggi scambiati.
     """
     global _ultimo_modello_gemini_valido, ULTIMO_MODELLO_USATO
 
@@ -241,7 +251,7 @@ def genera_risposta(
             modelli.append(m_risolto)
 
     contenuto_fonti = formatta_blocco_openai(fonti)
-    messaggio_utente = formatta_messaggio_cloud(contenuto_fonti, domanda)
+    messaggio_utente = formatta_messaggio_cloud(contenuto_fonti, domanda, memoria=memoria)
 
     # --------------------------------------------------------------------------
     # PERCORSO 1: google-genai SDK (se disponibile)
@@ -262,6 +272,21 @@ def genera_risposta(
                 statistiche_missione,
             ]
 
+        # Costruzione cronologia messaggi per SDK google-genai
+        gemini_history: list[Any] = []
+        if memoria and types is not None:
+            for m_item in memoria:
+                d = (m_item.get("domanda") or "").strip()
+                r = (m_item.get("risposta") or "").strip()
+                if d:
+                    gemini_history.append(
+                        types.Content(role="user", parts=[types.Part.from_text(text=d)])
+                    )
+                if r:
+                    gemini_history.append(
+                        types.Content(role="model", parts=[types.Part.from_text(text=r)])
+                    )
+
         ultimo_errore: Exception | None = None
 
         for indice, modello_corrente in enumerate(modelli):
@@ -277,12 +302,19 @@ def genera_risposta(
 
                 # Se ci sono tools, usa Chat con Automatic Function Calling (raccomandato da Google)
                 if funzioni_tools:
-                    chat = client.chats.create(model=modello_corrente, config=config)
+                    chat = client.chats.create(
+                        model=modello_corrente, config=config, history=gemini_history
+                    )
                     risultato = chat.send_message(messaggio_utente)
                 else:
+                    contents_sdk = list(gemini_history) + [
+                        types.Content(
+                            role="user", parts=[types.Part.from_text(text=messaggio_utente)]
+                        )
+                    ]
                     risultato = client.models.generate_content(
                         model=modello_corrente,
-                        contents=messaggio_utente,
+                        contents=contents_sdk,
                         config=config,
                     )
 
@@ -384,7 +416,7 @@ def genera_risposta(
     ultimo_err_rest: Exception | None = None
     for indice, m in enumerate(modelli):
         try:
-            return _genera_risposta_rest(domanda, fonti, chiave, m)
+            return _genera_risposta_rest(domanda, fonti, chiave, m, memoria=memoria)
         except (GeminiAuthError, GeminiQuotaError):
             raise
         except Exception as err:

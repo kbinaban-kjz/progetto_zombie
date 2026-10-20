@@ -13,7 +13,11 @@ from typing import Any
 
 try:
     from Backend.config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
-    from Backend.database import salva_con_instradamento, cancella_cronologia
+    from Backend.database import (
+        salva_con_instradamento,
+        cancella_cronologia,
+        leggi_ultimi_messaggi,
+    )
     from Backend.sources import carica_fonti
     from Backend.router import genera_risposta_ibrida
     from Backend.tools import (
@@ -24,7 +28,11 @@ try:
     )
 except ImportError:
     from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
-    from database import salva_con_instradamento, cancella_cronologia
+    from database import (
+        salva_con_instradamento,
+        cancella_cronologia,
+        leggi_ultimi_messaggi,
+    )
     from sources import carica_fonti
     from router import genera_risposta_ibrida
     from tools import (
@@ -41,6 +49,7 @@ def stampa_guida_comandi() -> None:
     print("  /tools          : Elenca tutti gli strumenti investigativi dell'AI")
     print("  /fonti          : Mostra i file del dossier attualmente caricati")
     print("  /stats          : Statistiche operative della missione e del database")
+    print("  /memoria        : Visualizza gli ultimi 10 messaggi nella memoria del database SQLite")
     print("  /nodo <id>      : Intelligence dettagliata su un nodo (es. /nodo ferri)")
     print("  /cerca <testo>  : Cerca nei documenti senza interrogare il modello")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
@@ -103,6 +112,20 @@ def avvia_cli() -> int:
                 print(f"  {k}: {v}")
             continue
 
+        if cmd_lower in {"/memoria", "/memory"}:
+            ultimi = leggi_ultimi_messaggi(10)
+            print(f"\nMemoria dell'agente (ultimi {len(ultimi)} messaggi nel database SQLite):")
+            if not ultimi:
+                print("  (Nessun messaggio salvato nel database)")
+            else:
+                for idx, r in enumerate(ultimi, 1):
+                    d_breve = (r['domanda'][:80] + '...') if len(r['domanda']) > 80 else r['domanda']
+                    r_breve = (r['risposta'][:80] + '...') if len(r['risposta']) > 80 else r['risposta']
+                    print(f"  {idx}. [ID {r['id']}] {r.get('created_at', '')}")
+                    print(f"     Utente : {d_breve}")
+                    print(f"     Armando: {r_breve}")
+            continue
+
         if cmd_lower in {"/clear-history", "/pulisci-cronologia", "/elimina-cronologia", "/reset-cronologia"}:
             eliminati = cancella_cronologia()
             print(f"\nCronologia rimossa con successo ({eliminati} record eliminati dal database SQLite).")
@@ -145,7 +168,10 @@ def avvia_cli() -> int:
                 if esito["motore"] == "locale"
                 else f"[CLOUD • {esito['modello_usato']}]"
             )
-            print(f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']}, {esito['durata_ms']} ms)")
+            print(
+                f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']}, "
+                f"memoria: {esito.get('memoria_usata', 0)} msg, {esito['durata_ms']} ms)"
+            )
             print(f"Risposta:\n{esito['risposta']}")
             salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
         except Exception as exc:

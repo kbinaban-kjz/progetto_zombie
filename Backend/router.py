@@ -25,6 +25,7 @@ try:
         get_openai_api_key,
     )
     from Backend.modello_locale import genera_risposta_locale, is_modello_caricato
+    from Backend.database import leggi_ultimi_messaggi
     import Backend.modello_openai as modello_openai
     import Backend.modello_gemini as modello_gemini
 except ImportError:
@@ -39,6 +40,7 @@ except ImportError:
         get_openai_api_key,
     )
     from modello_locale import genera_risposta_locale, is_modello_caricato
+    from database import leggi_ultimi_messaggi
     import modello_openai
     import modello_gemini
 
@@ -123,12 +125,24 @@ def genera_risposta_ibrida(
     modello: str | None = None,
     modalita: str = "auto",
     usa_tools: bool = False,
+    memoria: list[dict[str, Any]] | None = None,
+    limite_memoria: int = 10,
 ) -> dict[str, Any]:
     """
     Smista la richiesta tra:
     - Modello locale (per richieste semplici o modalita='locale')
     - Modello cloud (per richieste complesse o modalita='cloud')
+    Carica automaticamente gli ultimi `limite_memoria` messaggi dal database SQLite
+    per garantire la continuità conversazionale dell'agente.
     """
+    # Carica la memoria degli ultimi messaggi dal database se non passata esplicitamente
+    if memoria is None:
+        try:
+            memoria = leggi_ultimi_messaggi(limite=limite_memoria)
+        except Exception as exc:
+            print(f"(Avviso recupero memoria database SQLite: {exc})")
+            memoria = []
+
     is_complessa, motivo = valuta_complessita(domanda)
     modalita_norm = (modalita or "auto").strip().lower()
 
@@ -145,7 +159,7 @@ def genera_risposta_ibrida(
     inizio = time.perf_counter()
 
     if not usa_cloud:
-        risposta = genera_risposta_locale(domanda, fonti)
+        risposta = genera_risposta_locale(domanda, fonti, memoria=memoria)
         if is_modello_caricato():
             modello_effettivo = MODELLO_LOCALE
         else:
@@ -200,6 +214,7 @@ def genera_risposta_ibrida(
                 api_key=api_key,
                 modello=modello,
                 usa_tools=usa_tools,
+                memoria=memoria,
             )
             modello_cloud = (
                 modello_gemini.ULTIMO_MODELLO_USATO
@@ -222,6 +237,7 @@ def genera_risposta_ibrida(
                 api_key=api_key,
                 modello=modello,
                 usa_tools=usa_tools,
+                memoria=memoria,
             )
             _, provider = stato_chiavi_api()
             usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
@@ -248,10 +264,11 @@ def genera_risposta_ibrida(
                 "motivo_routing": motivo,
             }
 
+    esito["memoria_usata"] = len(memoria)
     esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
     print(
         f"[ROUTING] {esito['motore'].upper()} | {esito['modello_usato']} | "
-        f"{livello} ({motivo}) | {esito['durata_ms']} ms"
+        f"{livello} ({motivo}) | memoria: {len(memoria)} msg | {esito['durata_ms']} ms"
     )
     return esito
 
