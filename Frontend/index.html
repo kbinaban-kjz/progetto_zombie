@@ -708,6 +708,11 @@
     const DOMANDA_ESEMPIO_COMPLESSA = "Confronta tutte le fonti e analizza perché le chiamate della centrale sono sospette.";
     let COMANDO_USCITA = "esci";
 
+    // Stato della sessione
+    let apiBase = null;            // URL del server Python (null = modalità browser diretta)
+    let cronologiaSql = [];        // Record della tabella cronologia_chat
+    let programmaTerminato = false;
+
     const PAROLE_COMPLESSE = [
       "confronta", "confronto", "analizza", "analisi", "riassumi", "riassunto",
       "sintetizza", "sintesi", "spiega", "perché", "perche", "come mai",
