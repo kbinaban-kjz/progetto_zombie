@@ -49,15 +49,21 @@ try:
         get_connection,
     )
     from Backend.sources import (
+        carica_archivio_completo,
         carica_fonti,
+        costruisci_indice_rag,
         formatta_fonte,
+        read_document,
         risolvi_cartella_dati,
+        scegli_fonti,
+        scegli_fonti_dettagliato,
     )
     from Backend.tools import (
         STRUMENTI_REGISTRATI,
         TOOLS_OPENAI_SCHEMA,
         esegui_tool,
         cerca_fonti,
+        recupera_rag,
         leggi_fonte,
         elenca_fonti,
         ottieni_nodi_mappa,
@@ -110,15 +116,21 @@ except ImportError:
         get_connection,
     )
     from sources import (
+        carica_archivio_completo,
         carica_fonti,
+        costruisci_indice_rag,
         formatta_fonte,
+        read_document,
         risolvi_cartella_dati,
+        scegli_fonti,
+        scegli_fonti_dettagliato,
     )
     from tools import (
         STRUMENTI_REGISTRATI,
         TOOLS_OPENAI_SCHEMA,
         esegui_tool,
         cerca_fonti,
+        recupera_rag,
         leggi_fonte,
         elenca_fonti,
         ottieni_nodi_mappa,

@@ -15,6 +15,10 @@ ENV_PATH = ROOT_DIR / ".env"
 DATI_DIR = ROOT_DIR / "dati" if (ROOT_DIR / "dati").is_dir() else ROOT_DIR / "data"
 # Documenti aggiunti giorno per giorno (es. new_dati/ per il Giorno 2)
 NUOVI_DATI_DIR = ROOT_DIR / "new_dati"
+# Archivio digitale di emergenza (Giorno 3 — Operazione Esumazione: .txt, .html, .json, .xml)
+ARCHIVIO_DIR = DATI_DIR / "archivio" if (DATI_DIR / "archivio").is_dir() else ROOT_DIR / "archivio"
+ESTENSIONI_SUPPORTATE = (".txt", ".html", ".json", ".xml")
+MODELLO_EMBEDDING_RAG = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 # Assicura che la root e la cartella Backend siano nel PYTHONPATH
 if str(ROOT_DIR) not in sys.path:

@@ -43,7 +43,14 @@ try:
         cancella_cronologia,
         leggi_ultimi_messaggi,
     )
-    from Backend.sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
+    from Backend.sources import (
+        carica_archivio_completo,
+        carica_fonti,
+        costruisci_indice_rag,
+        costruisci_intelligence_board,
+        risolvi_cartella_dati,
+        scegli_fonti_dettagliato,
+    )
     from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
     from Backend.modello_locale import is_modello_caricato
     from Backend.router import genera_risposta_ibrida
@@ -72,7 +79,14 @@ except ImportError:
         cancella_cronologia,
         leggi_ultimi_messaggi,
     )
-    from sources import carica_fonti, risolvi_cartella_dati, costruisci_intelligence_board
+    from sources import (
+        carica_archivio_completo,
+        carica_fonti,
+        costruisci_indice_rag,
+        costruisci_intelligence_board,
+        risolvi_cartella_dati,
+        scegli_fonti_dettagliato,
+    )
     from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
     from modello_locale import is_modello_caricato
     from router import genera_risposta_ibrida
@@ -319,6 +333,7 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                 )
                 risposta = esito["risposta"]
                 fonti_citate = esito.get("fonti_citate") or []
+                file_rag = esito.get("file_recuperati_rag") or []
                 record = salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
                 return self._send_json(
                     {
@@ -332,6 +347,8 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                         "durata_ms": esito["durata_ms"],
                         "memoria_usata": esito.get("memoria_usata", 0),
                         "fonti": fonti_citate,
+                        "file_recuperati_rag": file_rag,
+                        "dettagli_rag": esito.get("dettagli_rag", []),
                         "fonti_disponibili": [nome for nome, _ in fonti],
                         "grounding_ok": esito.get("grounding_ok", True),
                         "record": record,

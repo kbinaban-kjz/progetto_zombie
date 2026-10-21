@@ -1,0 +1,5 @@
+id: WIKI-1262
+title: Cycadophytina
+text: Cycadophytina è una sottodivisione delle gimnosperme con foglie pennate. La sottodivisione Cycadophytina è composta da due classi: classe Gnetopsida (o Gnetatae), comprendente un unico ordine, quello dei Gnetales: I generi compresi sono Ephedra, Gnetum e Welwitschia. Si tratta di piante che si trovano nelle regioni tropicali e in zone aride. A parte l'estrazione di alcune sostanze usate in medicina (efedrina) non hanno particolare valore da un punto di vista economico o applicativo. Circa 70 specie con caratteristiche intermedie tra le gimnosperme e le angiosperme. classe Cycadopsida, o Cycadatae (cicadine). Molto diffuse nel Mesozoico (in particolare nel Giurassico, 190-130 milioni di anni fa), attualmente ne esistono poco più di un centinaio di specie, che crescono in aree tropicali e subtropicali, molte delle quali rischiano l'estinzione. Gimnosperme
+source: https://it.wikipedia.org/wiki/Cycadophytina (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

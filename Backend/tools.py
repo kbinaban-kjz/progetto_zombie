@@ -13,18 +13,24 @@ from typing import Any
 try:
     from Backend.database import cerca_in_cronologia, leggi_cronologia
     from Backend.sources import (
+        carica_archivio_completo,
         carica_fonti,
+        costruisci_indice_rag,
         estrai_metadati_fonte,
         cerca_in_fonti,
         fonti_sospette,
+        scegli_fonti_dettagliato,
     )
 except ImportError:
     from database import cerca_in_cronologia, leggi_cronologia
     from sources import (
+        carica_archivio_completo,
         carica_fonti,
+        costruisci_indice_rag,
         estrai_metadati_fonte,
         cerca_in_fonti,
         fonti_sospette,
+        scegli_fonti_dettagliato,
     )
 
 # ==============================================================================
@@ -187,6 +193,46 @@ NODI_TEATRO = [
         "reliability": 98,
         "tags": ["RETE SECONDARIA", "GUASTO RADIO 06:40", "OROLOGIO SINCRONIZZATO", "TECNICO MANUALE"],
         "desc": "Nodo della rete secondaria isolato alle ore 06:40. La scheda manuale firmata dal tecnico di turno attesta un guasto radio hardware, non un focolaio biologico. L'orologio è sincronizzato con la centrale.",
+    },
+
+    # -------------------------------------------------------------------------
+    # GIORNO 3 — Operazione Esumazione (Archivio Sepolto: Depositi & Contenitore LUME)
+    # -------------------------------------------------------------------------
+    {
+        "id": "fortecenere",
+        "code": "ARCH-FC",
+        "name": "Deposito Forte Cenere (Settore D6)",
+        "place": "Forte Cenere",
+        "region": "Appennino / Entroterra, IT",
+        "lat": 44.2850,
+        "lon": 11.8820,
+        "type": "bunker",
+        "status": "CONTENITORE LUME (RV753)",
+        "threat": 2,
+        "survivors": "??",
+        "contact": "PRATICA RV753",
+        "source": "ARCH-3097 / ARCH-5721 / ARCH-6408",
+        "reliability": 99,
+        "tags": ["NORA FERRI", "PRATICA RV753", "CONTENITORE LUME", "SETTORE D6"],
+        "desc": "Deposito strategico dove è stato trasferito il contenitore LUME (materiale di recupero) sotto la pratica RV753 aperta da Nora Ferri per proteggerlo. La planimetria ufficiale (ARCH-6408) conferma che il materiale di recupero si trova nel Settore D6.",
+    },
+    {
+        "id": "darsenavuota",
+        "code": "ARCH-DV",
+        "name": "Deposito Darsena Vuota (Settore A1)",
+        "place": "Darsena / Costa Adriatica",
+        "region": "Emilia-Romagna, IT",
+        "lat": 44.4320,
+        "lon": 12.2450,
+        "type": "anomaly",
+        "status": "MAGAZZINO VUOTO (FALSA PISTA)",
+        "threat": 3,
+        "survivors": "0",
+        "contact": "NESSUNA PRATICA",
+        "source": "ARCH-8254 / ARCH-6408",
+        "reliability": 15,
+        "tags": ["APPUNTO SENZA FIRMA", "SETTORE A1 VUOTO", "NESSUNA PRATICA", "DEPISTAGGIO"],
+        "desc": "Destinazione indicata da un foglio anonimo senza firma e senza pratica trovato sul pavimento (ARCH-8254). Contraddice il registro dei trasferimenti (ARCH-5721) ed è smentito dalla planimetria dei depositi (ARCH-6408), che attesta che il Settore A1 è un vecchio magazzino vuoto.",
     },
 
     # -------------------------------------------------------------------------
@@ -397,14 +443,13 @@ NODI_TEATRO = [
 # IMPLEMENTAZIONE DEI TOOL
 # ==============================================================================
 
-def cerca_fonti(query: str, limite: int = 5) -> dict[str, Any]:
+def cerca_fonti(query: str, limite: int = 8) -> dict[str, Any]:
     """
-    Cerca termini o concetti chiave all'interno dei documenti del dossier.
+    Cerca termini o concetti chiave all'interno dei documenti del dossier e dell'archivio (TXT, HTML, JSON, XML).
     Restituisce i brani più rilevanti e il file di provenienza.
     USARE SOLO SE i documenti pertinenti non sono già presenti nel testo fornito nel blocco fonti.
     """
-    fonti = carica_fonti()
-    risultati = cerca_in_fonti(query, fonti)
+    risultati = cerca_in_fonti(query, cerca_in_archivio=True)
     return {
         "ok": True,
         "query": query,
@@ -413,31 +458,63 @@ def cerca_fonti(query: str, limite: int = 5) -> dict[str, Any]:
     }
 
 
+def recupera_rag(domanda: str, top_k: int = 8) -> dict[str, Any]:
+    """
+    Esegue il recupero RAG (Retrieval-Augmented Generation) sull'intero archivio sepolto
+    (1.023 documenti in formato .txt, .html, .json, .xml) restituendo i file e i blocchi più pertinenti.
+    """
+    esito = scegli_fonti_dettagliato(domanda, top_k=top_k)
+    return {
+        "ok": True,
+        "domanda": domanda,
+        "totale_archivio": esito["totale_archivio"],
+        "totale_blocchi_indicizzati": esito["totale_blocchi_indicizzati"],
+        "file_recuperati": esito["file_recuperati"],
+        "dettagli_file": esito["dettagli_file"],
+        "blocchi_recuperati": esito["blocchi_recuperati"],
+    }
+
+
 def leggi_fonte(nome_file: str) -> dict[str, Any]:
     """
-    Restituisce il testo completo e i dettagli di un documento specifico (es. 'G1-01.txt').
+    Restituisce il testo completo e i dettagli di un documento specifico
+    (es. 'G1-01.txt', 'documento_0057.html', 'documento_0389.xml', 'ARCH-3097', 'WIKI-2828').
     USARE SOLO SE il testo integrale del file manca dal contesto già fornito.
     """
-    fonti = carica_fonti()
-    mappa = {n.lower(): (n, t) for n, t in fonti}
-    chiave = nome_file.strip().lower()
-    if not chiave.endswith(".txt"):
-        chiave += ".txt"
+    fonti_complete = carica_archivio_completo()
+    mappa_nome: dict[str, tuple[str, str]] = {}
+    mappa_id: dict[str, tuple[str, str]] = {}
+    for n, t in fonti_complete:
+        mappa_nome[n.lower()] = (n, t)
+        stem = n.lower().rsplit(".", 1)[0]
+        mappa_nome[stem] = (n, t)
+        meta = estrai_metadati_fonte(n, t)
+        mappa_id[meta["id"].lower().replace("_", "-")] = (n, t)
 
-    if chiave in mappa:
-        nome_reale, testo = mappa[chiave]
+    chiave = nome_file.strip().lower()
+    trovato = (
+        mappa_nome.get(chiave)
+        or mappa_nome.get(f"{chiave}.txt")
+        or mappa_id.get(chiave.replace("_", "-"))
+    )
+
+    if trovato is not None:
+        nome_reale, testo = trovato
         meta = estrai_metadati_fonte(nome_reale, testo)
         return {
             "ok": True,
             "file": nome_reale,
             "id": meta["id"],
             "titolo": meta["titolo"],
+            "formato": meta["formato"],
+            "fase": meta["fase"],
             "testo": testo,
         }
+    fonti_dossier = carica_fonti()
     return {
         "ok": False,
-        "error": f"Documento '{nome_file}' non trovato nel dossier.",
-        "file_disponibili": [n for n, _ in fonti],
+        "error": f"Documento '{nome_file}' non trovato nel dossier o nell'archivio.",
+        "file_disponibili": [n for n, _ in fonti_dossier],
     }
 
 
@@ -551,16 +628,20 @@ def cerca_cronologia(termine: str) -> dict[str, Any]:
 
 def statistiche_missione() -> dict[str, Any]:
     """
-    Restituisce un quadro di sintesi sullo stato della missione, fonti e database.
+    Restituisce un quadro di sintesi sullo stato della missione, fonti, archivio RAG e database.
     USARE SOLO SE l'utente chiede metriche numeriche o conteggi quantitativi globali della missione.
     """
     fonti = carica_fonti()
+    archivio = carica_archivio_completo()
+    indice_rag = costruisci_indice_rag()
     cronologia = leggi_cronologia()
     return {
         "ok": True,
-        "missione": "Operazione Silenzio — Protocollo Lazzaro",
+        "missione": "Operazione Silenzio / Esumazione — Protocollo Lazzaro",
         "fonti_dossier": len(fonti),
         "file_dossier": [n for n, _ in fonti],
+        "archivio_totale_file": len(archivio),
+        "blocchi_rag_indicizzati": indice_rag["totale_blocchi"],
         "nodi_teatro_mappa": len(NODI_TEATRO),
         "record_sqlite_chat": len(cronologia),
         "tipi_nodi": {
@@ -578,6 +659,7 @@ def statistiche_missione() -> dict[str, Any]:
 
 STRUMENTI_REGISTRATI: dict[str, Any] = {
     "cerca_fonti": cerca_fonti,
+    "recupera_rag": recupera_rag,
     "leggi_fonte": leggi_fonte,
     "elenca_fonti": elenca_fonti,
     "verifica_sicurezza_fonti": verifica_sicurezza_fonti,
@@ -612,14 +694,35 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "recupera_rag",
+            "description": "Esegue il recupero RAG su tutti i 1.023 file dell'archivio (.txt, .html, .json, .xml) restituendo i documenti e i blocchi più rilevanti. USARE SOLO SE occorre cercare un argomento specifico nell'archivio esterno.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domanda": {
+                        "type": "string",
+                        "description": "Domanda o concetto da cercare con il RAG nell'archivio.",
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "Numero di documenti da recuperare (default 8).",
+                    },
+                },
+                "required": ["domanda"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "leggi_fonte",
-            "description": "Recupera il testo integrale di un file specifico. USARE SOLO SE il testo integrale del file manca dal contesto fornito. NON usare se il file è già presente.",
+            "description": "Recupera il testo integrale di un file specifico (.txt, .html, .json, .xml) per nome o ID (es. 'G1-02.txt', 'documento_0057.html', 'ARCH-3097'). USARE SOLO SE il testo integrale del file manca dal contesto fornito.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "nome_file": {
                         "type": "string",
-                        "description": "Il nome del file da leggere (es. 'G1-02.txt').",
+                        "description": "Il nome o ID del file da leggere (es. 'G1-02.txt', 'documento_0389.xml', 'ARCH-5721').",
                     }
                 },
                 "required": ["nome_file"],

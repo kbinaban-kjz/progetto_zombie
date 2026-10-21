@@ -1,0 +1,5 @@
+id: WIKI-2385
+title: Irénée-Jules Bienaymé
+text: Contribuì notevolmente alla teoria della probabilità, statistica matematica, demografia e statistica sociale. Cominciò a studiare nel 1815 presso l'École Polytechnique, la quale venne chiusa nel 1816 per le simpatie pronapoleoniche degli studenti. Lavorò in seguito come traduttore di giornali. Nel 1818 divenne lettore di matematica all'accademia militare di St. Cry che lasciò nel 1820 per entrare nel Ministero delle Finanze diventando prima ispettore e nel 1834 ispettore generale. Durante la rivoluzione del 1848 si ritira per dedicarsi alla ricerca scientifica. Tenne una corrispondenza con Quételet ed era amico di A.A. Cournot e Cebicev. Dotato di una forte predisposizione alle controversie, criticò la legge dei grandi numeri di Poisson ed ebbe una controversia con Cauchy. Formulò per primo la diseguaglianza di Bienaymé-Cebicev. Altri progetti Collegamenti esterni
+source: https://it.wikipedia.org/wiki/Ir%C3%A9n%C3%A9e-Jules%20Bienaym%C3%A9 (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

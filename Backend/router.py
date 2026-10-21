@@ -26,7 +26,7 @@ try:
     )
     from Backend.modello_locale import genera_risposta_locale, is_modello_caricato
     from Backend.database import leggi_ultimi_messaggi
-    from Backend.sources import estrai_fonti_citate, verifica_grounding_risposta
+    from Backend.sources import estrai_fonti_citate, scegli_fonti_dettagliato, verifica_grounding_risposta
     import Backend.modello_openai as modello_openai
     import Backend.modello_gemini as modello_gemini
 except ImportError:
@@ -42,7 +42,7 @@ except ImportError:
     )
     from modello_locale import genera_risposta_locale, is_modello_caricato
     from database import leggi_ultimi_messaggi
-    from sources import estrai_fonti_citate, verifica_grounding_risposta
+    from sources import estrai_fonti_citate, scegli_fonti_dettagliato, verifica_grounding_risposta
     import modello_openai
     import modello_gemini
 
@@ -116,10 +116,10 @@ def valuta_complessita(domanda: str) -> tuple[bool, str]:
     if testo.count("?") > 1:
         return True, "Domanda multipla (più quesiti nella stessa richiesta)"
 
-    # 2. Riferimento esplicito a più fonti/documenti (es. G1-01, G2-01, LX5-1264)
+    # 2. Riferimento esplicito a più fonti/documenti (es. G1-01, G2-01, LX5-1264, ARCH-3097)
     fonti_citate = {
         m.replace("_", "-")
-        for m in re.findall(r"(?:g\d+-\d+|lx5[-_]\d+)", testo_lower)
+        for m in re.findall(r"(?:g\d+-\d+|lx5[-_]\d+|arch[-_]\d+|wiki[-_]\d+|documento[-_]\d+)", testo_lower)
     }
     if len(fonti_citate) > 1:
         return True, "Confronto esplicito tra più documenti del dossier"
@@ -195,8 +195,23 @@ def genera_risposta_ibrida(
     livello = "complessa" if is_complessa else "semplice"
     inizio = time.perf_counter()
 
+    # Recupero RAG (Giorno 3 — Operazione Esumazione): cerca prima i pezzi utili nell'archivio
+    # (inclusi i 1.005 file TXT, HTML, JSON, XML in dati/archivio/) e li unisce al contesto.
+    esito_rag = scegli_fonti_dettagliato(domanda, top_k=8)
+    fonti_rag = esito_rag["fonti"]
+    file_recuperati_rag = esito_rag["file_recuperati"]
+
+    # Unisce i documenti recuperati dal RAG con il dossier base senza duplicati,
+    # mettendo in testa i file recuperati dal RAG per massimizzare la rilevanza.
+    fonti_combinate: list[tuple[str, str]] = []
+    visti_nomi: set[str] = set()
+    for n_f, t_f in list(fonti_rag) + list(fonti):
+        if n_f not in visti_nomi:
+            visti_nomi.add(n_f)
+            fonti_combinate.append((n_f, t_f))
+
     if not usa_cloud:
-        risposta = genera_risposta_locale(domanda, fonti, memoria=memoria)
+        risposta = genera_risposta_locale(domanda, fonti_combinate, memoria=memoria)
         if is_modello_caricato():
             modello_effettivo = MODELLO_LOCALE
         else:
@@ -247,7 +262,7 @@ def genera_risposta_ibrida(
         if usa_gemini:
             risposta = modello_gemini.genera_risposta(
                 domanda,
-                fonti,
+                fonti_combinate,
                 api_key=api_key,
                 modello=modello,
                 usa_tools=usa_tools,
@@ -270,7 +285,7 @@ def genera_risposta_ibrida(
         else:
             risposta = modello_openai.genera_risposta(
                 domanda,
-                fonti,
+                fonti_combinate,
                 api_key=api_key,
                 modello=modello,
                 usa_tools=usa_tools,
@@ -301,15 +316,17 @@ def genera_risposta_ibrida(
                 "motivo_routing": motivo,
             }
 
-    grounding = verifica_grounding_risposta(esito.get("risposta", ""), fonti)
+    grounding = verifica_grounding_risposta(esito.get("risposta", ""), fonti_combinate)
     esito["fonti_citate"] = grounding["fonti_file"]
+    esito["file_recuperati_rag"] = file_recuperati_rag
+    esito["dettagli_rag"] = esito_rag["dettagli_file"]
     esito["grounding_ok"] = grounding["ok"]
     esito["citazioni_ignote"] = grounding["citazioni_ignote"]
     esito["memoria_usata"] = len(memoria)
     esito["durata_ms"] = int((time.perf_counter() - inizio) * 1000)
     print(
         f"[ROUTING] {esito['motore'].upper()} | {esito['modello_usato']} | "
-        f"{livello} ({motivo}) | fonti citate: {len(esito['fonti_citate'])} | "
+        f"{livello} ({motivo}) | RAG: {file_recuperati_rag[:4]} | fonti citate: {len(esito['fonti_citate'])} | "
         f"memoria: {len(memoria)} msg | {esito['durata_ms']} ms"
     )
     return esito

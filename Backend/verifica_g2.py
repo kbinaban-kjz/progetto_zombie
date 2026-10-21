@@ -50,7 +50,7 @@ def main() -> int:
 
     # 1. Documenti del dossier caricati e deduplicati
     controlla(
-        len(fonti) == len(set(nomi)) and len(fonti) in {10, 18},
+        len(fonti) == len(set(nomi)) and len(fonti) in {10, 18, 23},
         f"Documenti caricati senza duplicati ({len(fonti)} file unici)",
     )
     controlla(all(f"G2-0{i}.txt" in nomi for i in range(1, 8)), "I 7 documenti G2 sono nel dossier")

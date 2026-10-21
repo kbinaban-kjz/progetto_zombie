@@ -2287,6 +2287,17 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
           `<span class="px-1.5 py-0.5 rounded bg-bunker-800 border border-bunker-600 text-[10px] font-mono text-amber-300">[${escapeHtml(nome)}]</span>`
         ).join(' ');
 
+        const listaRag = Array.isArray(metaSql.file_recuperati_rag) ? metaSql.file_recuperati_rag : [];
+        const badgesRag = listaRag.map(nome =>
+          `<span class="px-1.5 py-0.5 rounded bg-bunker-900 border border-sky-800/80 text-[10px] font-mono text-sky-300">${escapeHtml(nome)}</span>`
+        ).join(' ');
+        const rigaRag = listaRag.length > 0
+          ? `<div class="flex flex-wrap items-center gap-1.5 w-full pt-1">
+               <span class="text-stone-500 uppercase tracking-wider">File recuperati (RAG):</span>
+               ${badgesRag}
+             </div>`
+          : '';
+
         const idTag = metaSql.id ? `SQLite #${escapeHtml(metaSql.id)}` : 'SQLite';
         const tsTag = metaSql.created_at ? ` • ${escapeHtml(metaSql.created_at)}` : '';
 
@@ -2297,6 +2308,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
               ${badgesFonti || '<span class="text-stone-500">Nessuna fonte citata</span>'}
             </div>
             <span class="text-phosphor-400 font-semibold">${idTag}${tsTag}</span>
+            ${rigaRag}
           </div>
         `;
       }
@@ -2381,6 +2393,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
             const metaRisposta = {
               ...(recordSalvato || {}),
               fonti: fontiCitateRisposta,
+              file_recuperati_rag: Array.isArray(data.file_recuperati_rag) ? data.file_recuperati_rag : [],
               motore: data.motore,
               modello_usato: data.modello_usato,
               complessita: data.complessita,

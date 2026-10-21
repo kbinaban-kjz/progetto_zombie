@@ -1,0 +1,5 @@
+id: ARCH-8254
+title: Appunto senza firma
+text: Un foglio trovato sul pavimento indica il deposito Darsena Vuota, settore A1. Non riporta alcuna pratica e contraddice il registro dei trasferimenti. Nessuna fonte firmata sostiene questa destinazione.
+source: Dossier fittizio della simulazione LAZZARO
+license: Materiale originale del laboratorio

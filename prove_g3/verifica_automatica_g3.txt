@@ -1,0 +1,19 @@
+VERIFICA AUTOMATICA — GIORNO 3 (OPERAZIONE ESUMAZIONE)
+
+[OK] Archivio completo letto correttamente (1023 file totali in .txt, .html, .json, .xml)
+[OK] Lettura e parsing .TXT -> documento_0023.txt [ARCH-8254]
+[OK] Lettura e parsing .HTML -> documento_0057.html [ARCH-3097]
+[OK] Lettura e parsing .XML -> documento_0389.xml [ARCH-5721]
+[OK] Lettura e parsing .JSON -> documento_0421.json [ARCH-6408]
+[OK] Lettura e parsing .TXT -> documento_0523.txt [ARCH-1842]
+[OK] Indice RAG attivo (9383 blocchi, chunk_size=450, step=340, top_k=8)
+[OK] Scoperta 1 (Rifugi): LAZZARO ha usato i rifugi per estendere il contagio [ARCH-1842] (documento_0523.txt)
+[OK] Prova Riformulazione: entrambe le formulazioni recuperano documento_0057.html [ARCH-3097] (Nora Ferri, pratica RV753)
+[OK] Prova Collegamenti RAG Multi-Hop: recuperati tutti i 4 file della catena (['documento_0023.txt', 'documento_0057.html', 'documento_0389.xml', 'documento_0421.json'])
+[OK] Scoperta Completa: Persona=Nora Ferri, Deposito=Forte Cenere, Settore=D6, Pratica=RV753 (Contenitore LUME)
+[OK] Verifica Falsa Pista: rilevato e distinto l'appunto senza firma su Darsena Vuota settore A1 [ARCH-8254]
+[OK] Tre collegamenti verificati tra i documenti dell'archivio (ARCH-3097 <-> ARCH-5721 <-> ARCH-6408 <-> ARCH-8254)
+[OK] Prova Domanda senza prove: dichiara non documentata l'autorizzazione nel database degli accessi citando [ARCH-5721]
+[OK] Lettura voci enciclopediche archivio: documento_0928.xml [WIKI-2828] recuperato e letto correttamente
+
+Risultato: 15/15 controlli superati

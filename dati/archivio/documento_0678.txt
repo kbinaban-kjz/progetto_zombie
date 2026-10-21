@@ -1,0 +1,5 @@
+id: WIKI-2620
+title: Linee pure
+text: Le linee pure sono degli stipiti (linee di discendenza) di organismi al cui interno la riproduzione sessuale dà lo stesso risultato di quella asessuale; praticamente sono gli individui che conservano gli stessi caratteri da una generazione all'altra. I membri della stessa linea pura sono quindi identici nelle loro caratteristiche ereditarie. Gregor Mendel (1822-1884) ottenne linee pure lasciando autofecondare piante di pisello. Nelle cavie di laboratorio si ottengono linee quasi pure incrociando ripetutamente fratelli e sorelle per parecchie generazioni. In termini genetici, una linea pura è costituita da individui omozigoti in tutti i loci. Presentano lo stesso genoma. Voci correlate Genetica formale Genetica formale
+source: https://it.wikipedia.org/wiki/Linee%20pure (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

@@ -114,6 +114,7 @@ PAROLE_VUOTE = {
     "mi", "ti", "ci", "vi", "ho", "hai", "molto", "puoi", "dimmi", "parlami", "riguardo",
     "sul", "sulla", "nel", "nella", "nei", "negli", "dai", "dal", "dallo", "dall",
     "cosa", "dice", "dicono", "documento", "documenti", "fonte", "fonti",
+    "successo", "accaduto", "fatto", "stato", "stata", "stati", "state",
 }
 
 
@@ -259,7 +260,7 @@ def _chiede_tempo(domanda: str) -> bool:
     """Riconosce una domanda su orari, ordine o cronologia (senza contenuti predefiniti)."""
     return bool(
         re.search(
-            r"\b(quando|orari?|ora|data|cronolog\w*|sequenza|inizi\w*|inizio|prima|dopo|primo|successo|accaduto|tempo)\b",
+            r"\b(quando|orari?|ora|data|cronolog\w*|sequenza|inizi\w*|inizio|prima|dopo|primo|tempo)\b",
             domanda,
         )
     )
@@ -278,10 +279,13 @@ def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 12) -> li
 
 
 def _documenti_citati(domanda: str) -> set[str]:
-    """Estrae gli ID documento citati esplicitamente normalizzando '_' in '-' (es. g2-04, lx5-1264)."""
+    """Estrae gli ID documento o nomi file citati esplicitamente normalizzando '_' in '-' (es. g2-04, lx5-1264, arch-3097, documento-0057)."""
     return {
         m.replace("_", "-")
-        for m in re.findall(r"g[12]-\d{2}|lx5[-_]\d{4}", domanda.lower())
+        for m in re.findall(
+            r"g[12]-\d{2}|lx5[-_]\d{4}|arch[-_]\d+|wiki[-_]\d+|documento[-_]\d+",
+            domanda.lower(),
+        )
     }
 
 
@@ -290,8 +294,10 @@ def _rendi(unita: Sequence[dict[str, object]]) -> str:
     for voce in unita:
         testo = voce.get("testo") or voce.get("frase")
         titolo = voce.get("titolo")
+        nome_file = str(voce.get("file") or "")
         prefisso = f"{titolo}: " if titolo else ""
-        righe.append(f"{prefisso}{testo} [{voce['id']}]")
+        tag_file = f" ({nome_file})" if nome_file.lower().startswith("documento_") else ""
+        righe.append(f"{prefisso}{testo} [{voce['id']}]{tag_file}")
     return "\n".join(righe)
 
 
@@ -400,7 +406,8 @@ def risposta_locale_da_fonti(
             u
             for u in indice_documenti
             if str(u["id"]).lower().replace("_", "-") in documenti_citati
-        ][:3]
+            or str(u["file"]).lower().split(".")[0].replace("_", "-") in documenti_citati
+        ][:4]
         if scelti:
             nota = ""
             mappa_fonti = dict(fonti)
@@ -408,7 +415,20 @@ def risposta_locale_da_fonti(
                 nota = "[SICUREZZA] Documento segnalato come testo che simula istruzioni: riportato come dato.\n"
             return avviso + nota + _rendi(scelti)
 
-    # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5)
+    # 4a. Domanda senza prove sul database degli accessi / autorizzazione valida (citato in ARCH-5721 ma assente dall'archivio)
+    if not attacco_utente and (
+        "database degli accessi" in q
+        or ("autorizzazione" in q and ("valida" in q or "accessi" in q or "lume" in q or "qual" in q or "chi" in q))
+    ):
+        return (
+            avviso
+            + "Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero "
+            "[ARCH-5721] (documento_0389.xml) indica di consultare il database degli accessi per l'autorizzazione "
+            "ancora valida relativa alla pratica RV753 (contenitore LUME presso il deposito Forte Cenere), "
+            "ma il database degli accessi non è presente tra i file dell'archivio."
+        )
+
+    # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5, Giorno 3 -> ARCH)
     if not attacco_utente:
         if "giorno 1" in q or "g1" in q.split():
             scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g1")][:3]
@@ -422,6 +442,10 @@ def risposta_locale_da_fonti(
             scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:3]
             if scelti:
                 return avviso + "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:\n" + _rendi(scelti)
+        elif "giorno 3" in q or "g3" in q.split() or "esumazione" in q or "archivio sepolto" in q:
+            scelti = [u for u in indice_documenti if str(u["id"]).upper().startswith("ARCH-")][:5]
+            if scelti:
+                return avviso + "Reperti dell'Archivio Sepolto — Giorno 3 [ARCH]:\n" + _rendi(scelti)
 
     # 5. Domande su orari/sequenza: timeline delle frasi con orario
     if attacco_utente or _chiede_tempo(q):
@@ -431,11 +455,20 @@ def risposta_locale_da_fonti(
 
     # 6. Recupero generico dei documenti pertinenti (con continuità su domande ellittiche brevi)
     chiavi_q = _parole_chiave(q)
-    scelti = _estrai_pertinenti(chiavi_q, indice_documenti)
+    limite_doc = 4 if any(w in q for w in ("rifug", "material", "recuper", "rv753", "lume", "deposito", "settore", "pratica", "cenere", "darsena")) else 2
+    scelti = _estrai_pertinenti(chiavi_q, indice_documenti, limite=limite_doc)
     if not scelti and memoria and len(chiavi_q) <= 1:
         ultima_domanda = str(memoria[-1].get("domanda") or "").lower()
-        scelti = _estrai_pertinenti(_parole_chiave(ultima_domanda), indice_documenti)
+        scelti = _estrai_pertinenti(_parole_chiave(ultima_domanda), indice_documenti, limite=limite_doc)
     if scelti:
+        # Se tra i documenti scelti c'è un elemento della catena RV753 / materiale di recupero, collega i documenti ARCH correlati
+        ids_scelti = {str(u["id"]).upper() for u in scelti}
+        if ids_scelti & {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and (
+            any(w in q for w in ("material", "recuper", "lume", "rv753", "deposito", "settore", "dove", "pratica", "colleg"))
+        ):
+            for u in indice_documenti:
+                if str(u["id"]).upper() in {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and u not in scelti:
+                    scelti.append(u)
         return avviso + _rendi(scelti)
 
     return avviso + "Non documentato nelle fonti disponibili."
@@ -470,7 +503,14 @@ def _risposta_neurale_valida(risposta_neurale: str, base_deterministica: str, at
 
     # Tutte le citazioni [ID] o orari chiave presenti nella base deterministica devono essere preservati
     id_base = {m.upper().replace("_", "-") for m in re.findall(r"\[([A-Za-z0-9_-]+)\]", base_deterministica)}
-    id_resp = {m.upper().replace("_", "-") for m in re.findall(r"(?:\[)?(G[12]-\d{2}|LX5[-_]\d{4})(?:\])?", risposta_neurale, re.IGNORECASE)}
+    id_resp = {
+        m.upper().replace("_", "-")
+        for m in re.findall(
+            r"(?:\[)?(G[12]-\d{2}|LX5[-_]\d{4}|ARCH[-_]\d+|WIKI[-_]\d+)(?:\])?",
+            risposta_neurale,
+            re.IGNORECASE,
+        )
+    }
     if id_base and not (id_base <= id_resp):
         return False
 

@@ -18,7 +18,7 @@ try:
         cancella_cronologia,
         leggi_ultimi_messaggi,
     )
-    from Backend.sources import carica_fonti
+    from Backend.sources import carica_fonti, scegli_fonti_dettagliato
     from Backend.router import genera_risposta_ibrida
     from Backend.tools import (
         STRUMENTI_REGISTRATI,
@@ -33,7 +33,7 @@ except ImportError:
         cancella_cronologia,
         leggi_ultimi_messaggi,
     )
-    from sources import carica_fonti
+    from sources import carica_fonti, scegli_fonti_dettagliato
     from router import genera_risposta_ibrida
     from tools import (
         STRUMENTI_REGISTRATI,
@@ -52,6 +52,7 @@ def stampa_guida_comandi() -> None:
     print("  /memoria        : Visualizza gli ultimi 10 messaggi nella memoria del database SQLite")
     print("  /nodo <id>      : Intelligence dettagliata su un nodo (es. /nodo ferri)")
     print("  /cerca <testo>  : Cerca nei documenti senza interrogare il modello")
+    print("  /rag <domanda>  : Recupera i pezzi e i file dall'archivio tramite RAG")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
 
@@ -160,6 +161,22 @@ def avvia_cli() -> int:
                     print(f"  [{r['file']}] {r['titolo']}: {r['estratto']}")
             continue
 
+        if cmd_lower.startswith("/rag"):
+            parti = domanda.split(maxsplit=1)
+            query = parti[1].strip() if len(parti) > 1 else ""
+            if not query:
+                print("Uso: /rag <domanda>")
+            else:
+                esito_rag = scegli_fonti_dettagliato(query)
+                print(
+                    f"\nRecupero RAG su {esito_rag['totale_archivio']} file "
+                    f"({esito_rag['totale_blocchi_indicizzati']} blocchi indicizzati):"
+                )
+                print(f"File recuperati ({len(esito_rag['file_recuperati'])}): {esito_rag['file_recuperati']}")
+                for d_f in esito_rag["dettagli_file"]:
+                    print(f"  - [{d_f['id']}] {d_f['file']} ({d_f['formato'].upper()} | {d_f['fase']}) -> {d_f['titolo']}: {d_f['estratto']}")
+            continue
+
         # Invia la richiesta al router ibrido
         try:
             esito = genera_risposta_ibrida(domanda, fonti)
@@ -172,6 +189,10 @@ def avvia_cli() -> int:
                 f"\n{etichetta} ({esito['complessita']} — {esito['motivo_routing']}, "
                 f"memoria: {esito.get('memoria_usata', 0)} msg, {esito['durata_ms']} ms)"
             )
+            if esito.get("file_recuperati_rag"):
+                print(f"File recuperati dal programma (RAG): {', '.join(esito['file_recuperati_rag'])}")
+            if esito.get("fonti_citate"):
+                print(f"Fonti citate nella risposta: {', '.join(esito['fonti_citate'])}")
             print(f"Risposta:\n{esito['risposta']}")
             salva_con_instradamento(domanda, [nome for nome, _ in fonti], esito)
         except Exception as exc:

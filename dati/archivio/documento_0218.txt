@@ -1,0 +1,5 @@
+id: WIKI-861
+title: CPAN
+text: CPAN è la sigla di Comprehensive Perl Archive Network, ed è l'archivio pubblico dei moduli, packages e applicazioni scritte in Perl e pubblicate con licenze libere. È basato sul modello di CTAN (Comprehensive Archive Network). La nuova interfaccia web per la consultazione dell'archivio è MetaCPAN. I moduli stessi archiviati in CPAN sono replicati e distribuiti in numerosi mirror presenti su tutto il globo terrestre. Il CPAN è stato creato da Jarkko Hietaniemi e Andreas König ed è online dal 26 ottobre 1995. Al 2010, il repository contiene circa 7 Gbyte di moduli Perl, sviluppati da oltre 8000 autori diversi, per un numero complessivo di più di 17000 moduli. Il sito viene relazionato come mirror in altri 228 server in tutto il mondo. Collegamenti esterni Siti web
+source: https://it.wikipedia.org/wiki/CPAN (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

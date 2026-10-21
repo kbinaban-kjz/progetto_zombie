@@ -1,0 +1,5 @@
+id: WIKI-348
+title: Assembler
+text: Un assembler (assemblatore in italiano) è un software che trasforma le istruzioni mnemoniche dell'assembly in linguaggio macchina. Si tratta dunque di un compilatore (traduttore) per un particolare linguaggio assembly. Il termine assembler deriva dal fatto che le istruzioni vengono convertite e montate una accanto all'altra come se fossero in fila. Ci sono molti tipi di linguaggi assembly e di conseguenza diversi assemblatori: esistono gli assembler per programmare i microchip, per creare programmi su personal computer, per telefoni cellulari, ecc. Questo perché un assemblatore produce linguaggi macchina per una specifica famiglia di processori (intel 8086, 80386, Motorola 68000, ecc.). Voci correlate Assembly Compilatore Debugger Disassembler Linguaggio macchina Altri progetti Collegamenti esterni Compilatori
+source: https://it.wikipedia.org/wiki/Assembler (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

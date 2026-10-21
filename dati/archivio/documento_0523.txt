@@ -1,0 +1,5 @@
+id: ARCH-1842
+title: Circolare interna sui rifugi
+text: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. Le persone sono state attirate con messaggi di protezione. Non è stato un semplice incidente. I registri originali del primo focolaio restano validi.
+source: Dossier fittizio della simulazione LAZZARO
+license: Materiale originale del laboratorio

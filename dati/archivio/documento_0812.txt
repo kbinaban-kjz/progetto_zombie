@@ -1,0 +1,5 @@
+id: WIKI-1700
+title: Piante officinali spontanee
+text: Elenco delle piante officinali spontanee soggette alle disposizioni della legge 6 gennaio 1931 n. 99., indicato con il Regio decreto n. 772, 26 maggio 1932, oggi abrogato. Si tratta delle piante incluse nella farmacopea ufficiale e che quindi, teoricamente, le farmacie dovrebbero avere in assortimento. L'elenco è stato rimaneggiato molte volte dal 1932 a oggi, soprattutto per escluderne alcune voci, di volta in volta sostituite da farmaci più facilmente reperibili e conservabili. Molto diverso è l'assortimento reperibile nelle erboristerie che riflette gli usi popolari ed esclude rigorosamente le piante velenose che in questo elenco sono ben nove. Elenco Note Voci correlate Koehler's Medizinal-Pflanzen Pianta officinale Pianta medicinale Specie botaniche spontanee Piante officinali spontanee
+source: https://it.wikipedia.org/wiki/Piante%20officinali%20spontanee (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

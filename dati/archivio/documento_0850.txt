@@ -1,0 +1,5 @@
+id: WIKI-691
+title: Barbarossa (disambigua)
+text: Astronomia 1860 Barbarossa – asteroide scoperto nel 1973 Persone Aruj Barbarossa – corsaro turco-ottomano Cristiano Barbarossa – autore televisivo e regista italiano Federico I Hohenstaufen, detto Federico Barbarossa – imperatore del Sacro Romano Impero Khayr al-Dīn – condottiero turco-ottomano, detto talora il (corsaro) Barbarossa Luca Barbarossa – cantante italiano Maria Immacolata Barbarossa – politica italiana Cinema Barbarossa (Barberousse) – film del 1917 diretto da Abel Gance Barbarossa (Akahige) – film del 1965 diretto da Akira Kurosawa Barbarossa – film del 2009 diretto da Renzo Martinelli Editoria Società Editrice Barbarossa – casa editrice italiana Televisione Barbarossa (Barbe Rouge) – serie tv animata Storia Operazione Barbarossa – invasione dell'Unione Sovietica da parte della Germania nazista nella Seconda guerra mondiale
+source: https://it.wikipedia.org/wiki/Barbarossa%20%28disambigua%29 (autori: cronologia della voce)
+license: CC BY-SA 3.0; estratto massimo 500 parole, formato convertito. https://creativecommons.org/licenses/by-sa/3.0/

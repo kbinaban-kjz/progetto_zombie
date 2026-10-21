@@ -1,6 +1,6 @@
 VERIFICA AUTOMATICA — GIORNO 2
 
-[OK] Documenti caricati senza duplicati (18 file unici)
+[OK] Documenti caricati senza duplicati (23 file unici)
 [OK] I 7 documenti G2 sono nel dossier
 [OK] Metadati LX5 estratti correttamente (id LX5-1264)
 [OK] G2-04 rilevato come documento sospetto
