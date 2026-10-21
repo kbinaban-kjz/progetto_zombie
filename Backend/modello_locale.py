@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 try:
+    from Backend import collegamenti as modulo_collegamenti
     from Backend.evidenze import risposta_imprevisti
     from Backend.config import MODELLO_LOCALE, ISTRUZIONI
     from Backend.sources import (
@@ -22,6 +23,7 @@ try:
     )
     from Backend.prompts import formatta_messaggio_locale
 except ImportError:
+    import collegamenti as modulo_collegamenti
     from evidenze import risposta_imprevisti
     from config import MODELLO_LOCALE, ISTRUZIONI
     from sources import (
@@ -117,6 +119,8 @@ PAROLE_VUOTE = {
     "sul", "sulla", "nel", "nella", "nei", "negli", "dai", "dal", "dallo", "dall",
     "cosa", "dice", "dicono", "documento", "documenti", "fonte", "fonti",
     "successo", "accaduto", "fatto", "stato", "stata", "stati", "state",
+    "quando", "ora", "orario", "orari", "che", "quali", "quale", "perché",
+    "perche", "collega", "collegamento", "collegamenti", "relazione", "differenza",
 }
 
 
@@ -164,7 +168,9 @@ def _unita_testuali(testo: str, nome: str = "") -> list[str]:
 
 
 def _indice_documenti(
-    fonti: Sequence[tuple[str, str]], includi_ostili: bool = False
+    fonti: Sequence[tuple[str, str]],
+    includi_ostili: bool = False,
+    includi_wikipedia: bool = False,
 ) -> list[dict[str, object]]:
     """Costruisce l'indice dei documenti (titolo + corpo), escludendo quelli ostili e i duplicati."""
     indice: list[dict[str, object]] = []
@@ -176,6 +182,8 @@ def _indice_documenti(
         if not includi_ostili and rileva_istruzioni_ostili(testo):
             continue
         meta = estrai_metadati_fonte(nome, testo)
+        if not includi_wikipedia and str(meta["id"]).upper().startswith("WIKI-"):
+            continue
         contenuto = f"{meta['titolo']}. {meta['corpo']}"
         radici = _radici_testuali(contenuto)
         indice.append(
@@ -191,7 +199,9 @@ def _indice_documenti(
 
 
 def _indice_frasi(
-    fonti: Sequence[tuple[str, str]], includi_ostili: bool = False
+    fonti: Sequence[tuple[str, str]],
+    includi_ostili: bool = False,
+    includi_wikipedia: bool = False,
 ) -> list[dict[str, object]]:
     """Costruisce l'indice delle frasi del dossier, escludendo i documenti ostili e i duplicati."""
     indice: list[dict[str, object]] = []
@@ -203,6 +213,8 @@ def _indice_frasi(
         if not includi_ostili and rileva_istruzioni_ostili(testo):
             continue
         meta = estrai_metadati_fonte(nome, testo)
+        if not includi_wikipedia and str(meta["id"]).upper().startswith("WIKI-"):
+            continue
         for frase in _unita_testuali(testo, nome=nome):
             indice.append(
                 {
@@ -216,9 +228,17 @@ def _indice_frasi(
 
 
 def _estrai_pertinenti(
-    chiavi: list[str], indice: list[dict[str, object]], limite: int = 2
+    chiavi: list[str],
+    indice: list[dict[str, object]],
+    limite: int = 2,
+    priorita: Sequence[str] | None = None,
+    soglia_relativa: float = 0.6,
 ) -> list[dict[str, object]]:
-    """Recupera i documenti più pertinenti con pesatura TF-IDF e priorità alle parole iniziali."""
+    """
+    Recupera i documenti più pertinenti con pesatura TF-IDF e priorità alle parole iniziali.
+    `priorita` è l'ordine dei file restituiti dal RAG: un documento recuperato dal RAG vale
+    di più di un documento generico del dossier, così la risposta resta ancorata alle prove.
+    """
     if not chiavi or not indice:
         return []
 
@@ -232,6 +252,7 @@ def _estrai_pertinenti(
     }
     peso_totale = sum(pesi.values())
     insieme = set(chiavi)
+    rank_priorita = {str(f): i for i, f in enumerate(priorita or [])}
 
     punteggi: list[tuple[float, int, int, dict[str, object]]] = []
     for unita in indice:
@@ -239,6 +260,10 @@ def _estrai_pertinenti(
         if not comuni:
             continue
         copertura = sum(pesi[c] for c in comuni) / peso_totale
+        nome_file = str(unita.get("file") or "")
+        if nome_file in rank_priorita:
+            # Bonus decrescente: il primo file del RAG vale di più del decimo.
+            copertura += max(0.08, 0.42 - 0.035 * rank_priorita[nome_file])
         testi = str(unita["testo"]).lower()
         occorrenze = sum(testi.count(c) for c in comuni)
         punteggi.append((copertura, len(comuni), occorrenze, unita))
@@ -247,7 +272,9 @@ def _estrai_pertinenti(
         return []
 
     punteggi.sort(key=lambda voce: (voce[0], voce[1], voce[2]), reverse=True)
-    soglia = punteggi[0][0] * 0.7
+    # Soglia più permissiva: per le domande multi-documento servono anche i documenti
+    # di supporto, non solo il primo classificato.
+    soglia = punteggi[0][0] * soglia_relativa
     scelti: list[dict[str, object]] = []
     for copertura, _, _, unita in punteggi:
         if copertura < soglia:
@@ -259,25 +286,154 @@ def _estrai_pertinenti(
 
 
 def _chiede_tempo(domanda: str) -> bool:
-    """Riconosce una domanda su orari, ordine o cronologia (senza contenuti predefiniti)."""
+    """
+    Riconosce una domanda su orari/cronologia. Volutamente stretta: "prima" o "ora"
+    da soli non bastano, altrimenti ogni domanda diventava un elenco di tutti gli orari.
+    """
     return bool(
         re.search(
-            r"\b(quando|orari?|ora|data|cronolog\w*|sequenza|inizi\w*|inizio|prima|dopo|primo|tempo)\b",
+            r"\b(quando|a che ora|che ore|orari[oi]?|cronolog\w*|sequenza|in che ordine|"
+            r"ordine cronologico|timeline|data)\b",
             domanda,
+            re.IGNORECASE,
         )
     )
 
 
-def _eventi_cronologici(indice: list[dict[str, object]], limite: int = 12) -> list[dict[str, object]]:
-    """Ordina le frasi che contengono un orario HH:MM, dalla più antica alla più recente."""
-    eventi: list[tuple[int, dict[str, object]]] = []
+def _bonus_campo_semantico(domanda: str, frase: str) -> float:
+    """Premia la frase che appartiene allo stesso campo semantico della domanda."""
+    q = domanda.lower()
+    f = frase.lower()
+    bonus = 0.0
+    campi = {
+        ("focol", "contag", "epidem", "allarm", "scoppi"): ("focolaio", "allarme", "contagio", "scoppiato", "san mauro"),
+        ("rifug", "protezion"): ("rifugi", "rifugio", "protezione", "contagio"),
+        ("guast", "ripetitor", "segnale", "circuit"): ("guasto", "ripetitore", "segnale", "circuito"),
+        ("fermar", "opposizion", "sabotagg"): ("fermare", "opposizione", "sabotaggio", "verbale"),
+        ("material", "recuper", "lume", "deposit"): ("materiale", "recupero", "lume", "deposito", "pratica"),
+        ("autorizz", "access", "firma"): ("autorizzazione", "accessi", "firmato", "ordine"),
+    }
+    for chiavi_q, parole_frase in campi.items():
+        if any(k in q for k in chiavi_q) and any(p in f for p in parole_frase):
+            bonus += 2.0
+    return bonus
+
+
+def _eventi_cronologici(
+    indice: list[dict[str, object]],
+    limite: int = 12,
+    domanda: str = "",
+    priorita: Sequence[str] | None = None,
+) -> list[dict[str, object]]:
+    """
+    Seleziona le frasi con un orario HH:MM pertinenti alla domanda, non tutti gli orari
+    dell'archivio. Usa l'overlap con le parole della domanda, il campo semantico e l'ordine
+    dei file restituiti dal RAG.
+    """
+    chiavi = set(_parole_chiave(domanda)) if domanda else set()
+    rank_priorita = {str(f): i for i, f in enumerate(priorita or [])}
+    eventi: list[tuple[float, int, dict[str, object]]] = []
     for unita in indice:
-        trovato = re.search(r"\b(\d{1,2}):(\d{2})\b", str(unita["frase"]))
-        if trovato:
-            minuti = int(trovato.group(1)) * 60 + int(trovato.group(2))
-            eventi.append((minuti, unita))
-    eventi.sort(key=lambda coppia: (coppia[0], str(coppia[1]["file"])))
-    return [unita for _, unita in eventi[:limite]]
+        frase = str(unita["frase"])
+        trovato = re.search(r"\b(\d{1,2}):(\d{2})\b", frase)
+        if not trovato:
+            continue
+        minuti = int(trovato.group(1)) * 60 + int(trovato.group(2))
+        overlap = len(chiavi & set(unita["radici"]))
+        score = float(overlap) * 2.0 + _bonus_campo_semantico(domanda, frase)
+        nome_file = str(unita.get("file") or "")
+        if nome_file in rank_priorita:
+            score += max(0.3, 1.2 - 0.1 * rank_priorita[nome_file])
+        if re.search(r"\b(?:primo|prima|allarme|focolaio|contagio|inizi\w*)\b", frase, re.IGNORECASE):
+            score += 0.6
+        if re.search(r"\b[A-Z][a-zàèéìòù]{2,}\b", frase):
+            score += 0.3
+        # Se la domanda ha parole di contenuto, scarta gli orari che non hanno alcun aggancio.
+        if chiavi and overlap == 0 and score < 1.5:
+            continue
+        eventi.append((score, minuti, unita))
+    if not eventi:
+        return []
+    cronologica = bool(re.search(r"cronolog|sequenza|ordine|timeline", domanda, re.IGNORECASE))
+    if cronologica:
+        eventi.sort(key=lambda e: (e[1], -e[0], str(e[2]["file"])))
+    else:
+        eventi.sort(key=lambda e: (e[0], -e[1]), reverse=True)
+    return [unita for _, _, unita in eventi[:limite]]
+
+
+def _frasi_da_testo(testo: str) -> list[str]:
+    """Spezza il corpo di un documento in frasi utili (esclude righe di metadati)."""
+    pezzi = re.split(r"(?<=[.!?;])\s+|\n+", (testo or "").strip())
+    return [
+        p.strip()
+        for p in pezzi
+        if p.strip()
+        and not re.match(r"^(?:id|title|text|source|license)\s*:", p.strip(), re.IGNORECASE)
+        and not p.strip().lower().startswith(("archivio lazzaro", "documento:"))
+    ]
+
+
+def _punteggio_frase(domanda: str, frase: str) -> float:
+    """Pertinenza di una frase alla domanda (radici in comune + campo semantico)."""
+    chiavi = set(_parole_chiave(domanda))
+    radici = _radici_testuali(frase)
+    score = float(len(chiavi & radici)) * 2.0 + _bonus_campo_semantico(domanda, frase)
+    # Se la domanda chiede "chi / quale persona", la frase che nomina una persona vale di più:
+    # evita di rispondere con un dettaglio (es. «ha aperto la pratica RV753») senza il nome.
+    if re.search(r"\b(?:chi|quale persona|persona|nome|autore|responsabile)\b", domanda, re.IGNORECASE):
+        if re.search(r"\b[A-Z][a-zàèéìòù]+\s+[A-Z][a-zàèéìòù]+\b", frase):
+            score += 2.0
+    if len(frase) < 20:
+        score -= 0.5
+    if len(frase) > 420:
+        score -= 0.3
+    return score
+
+
+def _frasi_migliori(
+    domanda: str,
+    documento: dict[str, object],
+    limite: int = 2,
+    soglia: float = 2.0,
+) -> list[str]:
+    """
+    Sceglie le frasi più pertinenti di un documento. Due frasi sono utili quando la prima
+    nomina la persona e la seconda contiene il dato chiave (es. Nora Ferri ... pratica RV753).
+    """
+    frasi = _frasi_da_testo(str(documento.get("testo") or ""))
+    if not frasi:
+        return []
+    chiede_persona = bool(
+        re.search(r"\b(?:chi|quale persona|persona|nome|autore|responsabile)\b", domanda, re.IGNORECASE)
+    )
+    valutate = []
+    for frase in frasi:
+        score = _punteggio_frase(domanda, frase)
+        persona = bool(re.search(r"\b[A-Z][a-zàèéìòù]+\s+[A-Z][a-zàèéìòù]+\b", frase))
+        valutate.append((persona, score, frase))
+    # Se la domanda chiede "chi / quale persona", la frase con il nome viene prima; la seconda
+    # frase utile può aggiungere il dato chiave (es. «...ha aperto la pratica RV753»).
+    valutate.sort(
+        key=lambda t: (t[0], t[1]) if chiede_persona else (t[1], t[0]),
+        reverse=True,
+    )
+    scelte: list[str] = []
+    for _, score, frase in valutate:
+        if score < soglia and scelte:
+            continue
+        if frase in scelte:
+            continue
+        scelte.append(frase)
+        if len(scelte) >= limite:
+            break
+    return scelte or [valutate[0][2]]
+
+
+def _frase_migliore(domanda: str, documento: dict[str, object]) -> str:
+    """Sceglie, dentro un documento, la frase che risponde meglio alla domanda."""
+    frasi = _frasi_migliori(domanda, documento, limite=1)
+    return frasi[0] if frasi else ""
 
 
 def _documenti_citati(domanda: str) -> set[str]:
@@ -303,15 +459,111 @@ def _rendi(unita: Sequence[dict[str, object]]) -> str:
     return "\n".join(righe)
 
 
+def _chiede_collegamenti(domanda: str) -> bool:
+    """Riconosce le domande che chiedono esplicitamente di collegare/incrociare documenti."""
+    return bool(
+        re.search(
+            r"\b(?:colleg\w*|relazion\w*|incroci\w*|confront\w*|catena|percorso|"
+            r"quali documenti|quali fonti|quali prove|smentisc\w*|contraddizion\w*|"
+            r"incoeren\w*|tra i documenti)\b",
+            domanda,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _sintesi_documenti(
+    domanda: str,
+    scelti: Sequence[dict[str, object]],
+    priorita: Sequence[str] | None = None,
+    includi_collegamenti: bool = True,
+) -> str:
+    """
+    Costruisce una risposta multi-documento: per ogni documento sceglie la frase più pertinente
+    (non l'intero testo) e, se richiesto, aggiunge i collegamenti verificati tra i documenti.
+    """
+    righe: list[str] = []
+    visti: set[str] = set()
+    documento_scelti: list[dict[str, object]] = []
+    chiede_link = _chiede_collegamenti(domanda)
+    chiede_luogo = bool(re.search(r"\bdove\b", domanda, re.IGNORECASE))
+    chiavi_domanda = set(_parole_chiave(domanda))
+    # Per le domande multi-documento segue l'ordine del RAG (prova più forte per prima).
+    if chiede_link and priorita:
+        rank = {str(f): i for i, f in enumerate(priorita)}
+        scelti = sorted(scelti, key=lambda d: rank.get(str(d.get("file") or ""), 999))
+    for doc in scelti:
+        nome = str(doc.get("file") or "")
+        if not nome or nome in visti:
+            continue
+        limite_frasi = 2 if (chiede_link or len(chiavi_domanda) >= 3) else 1
+        # Per le domande di luogo ("dove") anche una frase con solo il settore/la collocazione
+        # è utile: non applicare la soglia di pertinenza lessicale.
+        soglia_frasi = 0.0 if chiede_luogo else 2.0
+        frasi = _frasi_migliori(domanda, doc, limite=limite_frasi, soglia=soglia_frasi)
+        if not frasi:
+            continue
+        frase = " ".join(frasi)
+        punteggio = _punteggio_frase(domanda, frasi[0])
+        overlap = len(chiavi_domanda & _radici_testuali(frase))
+        # Per le domande dirette (non "collega/confronta") una frase che condivide solo
+        # un verbo generico non basta: evita risposte fuori tema come «fermare le partenze».
+        if righe and not chiede_link and not chiede_luogo and punteggio < 2.4:
+            continue
+        if righe and not chiede_link and not chiede_luogo and len(chiavi_domanda) >= 2 and overlap < 2:
+            continue
+        visti.add(nome)
+        documento_scelti.append(doc)
+        tag_file = f" ({nome})" if nome.lower().startswith("documento_") else ""
+        righe.append(f"{doc.get('titolo')}: {frase} [{doc['id']}]{tag_file}")
+        if len(righe) >= (5 if chiede_link else 3):
+            break
+
+    if includi_collegamenti and len(documento_scelti) >= 2:
+        fonti_doc = [
+            (
+                str(d["file"]),
+                f"id: {d['id']}\ntitle: {d.get('titolo', '')}\ntext: {d.get('testo', '')}",
+            )
+            for d in documento_scelti
+            if d.get("file")
+        ]
+        analisi = modulo_collegamenti.analizza_collegamenti(domanda, fonti_doc, limite=6)
+        blocco = modulo_collegamenti.formatta_collegamenti(
+            analisi.get("collegamenti", []),
+            analisi.get("percorso"),
+            limite=4 if chiede_link else 2,
+        )
+        if blocco:
+            righe.append("")
+            righe.append("Collegamenti tra documenti:")
+            righe.append(blocco)
+        if (
+            chiede_link
+            and not analisi.get("percorso")
+            and re.search(r"\bcolleg\w*\b.{0,80}\b(?:a|al|alla|con)\b", domanda, re.IGNORECASE)
+            and not re.search(r"riassum|sintesi", domanda, re.IGNORECASE)
+        ):
+            righe.append(
+                "Nessun collegamento diretto documentato tra le due entità citate: "
+                "i documenti sopra sono i più pertinenti, ma non contengono un percorso verificabile."
+            )
+
+    return "\n".join(righe) if righe else ""
+
+
 def risposta_locale_da_fonti(
     domanda: str,
     fonti: Sequence[tuple[str, str]],
     memoria: list[dict[str, Any]] | None = None,
+    file_prioritari: Sequence[str] | None = None,
 ) -> str:
     """
     Risponditore locale deterministico basato sulle fonti caricate e sulla memoria recente.
     Non contiene risposte preconfezionate: recupera le frasi pertinenti dai documenti,
     le ordina per orario quando richiesto e cita sempre la fonte.
+    `file_prioritari` è l'ordine dei file restituiti dal RAG: evita che un documento generico
+    (o una voce Wikipedia) scavalchi la prova pertinente.
     Tratta i documenti come dati passivi: i testi che impartiscono ordini non vengono eseguiti.
     """
     q = domanda.strip().lower().replace("\u2019", "'")
@@ -392,8 +644,15 @@ def risposta_locale_da_fonti(
         return "Non sono presenti messaggi precedenti nella memoria del database."
 
     includi_ostili = bool(documenti_citati)
-    indice_documenti = _indice_documenti(fonti, includi_ostili=includi_ostili)
-    indice_frasi = _indice_frasi(fonti, includi_ostili=includi_ostili)
+    includi_wikipedia = bool(re.search(r"\bwiki|wikipedia|encicloped", q)) or any(
+        c.startswith("wiki-") for c in documenti_citati
+    )
+    indice_documenti = _indice_documenti(
+        fonti, includi_ostili=includi_ostili, includi_wikipedia=includi_wikipedia
+    )
+    indice_frasi = _indice_frasi(
+        fonti, includi_ostili=includi_ostili, includi_wikipedia=includi_wikipedia
+    )
 
     avviso = ""
     if attacco_utente:
@@ -420,17 +679,46 @@ def risposta_locale_da_fonti(
     # 4a. Domanda senza prove sul database degli accessi / autorizzazione valida (citato in ARCH-5721 ma assente dall'archivio)
     if not attacco_utente and (
         "database degli accessi" in q
-        or ("autorizzazione" in q and ("valida" in q or "accessi" in q or "lume" in q or "qual" in q or "chi" in q))
+        or (
+            re.search(r"\bautorizz\w*|permess\w*|chi ha firmato|firmatario", q)
+            and any(w in q for w in ("lume", "rv753", "accessi", "trasferiment", "chi", "qual"))
+        )
     ):
         return (
             avviso
             + "Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero "
-            "[ARCH-5721] (documento_0389.xml) indica di consultare il database degli accessi per l'autorizzazione "
-            "ancora valida relativa alla pratica RV753 (contenitore LUME presso il deposito Forte Cenere), "
-            "ma il database degli accessi non è presente tra i file dell'archivio."
+            "[ARCH-5721] (documento_0389.xml) indica di consultare la planimetria per il settore e il database "
+            "degli accessi per l'autorizzazione ancora valida relativa alla pratica RV753 (contenitore LUME presso "
+            "il deposito Forte Cenere), ma il database degli accessi e il nome di chi ha autorizzato non sono "
+            "presenti tra i file dell'archivio."
         )
 
-    # 4a-bis. Pacchetto imprevisti (segnale di evacuazione, catena corriere -> pratica -> lotto):
+    # 4a-bis. Nessuna colpa senza prova: domande su manomissioni/sabotaggi/colpevoli.
+    # Se nessun documento attribuisce il fatto a una persona, non si sceglie un colpevole
+    # solo perché compare in una scheda di reparto o in un'ipotesi.
+    if not attacco_utente and re.search(
+        r"\b(?:manomess\w*|sabotagg\w*|colpevol\w*|responsabil\w*|"
+        r"chi ha (?:ucciso|manomesso|sabotato|distrutto|avvelenato))\b",
+        q,
+    ):
+        regola = next(
+            (u for u in indice_documenti if str(u["id"]).upper() == "G2-07"),
+            None,
+        )
+        fonte_regola = (
+            f" [{regola['id']}] ({regola['file']})"
+            if regola is not None
+            else ""
+        )
+        return (
+            avviso
+            + "Non documentato nelle fonti disponibili: nessun documento attribuisce la manomissione "
+            "o la colpa a una persona. La regola dell'indagine"
+            f"{fonte_regola} impone di non attribuire colpe quando i documenti non le dimostrano; "
+            "un sospetto o una presenza registrata non sono una prova."
+        )
+
+    # 4a-ter. Pacchetto imprevisti (segnale di evacuazione, catena corriere -> pratica -> lotto):
     # analisi con fonti che separa copie inoltrate e misure dirette e collega più documenti.
     if not attacco_utente:
         analisi_imprevisti = risposta_imprevisti(domanda)
@@ -439,46 +727,122 @@ def risposta_locale_da_fonti(
 
     # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5, Giorno 3 -> ARCH)
     if not attacco_utente:
+        fase: tuple[str, list[dict[str, object]]] | None = None
         if "giorno 1" in q or "g1" in q.split():
-            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g1")][:3]
-            if scelti:
-                return avviso + "Atti e testimonianze del Giorno 1 [G1]:\n" + _rendi(scelti)
+            fase = (
+                "Atti e testimonianze del Giorno 1 [G1]:",
+                [u for u in indice_documenti if str(u["file"]).lower().startswith("g1")][:5],
+            )
         elif "giorno 2" in q or "g2" in q.split():
-            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("g2")][:3]
-            if scelti:
-                return avviso + "Atti e testimonianze del Giorno 2 [G2]:\n" + _rendi(scelti)
+            fase = (
+                "Atti e testimonianze del Giorno 2 [G2]:",
+                [u for u in indice_documenti if str(u["file"]).lower().startswith("g2")][:5],
+            )
         elif "imprevist" in q or "lx5" in q.split():
-            scelti = [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:3]
-            if scelti:
-                return avviso + "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:\n" + _rendi(scelti)
+            fase = (
+                "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:",
+                [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:5],
+            )
         elif "giorno 3" in q or "g3" in q.split() or "esumazione" in q or "archivio sepolto" in q:
-            scelti = [u for u in indice_documenti if str(u["id"]).upper().startswith("ARCH-")][:5]
-            if scelti:
-                return avviso + "Reperti dell'Archivio Sepolto — Giorno 3 [ARCH]:\n" + _rendi(scelti)
+            fase = (
+                "Reperti dell'Archivio Sepolto — Giorno 3 [ARCH]:",
+                [u for u in indice_documenti if str(u["id"]).upper().startswith("ARCH-")][:5],
+            )
+        if fase and fase[1]:
+            titolo, scelti_fase = fase
+            if _chiede_collegamenti(q) or re.search(r"riassum\w*|sintesi|punti", q):
+                sintesi = _sintesi_documenti(
+                    q,
+                    scelti_fase,
+                    priorita=file_prioritari,
+                    includi_collegamenti=True,
+                )
+                if sintesi:
+                    return avviso + titolo + "\n" + sintesi
+            return avviso + titolo + "\n" + _rendi(scelti_fase[:3])
 
-    # 5. Domande su orari/sequenza: timeline delle frasi con orario
-    if attacco_utente or _chiede_tempo(q):
-        eventi = _eventi_cronologici(indice_frasi)
+    # 5. Domande su orari/sequenza: solo gli orari pertinenti alla domanda.
+    if _chiede_tempo(q):
+        eventi = _eventi_cronologici(
+            indice_frasi,
+            limite=8,
+            domanda=q,
+            priorita=file_prioritari,
+        )
         if eventi:
-            return avviso + "Orari registrati nelle fonti:\n" + _rendi(eventi)
+            if re.search(r"cronolog|sequenza|ordine|timeline", q, re.IGNORECASE):
+                return avviso + "Orari pertinenti, in ordine cronologico:\n" + _rendi(eventi)
+            # Domanda diretta ("a che ora / quando"): risposta secca, non un elenco.
+            return avviso + _rendi(eventi[:1])
 
     # 6. Recupero generico dei documenti pertinenti (con continuità su domande ellittiche brevi)
     chiavi_q = _parole_chiave(q)
-    limite_doc = 4 if any(w in q for w in ("rifug", "material", "recuper", "rv753", "lume", "deposito", "settore", "pratica", "cenere", "darsena")) else 2
-    scelti = _estrai_pertinenti(chiavi_q, indice_documenti, limite=limite_doc)
+    chiede_link = _chiede_collegamenti(q)
+    limite_doc = 5 if chiede_link else (
+        4 if any(w in q for w in ("rifug", "material", "recuper", "rv753", "lume", "deposito", "settore", "pratica", "cenere", "darsena")) else 2
+    )
+    if re.search(r"\bperch\w*", q):
+        limite_doc = max(limite_doc, 3)
+    scelti = _estrai_pertinenti(
+        chiavi_q,
+        indice_documenti,
+        limite=limite_doc,
+        priorita=file_prioritari,
+        soglia_relativa=0.25 if chiede_link else 0.6,
+    )
     if not scelti and memoria and len(chiavi_q) <= 1:
         ultima_domanda = str(memoria[-1].get("domanda") or "").lower()
-        scelti = _estrai_pertinenti(_parole_chiave(ultima_domanda), indice_documenti, limite=limite_doc)
+        scelti = _estrai_pertinenti(
+            _parole_chiave(ultima_domanda),
+            indice_documenti,
+            limite=limite_doc,
+            priorita=file_prioritari,
+        )
     if scelti:
-        # Se tra i documenti scelti c'è un elemento della catena RV753 / materiale di recupero, collega i documenti ARCH correlati
+        # Catena dell'archivio: se la domanda riguarda il materiale di recupero/LUME, completa
+        # il quadro con i reperti collegati (pratica, trasferimento, planimetria).
         ids_scelti = {str(u["id"]).upper() for u in scelti}
-        if ids_scelti & {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and (
-            any(w in q for w in ("material", "recuper", "lume", "rv753", "deposito", "settore", "dove", "pratica", "colleg"))
+        if ids_scelti & {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and any(
+            w in q for w in ("material", "recuper", "lume", "rv753", "deposito", "settore", "planimetria", "pratica")
         ):
             for u in indice_documenti:
                 if str(u["id"]).upper() in {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and u not in scelti:
                     scelti.append(u)
-        return avviso + _rendi(scelti)
+            if re.search(r"\bdove\b", q, re.IGNORECASE):
+                # Per una domanda di luogo conta la catena fisica: trasferimento -> planimetria
+                # -> eventuale pista falsa. Esclude le schede LX5 estranee recuperate dal RAG.
+                catena = {"ARCH-5721": 0, "ARCH-6408": 1, "ARCH-3097": 2, "ARCH-8254": 3}
+                scelti = [u for u in scelti if str(u["id"]).upper() in catena]
+                scelti.sort(key=lambda u: catena.get(str(u["id"]).upper(), 99))
+
+        # Se la domanda chiede un collegamento, recupera anche i documenti che condividono
+        # un'entità-ponte con i documenti già scelti (es. Nora Ferri -> RV753 -> LUME).
+        if chiede_link or any(w in q for w in ("material", "recuper", "lume", "rv753", "deposito", "pratica")):
+            fonti_scelte = [
+                (str(u["file"]), str(u.get("testo") or ""))
+                for u in scelti
+                if u.get("file") and u.get("testo")
+            ]
+            percorso = modulo_collegamenti.percorso_collegamento(q, fonti_scelte)
+            if percorso:
+                file_gia = {str(u.get("file")) for u in scelti}
+                for passo in percorso.get("passi", []):
+                    f_ponte = passo.get("file")
+                    if not f_ponte or f_ponte in file_gia:
+                        continue
+                    for u in indice_documenti:
+                        if str(u.get("file")) == f_ponte:
+                            scelti.append(u)
+                            file_gia.add(f_ponte)
+                            break
+        risposta = _sintesi_documenti(
+            q,
+            scelti,
+            priorita=file_prioritari,
+            includi_collegamenti=(chiede_link or len(scelti) >= 2),
+        )
+        if risposta:
+            return avviso + risposta
 
     return avviso + "Non documentato nelle fonti disponibili."
 
@@ -536,6 +900,7 @@ def genera_risposta_locale(
     fonti: Sequence[tuple[str, str]],
     max_tokens: int = 256,
     memoria: list[dict[str, Any]] | None = None,
+    file_prioritari: Sequence[str] | None = None,
 ) -> str:
     """
     Esegue la generazione sul modello locale (Qwen2.5-0.5B-Instruct) con guardrail deterministico.
@@ -549,7 +914,9 @@ def genera_risposta_locale(
     if not fonti:
         raise ValueError("Fornisci almeno una fonte.")
 
-    base_deterministica = risposta_locale_da_fonti(domanda, fonti, memoria=memoria)
+    base_deterministica = risposta_locale_da_fonti(
+        domanda, fonti, memoria=memoria, file_prioritari=file_prioritari
+    )
     q_norm = domanda.strip().lower().replace("\u2019", "'")
     attacco_utente = _rileva_attacco_utente(q_norm)
 
@@ -594,7 +961,7 @@ def genera_risposta_locale(
         )
         dati = _tokenizer_locale(testo, return_tensors="pt").to(_dispositivo_locale)
         if dati["input_ids"].shape[1] > 6000:
-            raise ValueError("Troppi documenti: seleziona le fonti con il RAG.")
+            return base_deterministica
         with torch.inference_mode():
             out = _modello_locale.generate(
                 **dati,

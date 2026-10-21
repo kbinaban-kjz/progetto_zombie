@@ -64,6 +64,12 @@ PAROLE_COMPLESSE: tuple[str, ...] = (
     "differenze",
     "collegamento",
     "collegamenti",
+    "collega",
+    "collegano",
+    "collegando",
+    "quali documenti",
+    "smentisce",
+    "smentiscono",
     "relazione",
     "relazioni",
     "contraddizione",
@@ -211,7 +217,12 @@ def genera_risposta_ibrida(
             fonti_combinate.append((n_f, t_f))
 
     if not usa_cloud:
-        risposta = genera_risposta_locale(domanda, fonti_combinate, memoria=memoria)
+        risposta = genera_risposta_locale(
+            domanda,
+            fonti_combinate,
+            memoria=memoria,
+            file_prioritari=file_recuperati_rag,
+        )
         if is_modello_caricato():
             modello_effettivo = MODELLO_LOCALE
         else:
@@ -259,6 +270,22 @@ def genera_risposta_ibrida(
             elif chiave_gem:
                 usa_gemini = True
 
+        contesto_coll = esito_rag.get("testo_collegamenti", "")
+        try:
+            from Backend.evidenze import risposta_imprevisti
+        except ImportError:
+            try:
+                from evidenze import risposta_imprevisti
+            except ImportError:
+                risposta_imprevisti = None
+        if risposta_imprevisti is not None:
+            try:
+                evid = risposta_imprevisti(domanda)
+                if evid and "ANALISI EVIDENZE" not in contesto_coll:
+                    contesto_coll = f"{contesto_coll}\n\nANALISI EVIDENZE E CATENA MULTI-DOCUMENTO:\n{evid}".strip()
+            except Exception:
+                pass
+
         if usa_gemini:
             risposta = modello_gemini.genera_risposta(
                 domanda,
@@ -267,6 +294,7 @@ def genera_risposta_ibrida(
                 modello=modello,
                 usa_tools=usa_tools,
                 memoria=memoria,
+                contesto_collegamenti=contesto_coll,
             )
             modello_cloud = (
                 modello_gemini.ULTIMO_MODELLO_USATO
@@ -290,6 +318,7 @@ def genera_risposta_ibrida(
                 modello=modello,
                 usa_tools=usa_tools,
                 memoria=memoria,
+                contesto_collegamenti=contesto_coll,
             )
             _, provider = stato_chiavi_api()
             usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
@@ -320,6 +349,8 @@ def genera_risposta_ibrida(
     esito["fonti_citate"] = grounding["fonti_file"]
     esito["file_recuperati_rag"] = file_recuperati_rag
     esito["dettagli_rag"] = esito_rag["dettagli_file"]
+    esito["collegamenti"] = esito_rag.get("collegamenti", [])
+    esito["percorso_collegamento"] = esito_rag.get("percorso_collegamento")
     esito["grounding_ok"] = grounding["ok"]
     esito["citazioni_ignote"] = grounding["citazioni_ignote"]
     esito["memoria_usata"] = len(memoria)

@@ -51,6 +51,9 @@ models/
 *.bin
 *.safetensors
 
+# Cache locale degli embedding RAG (rigenerabile)
+*.npz
+
 # Gradio / Temp logs
 flagged/
 gradio_cached_examples/

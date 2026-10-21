@@ -371,6 +371,8 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                         "memoria_usata": esito.get("memoria_usata", 0),
                         "fonti": fonti_citate,
                         "file_recuperati_rag": file_rag,
+                        "collegamenti": esito.get("collegamenti", []),
+                        "percorso_collegamento": esito.get("percorso_collegamento"),
                         "dettagli_rag": esito.get("dettagli_rag", []),
                         "fonti_disponibili": [nome for nome, _ in fonti],
                         "grounding_ok": esito.get("grounding_ok", True),

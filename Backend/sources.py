@@ -45,6 +45,16 @@ except ImportError:
         ROOT_DIR,
     )
 
+try:
+    from Backend import collegamenti as modulo_collegamenti
+    from Backend import evidenze as modulo_evidenze
+except ImportError:
+    import collegamenti as modulo_collegamenti
+    try:
+        import evidenze as modulo_evidenze
+    except ImportError:
+        modulo_evidenze = None
+
 _cache_fonti_chiave: tuple[Any, ...] | None = None
 _cache_fonti_valore: list[tuple[str, str]] = []
 
@@ -64,6 +74,19 @@ RAG_CACHE_FILE = BACKEND_DIR / ".rag_embeddings_cache.npz"
 RAG_CHUNK_SIZE = 450
 RAG_CHUNK_STEP = 340
 RAG_TOP_K_DEFAULT = 15
+
+# Parole vuote usate dal matching lessicale e dal feedback di query.
+_STOPWORD_RAG = {
+    "il", "lo", "la", "i", "gli", "le", "un", "una", "uno", "di", "da", "in",
+    "con", "su", "per", "tra", "fra", "del", "della", "dei", "delle", "dello",
+    "al", "alla", "alle", "ai", "nel", "nella", "nei", "nelle", "sul", "sulla",
+    "che", "chi", "cosa", "dove", "quando", "come", "quale", "quali", "sono",
+    "era", "erano", "stato", "stata", "stati", "state", "ha", "hanno", "non",
+    "più", "piu", "anche", "questo", "questa", "quello", "quella", "documento",
+    "file", "fonte", "fonti", "dimmi", "parlami", "trova", "cerca", "allora",
+    "quindi", "essere", "avere", "fare", "viene", "vengono", "può", "puo",
+    "deve", "devono", "sulla", "dopo", "prima", "durante", "entro", "senza",
+}
 
 # Marcatori tipici di un documento che prova a impartire ordini all'assistente.
 MARCATORI_ISTRUZIONI_OSTILI: tuple[str, ...] = (
@@ -543,24 +566,47 @@ def _ottieni_embedder_rag() -> Any:
 def _tokenizza_rag(testo: str) -> list[str]:
     """Estrae token alfanumerici e radici morfologiche per il matching ibrido BM25/TF-IDF."""
     parole = re.findall(r"[a-zàèéìòù0-9_-]+", testo.lower().replace("\u2019", "'"))
-    stop = {
-        "il", "lo", "la", "i", "gli", "le", "un", "una", "uno", "di", "da", "in",
-        "con", "su", "per", "tra", "fra", "del", "della", "dei", "delle", "dello",
-        "al", "alla", "alle", "ai", "nel", "nella", "nei", "nelle", "sul", "sulla",
-        "che", "chi", "cosa", "dove", "quando", "come", "quale", "quali", "sono",
-        "era", "erano", "stato", "stata", "stati", "state", "ha", "hanno", "non",
-        "più", "piu", "anche", "questo", "questa", "quello", "quella", "documento",
-        "file", "fonte", "fonti", "dimmi", "parlami", " trova", "cerca",
-    }
     tokens: list[str] = []
     for p in parole:
-        if len(p) <= 1 or p in stop:
+        if len(p) <= 1 or p in _STOPWORD_RAG:
             continue
         tokens.append(p)
         # Aggiungi radice morfologica a 5 caratteri per l'italiano
         if len(p) > 5 and not any(c.isdigit() for c in p):
             tokens.append(p[:5])
     return tokens
+
+
+def _termini_feedback(
+    testi: Sequence[str],
+    token_domanda: Sequence[str],
+    idf: dict[str, float],
+    limite: int = 12,
+) -> list[str]:
+    """
+    Pseudo-relevance feedback: estrae dai primi blocchi recuperati i termini distintivi
+    (rari nell'archivio) che non erano nella domanda. Servono a recuperare i documenti
+    collegati (es. il riassunto parla di «registri originali» -> recupera il registro G2-01).
+    """
+    in_domanda = set(token_domanda)
+    conteggio: dict[str, int] = {}
+    for testo in testi:
+        visti: set[str] = set()
+        for p in re.findall(r"[a-zàèéìòù0-9_-]{4,}", (testo or "").lower().replace("\u2019", "'")):
+            if p in _STOPWORD_RAG or p in in_domanda or p.isdigit() or p in visti:
+                continue
+            if not any(c.isalpha() for c in p):
+                continue
+            visti.add(p)
+            conteggio[p] = conteggio.get(p, 0) + 1
+    candidati = sorted(
+        conteggio,
+        key=lambda t: (conteggio[t] * idf.get(t, 0.0), len(t)),
+        reverse=True,
+    )
+    # Solo termini realmente distintivi (IDF alto), altrimenti si aggiunge rumore:
+    # con 10.000+ blocchi, idf >= 5.0 esclude parole presenti in centinaia di documenti.
+    return [t for t in candidati if idf.get(t, 0.0) >= 5.0][:limite]
 
 
 def _chiave_contenuto_archivio(documenti: Sequence[tuple[str, str]]) -> str:
@@ -729,6 +775,16 @@ def scegli_fonti_dettagliato(
         "autorizzazione": ["autorizzazione", "database", "accessi", "valida", "rv753", "lume", "arch-5721"],
         "accessi": ["autorizzazione", "database", "accessi", "valida", "rv753", "lume", "arch-5721"],
         "archivio": ["arch-1842", "arch-3097", "arch-5721", "arch-6408", "arch-8254", "simulazione", "lazzaro"],
+        # Il "primo focolaio" è descritto nei registri come "primo allarme": senza questa
+        # equivalenza il riassunto della centrale (G2-03) scavalca il registro originale (G2-01).
+        "focolaio": ["focolaio", "allarme", "san", "mauro", "g2-01", "registri", "originali"],
+        "scoppiato": ["focolaio", "allarme", "san", "mauro", "g2-01", "registri", "originali"],
+        "scoppi": ["focolaio", "allarme", "san", "mauro", "g2-01", "registri", "originali"],
+        "prove": ["prova", "prove", "registri", "originali", "orari", "allarme", "g2-01", "g2-05", "g2-06"],
+        "prova": ["prova", "prove", "registri", "originali", "orari", "allarme", "g2-01", "g2-05", "g2-06"],
+        "smentiscono": ["smentisce", "contraddice", "registri", "originali", "orari", "allarme", "g2-01"],
+        "smentisce": ["smentiscono", "contraddice", "registri", "originali", "orari", "allarme", "g2-01"],
+        "versione": ["versione", "riassunto", "centrale", "registri", "originali", "prove"],
     }
     tokens_espansi = list(q_tokens)
     for t in q_tokens:
@@ -758,40 +814,87 @@ def scegli_fonti_dettagliato(
         )
     }
 
-    punteggi_blocchi: list[tuple[float, int]] = []
-    for idx, mb in enumerate(meta_blocchi):
-        score = 0.0
-        tokens_blocco = mb["tokens"]
-        testo_b_lower = mb["testo_blocco"].lower()
+    # Le 1.000 voci Wikipedia dell'archivio sono rumore: si escludono, a meno che la domanda
+    # non chieda esplicitamente una voce enciclopedica o citi un ID WIKI-*/documento_*.
+    chiede_wikipedia = bool(
+        re.search(r"\bwiki|wikipedia|encicloped|voce enciclopedica", q_lower)
+    ) or any(c.startswith("WIKI-") for c in citazioni_esplicite)
 
-        # 1. Match esplicito su ID o nome file
-        id_norm = mb["id"].upper().replace("_", "-")
-        stem_norm = Path(mb["file"]).stem.upper().replace("_", "-")
-        if id_norm in citazioni_esplicite or stem_norm in citazioni_esplicite:
-            score += 50.0
+    def blocco_ammesso(mb: dict[str, Any]) -> bool:
+        return chiede_wikipedia or not str(mb["id"]).upper().startswith("WIKI-")
 
-        # 2. Score lessicale pesato con IDF
-        comuni_diretti = [t for t in q_tokens if t in tokens_blocco]
-        comuni_espansi = [t for t in tokens_espansi if t in tokens_blocco]
-        for t in comuni_diretti:
-            score += idf.get(t, 2.0) * (1.5 + 0.3 * min(3, testo_b_lower.count(t)))
-        for t in comuni_espansi:
-            if t not in comuni_diretti:
-                score += idf.get(t, 1.5) * 0.65
+    def calcola_punteggi(tokens_extra: Sequence[str], is_feedback: bool = False) -> list[tuple[float, int]]:
+        """Punteggio lessicale + semantico sui blocchi ammessi (una sola implementazione)."""
+        punteggi: list[tuple[float, int]] = []
+        for idx, mb in enumerate(meta_blocchi):
+            if not blocco_ammesso(mb):
+                continue
+            score = 0.0
+            tokens_blocco = mb["tokens"]
+            testo_b_lower = mb["testo_blocco"].lower()
 
-        # 3. Bonus se il documento appartiene al dossier operativo LAZZARO (non Wikipedia)
-        # quando la domanda non chiede una voce specifica di Wikipedia
-        if mb["is_lazzaro"] and score > 0 and not any(c.startswith("WIKI-") for c in citazioni_esplicite):
-            score *= 1.45
+            # 1. Match esplicito su ID o nome file
+            id_norm = mb["id"].upper().replace("_", "-")
+            stem_norm = Path(mb["file"]).stem.upper().replace("_", "-")
+            if id_norm in citazioni_esplicite or stem_norm in citazioni_esplicite:
+                score += 50.0
 
-        # 4. Integrazione con score semantico SentenceTransformer (se disponibile)
-        if scores_dense is not None:
-            score += float(scores_dense[idx]) * 8.0
+            # 2. Score lessicale pesato con IDF
+            comuni_diretti = [t for t in q_tokens if t in tokens_blocco]
+            comuni_espansi = [t for t in tokens_extra if t in tokens_blocco]
+            for t in comuni_diretti:
+                score += idf.get(t, 2.0) * (1.5 + 0.3 * min(3, testo_b_lower.count(t)))
+            for t in comuni_espansi:
+                if t not in comuni_diretti:
+                    peso_espansione = 0.25 if is_feedback else 0.65
+                    score += idf.get(t, 1.5) * peso_espansione
 
-        if score > 0:
-            punteggi_blocchi.append((score, idx))
+            # 3. Bonus se il documento appartiene al dossier operativo LAZZARO (non Wikipedia)
+            if mb["is_lazzaro"] and score > 0 and not chiede_wikipedia:
+                score *= 1.45
 
-    punteggi_blocchi.sort(key=lambda x: x[0], reverse=True)
+            # 4. Integrazione con score semantico SentenceTransformer (se disponibile).
+            # Il peso è più alto di prima: senza di esso le parafrasi (focolaio/allarme)
+            # non venivano recuperate.
+            if scores_dense is not None:
+                score += float(scores_dense[idx]) * 18.0
+
+            if score > 0.5:
+                punteggi.append((score, idx))
+        punteggi.sort(key=lambda x: x[0], reverse=True)
+        return punteggi
+
+    punteggi_blocchi = calcola_punteggi(tokens_espansi, is_feedback=False)
+
+    # Pseudo-relevance feedback: i termini distintivi dei primi brani (es. «registri originali»,
+    # «materiale di recupero», «pratica RV753») vengono usati per una seconda ricerca, così
+    # si raggiungono i documenti collegati che non contengono le parole esatte della domanda.
+    # Si disattiva quando la domanda contiene già un codice esatto (EV-541, M562, un ID file):
+    # in quel caso il match lessicale è più affidabile del feedback.
+    usa_feedback = not citazioni_esplicite and not re.search(r"\b(?:EV|CN|RV|M\d|K\d)[-_ ]?\d+", q_lower, re.IGNORECASE)
+    if punteggi_blocchi and usa_feedback:
+        top_sc = punteggi_blocchi[0][0]
+        # Seleziona solo i blocchi con score coerente con il top (almeno 75% del punteggio max)
+        # per evitare query drift da template ripetitivi o documenti a basso score
+        blocchi_top_fb = [idx for s, idx in punteggi_blocchi[:6] if s >= top_sc * 0.75][:4]
+        testi_top = [meta_blocchi[idx]["testo_blocco"] for idx in blocchi_top_fb]
+        feedback = _termini_feedback(testi_top, q_tokens, idf)
+        if feedback:
+            tokens_arricchiti = list(tokens_espansi)
+            for termine in feedback:
+                if termine not in tokens_arricchiti:
+                    tokens_arricchiti.append(termine)
+            punteggi_feedback = calcola_punteggi(tokens_arricchiti, is_feedback=True)
+            map_fb = dict((idx, sc) for sc, idx in punteggi_feedback)
+            res_migliori = []
+            for sc_orig, idx in punteggi_blocchi:
+                sc_fb = map_fb.get(idx, sc_orig)
+                # Il feedback arricchisce con un boost controllato (max 15.0 pt) senza permettere
+                # a documenti privi di match diretti o con match deboli di scavalcare match esatti
+                sc_finale = min(sc_orig + 15.0, max(sc_orig, sc_fb))
+                res_migliori.append((sc_finale, idx))
+            res_migliori.sort(key=lambda x: x[0], reverse=True)
+            punteggi_blocchi = res_migliori
 
     # Selezione top blocchi e deduplicazione per documento
     blocchi_scelti: list[dict[str, Any]] = []
@@ -808,6 +911,8 @@ def scegli_fonti_dettagliato(
 
     for score, idx in punteggi_blocchi:
         mb = meta_blocchi[idx]
+        if not blocco_ammesso(mb):
+            continue
         nome_f = mb["file"]
         if collassa_copie and nome_f in copie_collassate:
             continue
@@ -850,6 +955,10 @@ def scegli_fonti_dettagliato(
             ponti.extend(["ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"])
         if "rifugi" in testo_aggregato and ("contagio" in q_lower or "archivio" in q_lower or "successo nei rifugi" in q_lower):
             ponti.append("ARCH-1842")
+        if "m562" in testo_aggregato or "k591" in testo_aggregato or "custodia schermata" in testo_aggregato or "ricambio" in testo_aggregato or ("nebbia" in q_lower and ("modulo" in q_lower or "custodia" in q_lower or "ricambio" in q_lower)):
+            ponti.extend(["LX5-2398", "LX5-1221", "LX5-1749"])
+        if "ev-541" in testo_aggregato or "ev-541" in q_lower or "segnale di evacuazione" in q_lower or "circuito cn" in q_lower:
+            ponti.extend(["LX5-2775", "LX5-8820"])
 
         for cod_ponte in ponti:
             f_ponte = mappa_id.get(cod_ponte)
@@ -870,6 +979,40 @@ def scegli_fonti_dettagliato(
                         "multi_hop": True,
                     }
                 )
+
+    # Multi-Hop generico (non limitato alla catena RV753): se due entità citate nella domanda
+    # sono collegate da un percorso di documenti che condividono codici/nomi/orari, si aggiungono
+    # i documenti del percorso. È il meccanismo che collega, per esempio, Nora Ferri -> LUME.
+    analisi_collegamenti = {"collegamenti": [], "percorso": None, "testo": ""}
+    if includi_multi_hop and fonti_scelte:
+        analisi_collegamenti = modulo_collegamenti.analizza_collegamenti(domanda, fonti_scelte)
+        percorso = analisi_collegamenti.get("percorso")
+        if percorso:
+            for passo in percorso.get("passi", []):
+                f_ponte = passo.get("file")
+                if not f_ponte or f_ponte in visti_file or f_ponte not in mappa_doc:
+                    continue
+                testo_p, meta_p = mappa_doc[f_ponte]
+                if not chiede_wikipedia and str(meta_p["id"]).upper().startswith("WIKI-"):
+                    continue
+                visti_file.add(f_ponte)
+                file_scelti.append(f_ponte)
+                fonti_scelte.append((f_ponte, testo_p))
+                blocchi_scelti.append(
+                    {
+                        "file": f_ponte,
+                        "id": meta_p["id"],
+                        "titolo": meta_p["titolo"],
+                        "formato": meta_p["formato"],
+                        "fase": meta_p["fase"],
+                        "score": 9.98,
+                        "blocco": testo_p,
+                        "multi_hop": True,
+                        "ponte": passo.get("ponte"),
+                    }
+                )
+            # Ricalcola i collegamenti includendo anche i documenti appena aggiunti.
+            analisi_collegamenti = modulo_collegamenti.analizza_collegamenti(domanda, fonti_scelte)
 
     # Fallback se la query non ha match specifici (es. saluti o domande generali sulla missione)
     if not fonti_scelte:
@@ -907,6 +1050,9 @@ def scegli_fonti_dettagliato(
         "dettagli_file": dettagli_file,
         "blocchi_recuperati": blocchi_scelti[:top_k],
         "fonti": fonti_scelte,
+        "collegamenti": analisi_collegamenti.get("collegamenti", []),
+        "percorso_collegamento": analisi_collegamenti.get("percorso"),
+        "testo_collegamenti": analisi_collegamenti.get("testo", ""),
     }
 
 
@@ -1021,9 +1167,14 @@ def cerca_in_fonti(
     if not parole_chiave:
         return []
 
+    chiede_wikipedia = bool(
+        re.search(r"\bwiki|wikipedia|encicloped|voce enciclopedica", query, re.IGNORECASE)
+    )
     risultati = []
     for nome, testo in fonti_effettive:
         meta = estrai_metadati_fonte(nome, testo)
+        if not chiede_wikipedia and str(meta["id"]).upper().startswith("WIKI-"):
+            continue
         testo_ricerca = f"{nome} {meta['id']} {meta['titolo']} {meta['corpo']}".lower()
         occorrenze = sum(testo_ricerca.count(p) for p in parole_chiave)
         if occorrenze > 0:

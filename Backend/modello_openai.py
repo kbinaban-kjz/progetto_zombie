@@ -119,6 +119,7 @@ def genera_risposta(
     modello: str | None = None,
     usa_tools: bool = False,
     memoria: list[dict[str, Any]] | None = None,
+    contesto_collegamenti: str = "",
 ) -> str:
     """
     Invia la richiesta al modello Cloud (NVIDIA NIM o OpenAI).
@@ -180,7 +181,7 @@ def genera_risposta(
         base_url=base_url,
         max_retries=0 if usa_nvidia else 1,
     )
-    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti)
+    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti, contesto_collegamenti)
     messaggi: list[dict[str, Any]] = [{"role": "system", "content": istruzioni_sistema}]
 
     # Inietta i turni della memoria passata (ultimi 10 scambi)
@@ -200,11 +201,7 @@ def genera_risposta(
         }
     )
 
-    tools_attivi = [
-        t
-        for t in TOOLS_OPENAI_SCHEMA
-        if t.get("function", {}).get("name") not in {"cerca_fonti", "leggi_fonte", "elenca_fonti"}
-    ]
+    tools_attivi = list(TOOLS_OPENAI_SCHEMA)
 
     risultato = None
     for indice, modello_corrente in enumerate(modelli):
@@ -242,8 +239,10 @@ def genera_risposta(
 
     messaggio_risposta = risultato.choices[0].message
 
-    # Gestione di eventuali Tool Calls emesse dal modello
-    if getattr(messaggio_risposta, "tool_calls", None):
+    # Gestione multi-passo di eventuali Tool Calls emesse dal modello (fino a 4 turni)
+    for _ in range(4):
+        if not getattr(messaggio_risposta, "tool_calls", None):
+            break
         messaggi.append(messaggio_risposta)
         for tool_call in messaggio_risposta.tool_calls:
             nome_tool = tool_call.function.name
@@ -257,16 +256,15 @@ def genera_risposta(
                 }
             )
 
-        # Secondo passo di completamento con i dati restituiti dal tool
-        completamento_finale = client.chat.completions.create(
-            model=ULTIMO_MODELLO_USATO or modello_principale,
-            messages=messaggi,
-            temperature=0,
-        )
-        risposta_testo = completamento_finale.choices[0].message.content
-        if not risposta_testo:
-            raise RuntimeError("Il modello cloud ha restituito una risposta finale vuota.")
-        return risposta_testo
+        kwargs_loop: dict[str, Any] = {
+            "model": ULTIMO_MODELLO_USATO or modello_principale,
+            "messages": messaggi,
+            "temperature": 0,
+        }
+        if usa_tools and tools_attivi:
+            kwargs_loop["tools"] = tools_attivi
+        completamento_passo = client.chat.completions.create(**kwargs_loop)
+        messaggio_risposta = completamento_passo.choices[0].message
 
     risposta = messaggio_risposta.content
     if not risposta:

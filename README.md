@@ -25,6 +25,7 @@ Ogni file gestisce un ambito operativo ben definito:
 │   ├── schema.sql            # Schema SQL tabelle (cronologia_chat e instradamento_chat)
 │   ├── database.py           # Gestione SQLite: connessione, persistenza, cronologia e telemetria
 │   ├── sources.py            # Caricamento, caching e formattazione dei documenti del dossier (dati/ e new_dati/) + rilevamento injection
+│   ├── collegamenti.py       # Grafo documento <-> entità: collegamenti verificati e percorsi multi-documento
 │   ├── tools.py              # Strumenti (Tools) operativi invocabili dall'AI (schemi OpenAI + funzioni Python)
 │   ├── modello_locale.py     # Modello Qwen2.5-0.5B su CPU/MPS/CUDA + risponditore locale deterministico
 │   ├── modello_gemini.py     # Client Google Gemini (google-genai / REST) con fallback e supporto Tools
@@ -34,6 +35,7 @@ Ogni file gestisce un ambito operativo ben definito:
 │   ├── cli.py                # Interfaccia a riga di comando (CLI) interattiva da terminale con comandi rapidi
 │   ├── snapshot_g2.py        # Snapshot delle risposte del Giorno 2 (prova prima/dopo)
 │   ├── verifica_g2.py        # Verifica automatica della consegna (documenti, risposte, attacco, test)
+│   ├── verifica_collegamenti.py # Verifica delle risposte multi-documento e dei collegamenti
 │   ├── verifica_cloud_g2.py  # Confronto prompt originale vs irrobustito sul modello Cloud
 │   ├── Investigatore.py      # Entry point principale dell'applicazione (avvio server o CLI; re-export modulare)
 │   └── Missione.xlsx         # Specifiche e obiettivi operativi della missione
@@ -60,6 +62,7 @@ Ogni file gestisce un ambito operativo ben definito:
 | **`Backend/config.py`** | **Configurazione globale**: centralizza percorsi (`ROOT_DIR`, `DATI_DIR`, `NUOVI_DATI_DIR`, `DB_PATH`), caricamento sicuro da `.env`, costanti di rete, istruzioni di sistema e verifica credenziali API. |
 | **`Backend/database.py`** | **Persistenza dati**: inizializzazione schema, salvataggio e recupero messaggi con metadati di routing, ricerca testuale nella cronologia pregressa. |
 | **`Backend/sources.py`** | **Gestione dossier**: individuazione delle cartelle (`dati/` e `new_dati/`), lettura file `.txt` con cache basata su timestamp `mtime`, parsing ID/titolo, formattazione per prompt e rilevamento dei testi che simulano istruzioni all'AI (`rileva_istruzioni_ostili`, `fonti_sospette`). |
+| **`Backend/collegamenti.py`** | **Collegamenti tra documenti**: estrae codici, nomi, acronimi e orari, costruisce il grafo documento↔entità, elenca i collegamenti verificati e trova il percorso più breve tra due entità citate nella domanda (`Nora Ferri` → `RV753` → `LUME`). |
 | **`Backend/modello_locale.py`** | **Motore locale**: esecuzione di `Qwen/Qwen2.5-0.5B-Instruct` con accelerazione hardware (Apple Silicon MPS, CUDA, CPU) ed estrattore deterministico di riserva se PyTorch/transformers non sono installati. |
 | **`Backend/modello_gemini.py`** | **Motore Google Gemini**: connessione a Gemini (tramite SDK ufficiale `google-genai` o fallback REST nativo), failover sui modelli di riserva (`gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) e function calling integrato. |
 | **`Backend/modello_openai.py`** | **Motore cloud (NVIDIA / OpenAI)**: interazione con API OpenAI o NVIDIA NIM, failover automatico sui modelli di riserva in caso di quota esaurita o errori transitori, esecuzione tool calls. |
@@ -159,3 +162,36 @@ python Backend/verifica_cloud_g2.py               # prompt originale vs irrobust
      # Test caricamento fonti
      python Backend/sources.py
      ```
+
+---
+
+## Qualità delle risposte e collegamenti tra documenti
+
+Sono state corrette le cause che producevano risposte fuori tema o scollegate:
+
+1. **Rumore Wikipedia escluso dal RAG**: le 1.000 voci `WIKI-*` non entrano più nei risultati
+   (a meno che la domanda non chieda esplicitamente Wikipedia o citi un ID `WIKI-*`). Prima, per
+   «Chi ha cercato di fermare il progetto?» il RAG recuperava *ARPANET* e per «Cosa è successo nei
+   rifugi?» il *Corno del Renon*.
+2. **Recupero ibrido più solido**: peso maggiore agli embedding semantici, pseudo-relevance feedback
+   sui termini distintivi dei primi brani (es. «registri originali» → `G2-01`) e disattivazione del
+   feedback quando la domanda contiene già un codice esatto (`EV-541`, `M562`).
+3. **Multi-hop generico** (`Backend/collegamenti.py`): il RAG collega i documenti tramite entità
+   condivise (codici, nomi, orari) e ricostruisce il percorso tra due entità citate nella domanda,
+   non solo per la catena RV753. Esempio: `Nora Ferri` → pratica `RV753` → contenitore `LUME`.
+4. **Risposte ancorate alle prove**: il risponditore locale usa l'ordine del RAG, sceglie le frasi
+   pertinenti (non interi documenti) e per le domande su orari non restituisce più la timeline
+   completa dell'archivio, ma solo gli eventi pertinenti. Per «Dove è scoppiato il primo focolaio?»
+   risponde `San Mauro, 01:12 [G2-01]`.
+5. **Prompt cloud**: ai modelli viene passato un blocco `COLLEGAMENTI VERIFICATI TRA I DOCUMENTI`
+   e l'istruzione di costruire la catena fatto → `[ID]` → entità-ponte → documento successivo,
+   dichiarando i collegamenti non documentati invece di inventarli.
+
+Verifica automatica:
+
+```bash
+python Backend/verifica_collegamenti.py        # 17 controlli su rumore, focolaio, catena Nora/LUME, astensione
+python Backend/verifica_g3_imprevisti.py       # 28 controlli della consegna imprevisti (regressione)
+```
+
+Resoconti: `prove_g3/verifica_collegamenti.txt` e `prove_g3/verifica_imprevisti_gg3.txt`.

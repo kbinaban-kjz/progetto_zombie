@@ -34,8 +34,11 @@ try:
     from Backend.tools import (
         STRUMENTI_REGISTRATI,
         esegui_tool,
+        recupera_rag,
         cerca_fonti,
         leggi_fonte,
+        collega_documenti,
+        analizza_evidenze,
         elenca_fonti,
         verifica_sicurezza_fonti,
         ottieni_nodi_mappa,
@@ -60,8 +63,11 @@ except ImportError:
     from tools import (
         STRUMENTI_REGISTRATI,
         esegui_tool,
+        recupera_rag,
         cerca_fonti,
         leggi_fonte,
+        collega_documenti,
+        analizza_evidenze,
         elenca_fonti,
         verifica_sicurezza_fonti,
         ottieni_nodi_mappa,
@@ -152,6 +158,7 @@ def _genera_risposta_rest(
     api_key: str,
     modello: str,
     memoria: list[dict[str, Any]] | None = None,
+    contesto_collegamenti: str = "",
 ) -> str:
     """
     Fallback REST nativo via urllib: esegue la chiamata a Gemini senza librerie esterne.
@@ -159,7 +166,7 @@ def _genera_risposta_rest(
     """
     global ULTIMO_MODELLO_USATO
     contenuto_fonti = formatta_blocco_openai(fonti)
-    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti)
+    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti, contesto_collegamenti)
 
     # Assicura formato corretto del modello per la REST API
     id_modello = modello.split("/")[-1] if "/" in modello else modello
@@ -227,6 +234,7 @@ def genera_risposta(
     modello: str | None = None,
     usa_tools: bool = False,
     memoria: list[dict[str, Any]] | None = None,
+    contesto_collegamenti: str = "",
 ) -> str:
     """
     Invia la richiesta al modello Google Gemini.
@@ -262,7 +270,7 @@ def genera_risposta(
             modelli.append(m_risolto)
 
     contenuto_fonti = formatta_blocco_openai(fonti)
-    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti)
+    istruzioni_sistema = costruisci_istruzioni_con_fonti(contenuto_fonti, contesto_collegamenti)
 
     # --------------------------------------------------------------------------
     # PERCORSO 1: google-genai SDK (se disponibile)
@@ -270,11 +278,18 @@ def genera_risposta(
     if GOOGLE_GENAI_DISPONIBILE and genai is not None:
         client = ottieni_client(chiave)
 
-        # Preparazione lista funzioni tools: poiché le fonti .txt sono già nel prompt,
-        # espone solo gli strumenti esterni (audit sicurezza, mappa tattica, cronologia, statistiche)
+        # Preparazione lista completa delle funzioni investigative (Tools):
+        # Permette all'agente di interrogare l'archivio (RAG), cercare e leggere documenti,
+        # collegare prove, verificare sicurezza, consultare la mappa e interrogare la cronologia.
         funzioni_tools: list[Any] = []
         if usa_tools:
             funzioni_tools = [
+                recupera_rag,
+                cerca_fonti,
+                leggi_fonte,
+                collega_documenti,
+                analizza_evidenze,
+                elenca_fonti,
                 verifica_sicurezza_fonti,
                 ottieni_nodi_mappa,
                 ottieni_dettaglio_nodo,
@@ -433,7 +448,14 @@ def genera_risposta(
     ultimo_err_rest: Exception | None = None
     for indice, m in enumerate(modelli):
         try:
-            return _genera_risposta_rest(domanda, fonti, chiave, m, memoria=memoria)
+            return _genera_risposta_rest(
+                domanda,
+                fonti,
+                chiave,
+                m,
+                memoria=memoria,
+                contesto_collegamenti=contesto_collegamenti,
+            )
         except (GeminiAuthError, GeminiQuotaError):
             raise
         except Exception as err:

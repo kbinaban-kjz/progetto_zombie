@@ -11,6 +11,7 @@ import json
 from typing import Any
 
 try:
+    from Backend import collegamenti as modulo_collegamenti
     from Backend.evidenze import risposta_imprevisti
     from Backend.database import cerca_in_cronologia, leggi_cronologia
     from Backend.sources import (
@@ -23,6 +24,7 @@ try:
         scegli_fonti_dettagliato,
     )
 except ImportError:
+    import collegamenti as modulo_collegamenti
     from evidenze import risposta_imprevisti
     from database import cerca_in_cronologia, leggi_cronologia
     from sources import (
@@ -474,6 +476,26 @@ def recupera_rag(domanda: str, top_k: int = 8) -> dict[str, Any]:
         "file_recuperati": esito["file_recuperati"],
         "dettagli_file": esito["dettagli_file"],
         "blocchi_recuperati": esito["blocchi_recuperati"],
+        "collegamenti": esito.get("collegamenti", []),
+        "percorso_collegamento": esito.get("percorso_collegamento"),
+    }
+
+
+def collega_documenti(domanda: str) -> dict[str, Any]:
+    """
+    Collega i documenti recuperati dal RAG mostrando le entità condivise (codici, nomi, orari)
+    e, se la domanda cita due entità, il percorso più breve che le collega.
+    USARE SE l'utente chiede di collegare, confrontare o ricostruire una catena tra documenti.
+    """
+    esito = scegli_fonti_dettagliato(domanda, top_k=10)
+    analisi = modulo_collegamenti.analizza_collegamenti(domanda, esito["fonti"])
+    return {
+        "ok": True,
+        "domanda": domanda,
+        "file_recuperati": esito["file_recuperati"],
+        "collegamenti": analisi.get("collegamenti", []),
+        "percorso": analisi.get("percorso"),
+        "testo": analisi.get("testo", ""),
     }
 
 
@@ -673,6 +695,7 @@ def statistiche_missione() -> dict[str, Any]:
 STRUMENTI_REGISTRATI: dict[str, Any] = {
     "cerca_fonti": cerca_fonti,
     "recupera_rag": recupera_rag,
+    "collega_documenti": collega_documenti,
     "analizza_evidenze": analizza_evidenze,
     "leggi_fonte": leggi_fonte,
     "elenca_fonti": elenca_fonti,
@@ -738,6 +761,23 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                         "type": "integer",
                         "description": "Numero di documenti da recuperare (default 8).",
                     },
+                },
+                "required": ["domanda"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "collega_documenti",
+            "description": "Collega i documenti recuperati dal RAG tramite le entità condivise (codici come RV753/M562, nomi come Nora Ferri, orari) e ricostruisce il percorso tra due entità citate nella domanda. USARE SE l'utente chiede di collegare, confrontare o ricostruire una catena tra documenti.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domanda": {
+                        "type": "string",
+                        "description": "Domanda con le entità da collegare (es. 'Quali documenti collegano Nora Ferri al contenitore LUME?').",
+                    }
                 },
                 "required": ["domanda"],
             },

@@ -1,0 +1,102 @@
+VERIFICA COLLEGAMENTI TRA DOCUMENTI
+Modalità: estrattore deterministico
+
+DOMANDA: Chi ha cercato di fermare il progetto?
+FILE RAG: documento_0057.html, G2-05.txt, documento_0523.txt, documento_0389.xml, G1-02.txt, G2-02.txt, G2-03.txt, LX5_1151.txt, documento_0421.json, documento_0023.txt
+RISPOSTA:
+  Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. [ARCH-3097] (documento_0057.html)
+[OK] Nessuna voce Wikipedia nelle fonti recuperate
+[OK] Risposta: Nora Ferri, non ARPANET
+[OK] Fonte corretta [ARCH-3097]
+
+DOMANDA: Dove è scoppiato il primo focolaio e a che ora?
+FILE RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, G2-01.txt, G1-02.txt, G2-07.txt, G2-06.txt, G2-02.txt
+RISPOSTA:
+  Ore 01:12. Primo allarme registrato nel laboratorio San Mauro. [G2-01]
+[OK] Risposta secca: San Mauro e 01:12
+[OK] Fonte del registro originale [G2-01]
+[OK] Nessun orario estraneo (06:25 / 06:40) nella risposta principale
+
+DOMANDA: Cosa è successo nei rifugi?
+FILE RAG: documento_0523.txt, G1-01.txt, G2-02.txt, LX5_3923.txt, documento_0023.txt, documento_0057.html, documento_0389.xml, documento_0421.json, LX5_2775.txt, LX5_8820.txt
+RISPOSTA:
+  Circolare interna sui rifugi: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. [ARCH-1842] (documento_0523.txt)
+  Messaggio della centrale: La centrale ordina ai superstiti di raggiungere i rifugi. [G1-01]
+  Intervento manutenzione: Nora Ferri chiede di chiudere il collegamento tra il laboratorio San Mauro e la rete dei rifugi. [G2-02]
+[OK] Risposta: i rifugi sono stati usati per estendere il contagio
+[OK] Fonte [ARCH-1842] e nessun Corno del Renon
+
+DOMANDA: Quali documenti collegano Nora Ferri al contenitore LUME?
+FILE RAG: documento_0389.xml, documento_0057.html, G2-02.txt, G1-02.txt, G2-03.txt, LX5_5496.txt, G2-07.txt, documento_0421.json, documento_0023.txt
+RISPOSTA:
+  Trasferimento del materiale di recupero: Il contenitore LUME è stato spostato nel deposito Forte Cenere. [ARCH-5721] (documento_0389.xml)
+  Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. Per proteggere il materiale di recupero ha aperto la pratica RV753. [ARCH-3097] (documento_0057.html)
+  Intervento manutenzione: Nora Ferri chiede di chiudere il collegamento tra il laboratorio San Mauro e la rete dei rifugi. [G2-02]
+  Una voce dal quartiere: Nora Ferri ha lasciato un messaggio: «Conservate i registri originali. [G1-02]
+  Regole archivio — giorno operativo 03: Per ricostruire un trasferimento serve collegare documenti diversi. [LX5-5496]
+  
+  Collegamenti tra documenti:
+  PERCORSO TRA «nora ferri» E «lume»: [ARCH-3097] (documento_0057.html) -> [ARCH-5721] (documento_0389.xml) --rv753--
+  COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
+    • [ARCH-3097] (documento_0057.html) <-> [G2-02] (G2-02.txt): nora, nora ferri, ferri
+    • [ARCH-3097] (documento_0057.html) <-> [G1-02] (G1-02.txt): nora, nora ferri, ferri
+    • [G2-02] (G2-02.txt) <-> [G1-02] (G1-02.txt): nora, nora ferri, ferri
+    • [ARCH-5721] (documento_0389.xml) <-> [ARCH-3097] (documento_0057.html): rv753
+  Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
+[OK] Collega almeno tre documenti (Nora, RV753, LUME)
+[OK] Mostra il percorso ARCH-3097 -> ARCH-5721
+[OK] Percorso verificato sulle entità condivise (rv753)
+
+DOMANDA: Chi ha autorizzato il trasferimento del contenitore LUME?
+FILE RAG: documento_0389.xml, LX5_1221.txt, LX5_5496.txt, documento_0421.json, documento_0023.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, documento_0057.html, LX5_2398.txt, LX5_1749.txt
+RISPOSTA:
+  Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica di consultare la planimetria per il settore e il database degli accessi per l'autorizzazione ancora valida relativa alla pratica RV753 (contenitore LUME presso il deposito Forte Cenere), ma il database degli accessi e il nome di chi ha autorizzato non sono presenti tra i file dell'archivio.
+[OK] Dichiara 'non documentato' citando ARCH-5721
+
+DOMANDA: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per proteggere il materiale?
+FILE RAG: documento_0057.html, documento_0421.json, documento_0389.xml, documento_0523.txt, documento_0023.txt, LX5_1213.txt, LX5_1614.txt, LX5_1756.txt, LX5_2398.txt, LX5_1221.txt, LX5_1749.txt
+RISPOSTA:
+  Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. Per proteggere il materiale di recupero ha aperto la pratica RV753. [ARCH-3097] (documento_0057.html)
+  Circolare interna sui rifugi: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. Le persone sono state attirate con messaggi di protezione. [ARCH-1842] (documento_0523.txt)
+  Planimetria depositi: Il deposito Forte Cenere usa il settore D6 per il materiale di recupero. Al prossimo controllo serviranno nome della persona, deposito, settore e pratica. [ARCH-6408] (documento_0421.json)
+[OK] Nora Ferri + RV753 + ARCH-3097
+
+DOMANDA: Chi ha manomesso il Ripetitore Pietra?
+FILE RAG: LX5_8820.txt, LX5_1264.txt, LX5_8823.txt, LX5_2775.txt, LX5_6396.txt, LX5_1079.txt, LX5_1105.txt, LX5_1126.txt
+RISPOSTA:
+  Non documentato nelle fonti disponibili: nessun documento attribuisce la manomissione o la colpa a una persona. La regola dell'indagine [G2-07] (G2-07.txt) impone di non attribuire colpe quando i documenti non le dimostrano; un sospetto o una presenza registrata non sono una prova.
+[OK] Non attribuisce la manomissione a una persona (astensione con G2-07)
+
+DOMANDA: Dove si trova il contenitore LUME?
+FILE RAG: documento_0389.xml, documento_0421.json, LX5_1221.txt, documento_0057.html, LX5_1151.txt, LX5_1226.txt, LX5_1229.txt, LX5_1272.txt, documento_0023.txt, LX5_2398.txt, LX5_1749.txt, LX5_2775.txt, LX5_8820.txt
+RISPOSTA:
+  Trasferimento del materiale di recupero: Il contenitore LUME è stato spostato nel deposito Forte Cenere. Pratica RV753. [ARCH-5721] (documento_0389.xml)
+  Planimetria depositi: Il deposito Forte Cenere usa il settore D6 per il materiale di recupero. Al prossimo controllo serviranno nome della persona, deposito, settore e pratica. [ARCH-6408] (documento_0421.json)
+  Verbale di opposizione: Per proteggere il materiale di recupero ha aperto la pratica RV753. Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. [ARCH-3097] (documento_0057.html)
+  
+  Collegamenti tra documenti:
+  COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
+    • [ARCH-5721] (documento_0389.xml) <-> [ARCH-6408] (documento_0421.json): cenere, forte cenere
+    • [ARCH-5721] (documento_0389.xml) <-> [ARCH-3097] (documento_0057.html): rv753
+  Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
+[OK] Risponde Forte Cenere, settore D6 con [ARCH-5721] e [ARCH-6408]
+
+DOMANDA: Come si collega il guasto del Ripetitore Pietra al primo focolaio?
+FILE RAG: LX5_2549.txt, LX5_6396.txt, G2-03.txt, documento_0523.txt, LX5_8823.txt, LX5_9242.txt, LX5_1151.txt, LX5_1889.txt
+RISPOSTA:
+  Rapporto intervento — giorno operativo 02, ore 08:00: Il primo guasto della rete secondaria è avvenuto a Ripetitore Salice, alle 06:40. È un guasto radio, non un nuovo focolaio. [LX5-2549]
+  Scheda manutenzione orologi — giorno operativo 02, ore 07:20: L’orologio locale di Ripetitore Pietra è indietro di 25 minuti. Il guasto dell’orologio era già presente prima delle 06:00. [LX5-6396]
+  Riassunto della centrale: La centrale attribuisce il primo focolaio a San Paolo e accusa Nora Ferri di sabotaggio. [G2-03]
+  Circolare interna sui rifugi: I registri originali del primo focolaio restano validi. Il progetto LAZZARO ha usato i rifugi per estendere il contagio. [ARCH-1842] (documento_0523.txt)
+  Registro di servizio — giorno operativo 02: 06:50 centrale: cade il segnale da Ripetitore Pietra. 06:40 centrale: cade il segnale da Ripetitore Salice. [LX5-8823]
+  
+  Collegamenti tra documenti:
+  COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
+    • [LX5-6396] (LX5_6396.txt) <-> [LX5-8823] (LX5_8823.txt): ripetitore pietra, pietra
+    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): 06:40, ripetitore salice, salice
+  Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
+  Nessun collegamento diretto documentato tra le due entità citate: i documenti sopra sono i più pertinenti, ma non contengono un percorso verificabile.
+[OK] Dichiara che il collegamento diretto non è documentato
+[OK] Riporta comunque le fonti del guasto (LX5-6396 / LX5-8823)
+
+Risultato: 17/17 controlli superati

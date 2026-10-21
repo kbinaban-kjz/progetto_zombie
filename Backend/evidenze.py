@@ -558,9 +558,14 @@ def risposta_imprevisti(domanda: str) -> str | None:
     q = domanda.lower()
     # Parole-guida volutamente strette: le domande dei giorni 1-3 (rifugi, Nora Ferri, RV753...) non
     # devono finire qui.
+    # Attenzione: "ripetitore" da solo NON basta (una domanda sul guasto di Pietra non è una
+    # domanda sul segnale di evacuazione). Serve il codice EV-* oppure un riferimento esplicito
+    # al canale/segnale di evacuazione o al circuito da usare per quel segnale.
     chiede_segnale = bool(
         _RE_SEGNALE.search(domanda)
-        or re.search(r"ripetitor|circuit[oi]|(?:canale|segnale) di evacuazione", q)
+        or re.search(r"(?:canale|segnale)\s+di\s+evacuazione", q)
+        or re.search(r"circuit[oi].{0,40}(?:evacuazione|segnale)", q)
+        or re.search(r"(?:quale|quali)\s+ripetitor.{0,60}(?:evacuazione|segnale)", q)
     )
     chiede_catena = bool(re.search(r"corriere|custodia schermata|ricambio|armadio|\blotto\b", q))
     if not (chiede_segnale or chiede_catena):
