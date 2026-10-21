@@ -145,6 +145,15 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             self.path = "/Frontend" + path
             return super().do_GET()
 
+        # Compatibilità percorsi Spazio Latente RAG 3D: risiede in Frontend/rag3d/
+        if path.startswith("/rag3d"):
+            self.path = "/Frontend" + path
+            return super().do_GET()
+
+        if path in {"/spazio-latente", "/spazio-latente-3d", "/rag-3d"}:
+            self.path = "/Frontend/rag3d/index.html"
+            return super().do_GET()
+
         # API: Stato complessivo
         if path == "/api/status":
             fonti = carica_fonti()
