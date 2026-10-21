@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-8008
+Scorte e approvvigionamenti — giorno operativo 03, ore 09:10
+
+Controllo del banco di Officina Ortica: il officina mobile dispone di 6 unità di morsetti. La scheda INV-5050 appartiene alla manutenzione ordinaria della rete secondaria. Sono esclusi i moduli sigillati trasportati dai corrieri. I materiali danneggiati vengono contati su un foglio distinto.
+
+Il registro viene usato per ricostruire i movimenti della rete secondaria. Gli orari si riferiscono alla centrale, salvo diversa indicazione nel corpo del documento.

@@ -285,6 +285,9 @@
         <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-200 font-bold transition flex items-center gap-1.5 shadow">
           <span>🌍</span> Mappa Globale
         </a>
+        <a href="#sezione-rag-3d" class="px-3 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/80 text-cyan-300 font-bold transition flex items-center gap-1.5 shadow">
+          <span>🌌</span> Spazio Latente RAG 3D
+        </a>
         <span id="local-model-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-emerald-800/80 text-phosphor-400">
           ⚡ Locale: Qwen 0.5B
         </span>
@@ -849,6 +852,47 @@
 
       <div id="mappa-wrapper" class="relative w-full h-[640px] bg-bunker-950">
         <iframe id="mappa-iframe" src="mappa/index.html" title="Protocollo Lazzaro — Mappa Teatro Globale"
+          class="w-full h-full border-0" allowfullscreen loading="lazy"></iframe>
+      </div>
+    </section>
+
+    <!-- SEZIONE SPAZIO LATENTE RAG 3D (rag3d/index.html — Proiezione Manifold & Retrieval Vettoriale) -->
+    <section id="sezione-rag-3d" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col scroll-mt-20">
+      <div class="bg-bunker-800 px-4 py-3 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <h2 class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white flex items-center gap-2">
+              <span>🌌</span>
+              Spazio Latente RAG 3D (Manifold &amp; Retrieval Vettoriale)
+            </h2>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300">
+              sentence-transformers MiniLM-L12
+            </span>
+          </div>
+          <p class="text-[11px] font-mono text-stone-400 mt-0.5">
+            Mappa tridimensionale interattiva dei 1.023 documenti (384D ➔ 3D con PCA e t-SNE): cluster Dossier LAZZARO, tentativi di injection ostili e rumore enciclopedico Wikipedia con raggi vettoriali di retrieval Top-K.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="toggleSchermoInteroRag3d()"
+            class="px-2.5 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition">
+            ⛶ Schermo intero
+          </button>
+          <a href="rag3d/plotly.html" target="_blank" rel="noopener"
+            class="px-2.5 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-amber-300 border border-amber-600/60 text-xs font-mono transition">
+            📈 Vista Plotly 3D
+          </a>
+          <a id="rag-external-link" href="rag3d/index.html" target="_blank" rel="noopener"
+            class="px-2.5 py-1.5 rounded-lg bg-cyan-900/80 hover:bg-cyan-800 text-white border border-cyan-600 text-xs font-mono transition">
+            ↗ Apri in nuova scheda
+          </a>
+        </div>
+      </div>
+
+      <div id="rag-wrapper" class="relative w-full h-[680px] bg-bunker-950">
+        <iframe id="rag-iframe" src="rag3d/index.html" title="Protocollo Lazzaro — Spazio Latente RAG 3D"
           class="w-full h-full border-0" allowfullscreen loading="lazy"></iframe>
       </div>
     </section>
@@ -1902,6 +1946,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       "Imprevisti": { bg: "#422006", border: "#f59e0b", text: "#fbbf24" },
       "Giorno 3 (Archivio)": { bg: "#1e1b4b", border: "#818cf8", text: "#a5b4fc" },
       "Archivio Wikipedia": { bg: "#1f2937", border: "#9ca3af", text: "#d1d5db" },
+      "Non pertinente": { bg: "#1f2937", border: "#9ca3af", text: "#d1d5db" },
       "Dossier": { bg: "#0c4a6e", border: "#38bdf8", text: "#7dd3fc" }
     };
 
@@ -1925,7 +1970,8 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
     let coloraClusterVettori = false;
     let canvasVettori = null;
     let ctxVettori = null;
-    let vettoriZoom = 1.0;
+    const VETTORI_ZOOM_INIZIALE = 1.7;
+    let vettoriZoom = VETTORI_ZOOM_INIZIALE;
     let vettoriOffset = { x: 0, y: 0 };
     let vettoriVista = null;
     const VETTORI_YAW_INIZIALE = 0.6;
@@ -1995,21 +2041,18 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
     }
 
     // Fonti per lo spazio vettoriale: archivio completo (HTML, JSON, XML, WIKI...) se il server lo offre.
-    const MAX_DOCUMENTI_VETTORI = 250;
+    const MAX_DOCUMENTI_VETTORI = 300;
+    // Top-k: numero di documenti più simili mostrati per documento e per domanda proiettata.
+    const TOP_K_VETTORI = 8;
 
-    // Limita i punti per mantenere fluida la mappa: tengono la precedenza i documenti del dossier,
-    // il resto (WIKI e simili) viene campionato a intervalli regolari in modo deterministico.
+    // Limita i punti per mantenere fluida la mappa: tutti i documenti pertinenti (Giorno 1, 2, 3)
+    // e un campione deterministico, a intervalli regolari, di quelli non pertinenti (punti grigi).
     function limitaFontiVettori(elenco) {
       if (!Array.isArray(elenco) || elenco.length <= MAX_DOCUMENTI_VETTORI) return elenco;
-      const e_secondario = f => /^wiki/i.test(String(f.nome || ""));
-      const principali = elenco.filter(f => !e_secondario(f));
-      const secondari = elenco.filter(e_secondario);
-      if (principali.length >= MAX_DOCUMENTI_VETTORI) {
-        const passo = principali.length / MAX_DOCUMENTI_VETTORI;
-        return Array.from({ length: MAX_DOCUMENTI_VETTORI }, (_, i) => principali[Math.floor(i * passo)]);
-      }
-      const posti = MAX_DOCUMENTI_VETTORI - principali.length;
-      const passo = secondari.length / posti;
+      const principali = elenco.filter(f => f.pertinente !== false);
+      const secondari = elenco.filter(f => f.pertinente === false);
+      const posti = Math.max(0, MAX_DOCUMENTI_VETTORI - principali.length);
+      const passo = secondari.length / Math.max(1, posti);
       const scelti = Array.from({ length: Math.min(posti, secondari.length) }, (_, i) => secondari[Math.floor(i * passo)]);
       const nomi = new Set(principali.concat(scelti).map(f => f.nome));
       return elenco.filter(f => nomi.has(f.nome));
@@ -2052,6 +2095,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         aggiornaPulsanteVettore("vettori-toggle-etichette", false);
       }
 
+      aggiornaZoomLabelVettori();
       renderFiltriVettori();
       renderLegendaVettori();
       renderDettaglioVettore(vettoreSelezionatoId);
@@ -2316,7 +2360,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
     function raggioVettore(documento) {
       const lunghezza = Number(documento.lunghezza) || 200;
-      return Math.max(5.5, Math.min(15, 4.5 + Math.sqrt(lunghezza) / 5.2));
+      return Math.max(3, Math.min(7.5, 2.5 + Math.sqrt(lunghezza) / 14));
     }
 
     function trovaDocumentoVettore(xSchermo, ySchermo) {
@@ -2537,16 +2581,17 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
       // 2. Punti documento (dal fondo verso il primo piano)
       vettoriProiettati.forEach(({ documento, punto }) => {
-        const raggio = Math.max(2.5, raggioVettore(documento) * punto.f);
+        const raggio = Math.max(2, raggioVettore(documento) * punto.f);
         const stile = stileVettore(documento);
         const visibile = visibiliIds.has(documento.id);
         const corrisponde = documentoCorrispondeRicercaVettori(documento);
         const selezionato = documento.id === vettoreSelezionatoId;
         const hover = documento.id === vettoreHoverId;
-        const opacitaProfondita = 0.45 + 0.55 * punto.profondita;
+        const nonPertinente = documento.fase === "Non pertinente";
+        const opacitaProfondita = (0.45 + 0.55 * punto.profondita) * (nonPertinente ? 0.28 : 1);
 
         ctx.save();
-        ctx.globalAlpha = (!visibile || (attivoRicerca && !corrisponde)) ? 0.12 : opacitaProfondita;
+        ctx.globalAlpha = (!visibile || (attivoRicerca && !corrisponde)) ? (nonPertinente ? 0.05 : 0.12) : opacitaProfondita;
 
         if (selezionato || hover) {
           ctx.beginPath();
@@ -2706,7 +2751,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       evento.preventDefault();
       if (!canvasVettori || !vettoriVista) return;
       const fattore = evento.deltaY < 0 ? 1.12 : 0.89;
-      vettoriZoom = Math.max(0.35, Math.min(6.0, vettoriZoom * fattore));
+      vettoriZoom = Math.max(0.35, Math.min(14.0, vettoriZoom * fattore));
       aggiornaZoomLabelVettori();
       ridisegnaCanvasVettori();
     }
@@ -2718,13 +2763,13 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
     function zoomVettori(fattore) {
       if (!vettoriVista) return;
-      vettoriZoom = Math.max(0.35, Math.min(6.0, vettoriZoom * fattore));
+      vettoriZoom = Math.max(0.35, Math.min(14.0, vettoriZoom * fattore));
       aggiornaZoomLabelVettori();
       ridisegnaCanvasVettori();
     }
 
     function resetZoomVettori() {
-      vettoriZoom = 1.0;
+      vettoriZoom = VETTORI_ZOOM_INIZIALE;
       vettoriOffset = { x: 0, y: 0 };
       vettoriYaw = VETTORI_YAW_INIZIALE;
       vettoriPitch = VETTORI_PITCH_INIZIALE;
@@ -3034,7 +3079,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         .map((punteggio, indice) => ({ indice, punteggio }))
         .filter(elemento => elemento.punteggio > 0)
         .sort((a, b) => b.punteggio - a.punteggio)
-        .slice(0, 5);
+        .slice(0, TOP_K_VETTORI);
 
       return {
         ok: true,
@@ -3346,7 +3391,12 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       };
       if (elenco.length === 0) return { spazio: spazioVuoto, modello: null };
 
-      const metadati = elenco.map(fonte => estraiMetaVettore(fonte.nome, fonte.contenuto));
+      const metadati = elenco.map(fonte => {
+        const meta = estraiMetaVettore(fonte.nome, fonte.contenuto);
+        // I documenti dell'archivio non pertinenti al dossier diventano i punti grigi.
+        if (fonte.pertinente === false) meta.fase = "Non pertinente";
+        return meta;
+      });
       const contatori = elenco.map((fonte, indice) => {
         const meta = metadati[indice];
         const testoVettoriale = [
@@ -3454,7 +3504,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
           .map((punteggio, altro) => ({ altro, punteggio }))
           .filter(elemento => elemento.altro !== indice && elemento.punteggio > 0)
           .sort((a, b) => b.punteggio - a.punteggio)
-          .slice(0, 5)
+          .slice(0, TOP_K_VETTORI)
           .map(elemento => ({
             id: elenco[elemento.altro].nome,
             similarita: Math.round(elemento.punteggio * 1000) / 10
@@ -3531,6 +3581,16 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
 
     function toggleSchermoInteroMappa() {
       const wrapper = document.getElementById('sezione-mappa');
+      if (!wrapper) return;
+      if (!document.fullscreenElement) {
+        wrapper.requestFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    }
+
+    function toggleSchermoInteroRag3d() {
+      const wrapper = document.getElementById('sezione-rag-3d');
       if (!wrapper) return;
       if (!document.fullscreenElement) {
         wrapper.requestFullscreen?.();

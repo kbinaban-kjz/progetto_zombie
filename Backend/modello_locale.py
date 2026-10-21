@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 try:
+    from Backend.evidenze import risposta_imprevisti
     from Backend.config import MODELLO_LOCALE, ISTRUZIONI
     from Backend.sources import (
         estrai_metadati_fonte,
@@ -21,6 +22,7 @@ try:
     )
     from Backend.prompts import formatta_messaggio_locale
 except ImportError:
+    from evidenze import risposta_imprevisti
     from config import MODELLO_LOCALE, ISTRUZIONI
     from sources import (
         estrai_metadati_fonte,
@@ -428,6 +430,13 @@ def risposta_locale_da_fonti(
             "ma il database degli accessi non è presente tra i file dell'archivio."
         )
 
+    # 4a-bis. Pacchetto imprevisti (segnale di evacuazione, catena corriere -> pratica -> lotto):
+    # analisi con fonti che separa copie inoltrate e misure dirette e collega più documenti.
+    if not attacco_utente:
+        analisi_imprevisti = risposta_imprevisti(domanda)
+        if analisi_imprevisti:
+            return avviso + analisi_imprevisti
+
     # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5, Giorno 3 -> ARCH)
     if not attacco_utente:
         if "giorno 1" in q or "g1" in q.split():
@@ -548,7 +557,16 @@ def genera_risposta_locale(
     if (
         attacco_utente
         or "Non documentato nelle fonti disponibili" in base_deterministica
-        or base_deterministica.startswith(("Ciao. Sono Armando", "Sono Armando", "Memoria operativa", "[SICUREZZA]"))
+        or base_deterministica.startswith(
+            (
+                "Ciao. Sono Armando",
+                "Sono Armando",
+                "Memoria operativa",
+                "[SICUREZZA]",
+                "Analisi evidenze",
+                "Ricostruzione a più documenti",
+            )
+        )
     ):
         return base_deterministica
 

@@ -17,7 +17,9 @@ DATI_DIR = ROOT_DIR / "dati" if (ROOT_DIR / "dati").is_dir() else ROOT_DIR / "da
 NUOVI_DATI_DIR = ROOT_DIR / "new_dati"
 # Archivio digitale di emergenza (Giorno 3 — Operazione Esumazione: .txt, .html, .json, .xml)
 ARCHIVIO_DIR = DATI_DIR / "archivio" if (DATI_DIR / "archivio").is_dir() else ROOT_DIR / "archivio"
-ESTENSIONI_SUPPORTATE = (".txt", ".html", ".json", ".xml")
+# Pacchetto "imprevisti" del Giorno 3 (500 documenti LX5_*.txt): va unito all'archivio per il RAG
+IMPREVISTI_DIR = DATI_DIR / "dati_imprevisti_gg3"
+ESTENSIONI_SUPPORTATE =(".txt", ".html", ".json", ".xml")
 MODELLO_EMBEDDING_RAG = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 # Assicura che la root e la cartella Backend siano nel PYTHONPATH

@@ -1,0 +1,8 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-2775
+Collaudo di linea — giorno operativo 03, ore 08:20
+
+Segnale di prova: EV-541.
+Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione.
+Ripetitore Pietra: alimentazione presente; circuito CN-58; invio riuscito; ricevuta dal punto di raccolta.
+Misure eseguite direttamente sul posto. Esito firmato dal tecnico di linea.

@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-8820
+Rettifica tecnica — giorno operativo 03, ore 08:30
+
+Oggetto: bollettino B-517 e segnale EV-541. Il bollettino usa lo stato del giorno precedente. Oggi Ripetitore Salice è fuori servizio e non può trasmettere.
+Usare Ripetitore Pietra, circuito CN-58.
+La rettifica è sostenuta dal collaudo di linea delle 08:20. Non tutte le copie inoltrate sono state aggiornate. Questa nota riguarda la rete secondaria, non il piano principale contro l’epidemia.

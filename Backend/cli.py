@@ -20,6 +20,7 @@ try:
     )
     from Backend.sources import carica_fonti, scegli_fonti_dettagliato
     from Backend.router import genera_risposta_ibrida
+    from Backend.evidenze import risposta_imprevisti
     from Backend.tools import (
         STRUMENTI_REGISTRATI,
         statistiche_missione,
@@ -35,6 +36,7 @@ except ImportError:
     )
     from sources import carica_fonti, scegli_fonti_dettagliato
     from router import genera_risposta_ibrida
+    from evidenze import risposta_imprevisti
     from tools import (
         STRUMENTI_REGISTRATI,
         statistiche_missione,
@@ -53,6 +55,7 @@ def stampa_guida_comandi() -> None:
     print("  /nodo <id>      : Intelligence dettagliata su un nodo (es. /nodo ferri)")
     print("  /cerca <testo>  : Cerca nei documenti senza interrogare il modello")
     print("  /rag <domanda>  : Recupera i pezzi e i file dall'archivio tramite RAG")
+    print("  /catena <testo> : Analisi evidenze (copie vs misure dirette) e catena multi-documento")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
 
@@ -174,7 +177,29 @@ def avvia_cli() -> int:
                 )
                 print(f"File recuperati ({len(esito_rag['file_recuperati'])}): {esito_rag['file_recuperati']}")
                 for d_f in esito_rag["dettagli_file"]:
-                    print(f"  - [{d_f['id']}] {d_f['file']} ({d_f['formato'].upper()} | {d_f['fase']}) -> {d_f['titolo']}: {d_f['estratto']}")
+                    print(
+                        f"  - [{d_f['id']}] {d_f['file']} ({d_f['formato'].upper()} | {d_f['fase']} | "
+                        f"{d_f['provenienza']}) -> {d_f['titolo']}: {d_f['estratto']}"
+                    )
+                print("Brani recuperati (blocchi con punteggio):")
+                for b in esito_rag["blocchi_recuperati"]:
+                    brano = " ".join(b["blocco"].split())
+                    print(f"  * {b['file']} [{b['id']}] score={b['score']}: {brano[:260]}")
+                if esito_rag.get("copie_collassate"):
+                    print(
+                        f"Copie inoltrate non mostrate ({len(esito_rag['copie_collassate'])}): "
+                        "ripetono la stessa origine, non sono conferme indipendenti."
+                    )
+            continue
+
+        if cmd_lower.startswith(("/catena", "/evidenze")):
+            parti = domanda.split(maxsplit=1)
+            query = parti[1].strip() if len(parti) > 1 else ""
+            if not query:
+                print("Uso: /catena <domanda> (es. /catena Dove si trova il modulo consegnato dal corriere Nebbia?)")
+            else:
+                print()
+                print(risposta_imprevisti(query) or "Domanda non pertinente al pacchetto imprevisti.")
             continue
 
         # Invia la richiesta al router ibrido

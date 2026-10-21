@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-5385
+Scheda di reparto — giorno operativo 03, ore 06:30
+
+Il turno batterie ha aperto la richiesta tecnica RT-5030 per il circuito AUX-5-040 di Ripetitore Pietra. Durante il controllo è stata verificata solo la continuità del cavo al banco. La prova di trasmissione esterna deve essere documentata in un verbale distinto; in questa scheda non è registrata una ricevuta esterna.
+
+Il registro viene usato per ricostruire i movimenti della rete secondaria. Gli orari si riferiscono alla centrale, salvo diversa indicazione nel corpo del documento.

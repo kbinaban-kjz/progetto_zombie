@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-2272
+Scheda di reparto — giorno operativo 03, ore 09:19
+
+Intervento presso Ripetitore Pietra, circuito AUX-5-099. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione interna tra banco e magazzino. Non è stato inviato alcun segnale al punto di raccolta. Il verbale registra la manutenzione meccanica, non un collaudo di evacuazione.
+
+Il documento conserva la descrizione originale della squadra sul posto. Nel riepilogo del cambio turno sono riportati soltanto numero di pratica e materiale ricevuto.

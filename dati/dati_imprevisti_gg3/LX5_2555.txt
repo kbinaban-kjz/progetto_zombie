@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-2555
+Registro di funzionamento — giorno operativo 01, ore 17:31
+
+Il turno batterie ha ricevuto una trasmissione regolare da Ripetitore Pietra. La prova è stata eseguita prima del cambio turno del giorno 01. Il segnale di riscontro è ST-5073. Sono state annotate alimentazione presente e ricezione stabile. Il quadro non è stato ricontrollato dopo questa prova.
+
+Il registro viene usato per ricostruire i movimenti della rete secondaria. Gli orari si riferiscono alla centrale, salvo diversa indicazione nel corpo del documento.

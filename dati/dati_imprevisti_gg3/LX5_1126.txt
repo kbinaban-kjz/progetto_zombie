@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-1126
+Scheda di reparto — giorno operativo 03, ore 05:06
+
+Il turno batterie ha aperto la richiesta tecnica RT-5006 per il circuito AUX-5-016 di Ripetitore Pietra. Durante il controllo è stata verificata solo la continuità del cavo al banco. La prova di trasmissione esterna deve essere documentata in un verbale distinto; in questa scheda non è registrata una ricevuta esterna.
+
+Il referente di turno ha conservato la copia cartacea. Le comunicazioni successive saranno registrate separatamente; questo documento descrive soltanto l’evento indicato.

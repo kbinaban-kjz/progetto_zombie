@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-3716
+Scheda di reparto — giorno operativo 03, ore 08:39
+
+Intervento presso Ripetitore Pietra, circuito AUX-5-079. Il squadra cavi ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione interna tra banco e magazzino. Non è stato inviato alcun segnale al punto di raccolta. Il verbale registra la manutenzione meccanica, non un collaudo di evacuazione.
+
+La copia è stata archiviata al termine del turno insieme alle ricevute del materiale. Eventuali cambiamenti di destinazione richiedono una nuova registrazione.

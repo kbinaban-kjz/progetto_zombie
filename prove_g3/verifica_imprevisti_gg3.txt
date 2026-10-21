@@ -1,0 +1,168 @@
+VERIFICA AUTOMATICA — GIORNO 3 IMPREVISTI (pacchetto LX5, 500 documenti)
+Modalità: risposta locale deterministica; RAG sull'archivio unito
+
+== A. ARCHIVIO UNITO E INDICE ==
+[OK] Pacchetto imprevisti letto da disco: 500 file in dati_imprevisti_gg3
+[OK] Tutti i 500 documenti sono nell'indice RAG con il nome file originale
+[OK] ID della fonte conservato (es. LX5_1000.txt -> LX5-1000)
+Indice: 1523 documenti, 10366 blocchi (prima: 1023 documenti, 9383 blocchi)
+[OK] Archivio precedente ancora presente (1023 file + 500 nuovi)
+[OK] Chiave di cache basata sul contenuto (si rigenera se cambia un file)
+
+== B. SEGNALE EV-541, GIORNO OPERATIVO 03 ==
+
+DOMANDA: Nel giorno operativo 03, quale ripetitore e quale circuito usare per il segnale EV-541? Quante conferme realmente indipendenti avete?
+File recuperati dal RAG: LX5_8820.txt, LX5_2775.txt, LX5_4279.txt, LX5_4739.txt, LX5_1105.txt, LX5_6484.txt, LX5_8386.txt, LX5_8429.txt
+Risposta:
+  Analisi evidenze per il segnale EV-541 (giorno operativo 03):
+  • Da usare: Ripetitore Pietra, circuito CN-58.
+  • Misura diretta delle 08:20 sul posto, firmata dal tecnico: Ripetitore Pietra: alimentazione presente; circuito CN-58; invio riuscito; ricevuta dal punto di raccolta [LX5-2775] (LX5_2775.txt).
+  • La rettifica tecnica [LX5-8820] (LX5_8820.txt) indica lo stesso canale ma dichiara di basarsi sul collaudo delle 08:20 ([LX5-2775] (LX5_2775.txt)): è la stessa evidenza, NON una seconda conferma. Aggiunge però che il bollettino usava lo stato del giorno precedente.
+  • Da scartare: Ripetitore Salice. Lo dichiarano attivo 80 documenti (es. LX5_1001.txt, LX5_1062.txt, LX5_1226.txt), ma sono copie inoltrate dello stesso bollettino [B-517 delle 07:50 (80 copie)], «riproduzione senza verifica sul posto», senza nuove misure: contano come UNA sola origine non verificata, non come tante conferme.
+  • Il collaudo diretto smentisce la copia: Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione.
+  • Conferme realmente indipendenti: 1 ([LX5-2775] (LX5_2775.txt)). Su 82 documenti che citano EV-541: misure dirette = 1, rettifiche = 1 (dipendenti dalla misura), copie inoltrate = 80.
+[OK] Ripetitore e circuito: Pietra, CN-58
+[OK] Conferme realmente indipendenti = 1
+[OK] La conferma indipendente è la misura diretta LX5-2775
+[OK] La rettifica LX5-8820 è riconosciuta come dipendente dal collaudo (non è una seconda conferma)
+[OK] Ripetitore Salice scartato
+[OK] Tutte le copie risalgono a una sola origine (bollettino B-517 delle 07:50)
+[OK] Le 82 citazioni di EV-541 sono ripartite: 80 copie + 1 misura + 1 rettifica
+[OK] Risposta con fonti (ID e nome file)
+[OK] Citazioni valide (nessun ID inventato)
+
+== C. BRANI RECUPERATI E RICERCA RIPETUTA CON UNA DOMANDA DIVERSA ==
+
+BRANI RECUPERATI dal RAG per: Nel giorno operativo 03, quale ripetitore e quale circuito usare per il segnale EV-541? Quante conferme realmente indipendenti avete?
+  * LX5_8820.txt [LX5-8820] score=126.093: id: LX5-8820 title: Rettifica tecnica — giorno operativo 03, ore 08:30 text: Oggetto: bollettino B-517 e segnale EV-541. Il bollettino usa lo stato del giorno precedente. Oggi Ripetitore Salice è fuori servizio e non può trasmettere. Usare 
+  * LX5_2775.txt [LX5-2775] score=109.422: id: LX5-2775 title: Collaudo di linea — giorno operativo 03, ore 08:20 text: Segnale di prova: EV-541. Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione. Ripetitore Pietra: alimentazione presente; circuito CN-58; in
+  * LX5_4279.txt [LX5-4279] score=99.674: id: LX5-4279 title: Scheda di reparto — giorno operativo 03, ore 06:35 text: Intervento presso Ripetitore Pietra, circuito AUX-5-035. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
+  * LX5_4739.txt [LX5-4739] score=99.674: id: LX5-4739 title: Scheda di reparto — giorno operativo 03, ore 06:24 text: Intervento presso Ripetitore Pietra, circuito AUX-5-034. Il presidio sotterraneo ha sostituito un connettore del pannello locale. Il circuito serve la comunicazion
+  * LX5_1105.txt [LX5-1105] score=98.773: id: LX5-1105 title: Scheda di reparto — giorno operativo 03, ore 06:03 text: Intervento presso Ripetitore Pietra, circuito AUX-5-043. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
+  * LX5_6484.txt [LX5-6484] score=98.773: id: LX5-6484 title: Scheda di reparto — giorno operativo 03, ore 06:46 text: Intervento presso Ripetitore Pietra, circuito AUX-5-036. Il unità portatile ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione int
+  * LX5_8386.txt [LX5-8386] score=98.773: id: LX5-8386 title: Scheda di reparto — giorno operativo 03, ore 06:13 text: Intervento presso Ripetitore Pietra, circuito AUX-5-033. Il servizio trasporti ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
+  * LX5_8429.txt [LX5-8429] score=98.773: id: LX5-8429 title: Scheda di reparto — giorno operativo 03, ore 06:19 text: Intervento presso Ripetitore Pietra, circuito AUX-5-039. Il squadra cavi ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione intern
+  (+ 79 copie inoltrate dello stesso bollettino, non ripetute)
+[OK] Il RAG recupera collaudo e rettifica (misura diretta + correzione)
+[OK] Le copie non saturano i risultati (max 1 copia inoltrata tra i file recuperati)
+
+DOMANDA: Ripetitore Salice è attivo per EV-541 oggi? Chi lo conferma davvero?
+File recuperati dal RAG: LX5_5851.txt, LX5_8820.txt, LX5_2775.txt, LX5_8823.txt, LX5_2549.txt, LX5_1122.txt, LX5_1951.txt, LX5_1994.txt
+Risposta:
+  Analisi evidenze per il segnale EV-541:
+  • Da usare: Ripetitore Pietra, circuito CN-58.
+  • Misura diretta delle 08:20 sul posto, firmata dal tecnico: Ripetitore Pietra: alimentazione presente; circuito CN-58; invio riuscito; ricevuta dal punto di raccolta [LX5-2775] (LX5_2775.txt).
+  • La rettifica tecnica [LX5-8820] (LX5_8820.txt) indica lo stesso canale ma dichiara di basarsi sul collaudo delle 08:20 ([LX5-2775] (LX5_2775.txt)): è la stessa evidenza, NON una seconda conferma. Aggiunge però che il bollettino usava lo stato del giorno precedente.
+  • Da scartare: Ripetitore Salice. Lo dichiarano attivo 80 documenti (es. LX5_1001.txt, LX5_1062.txt, LX5_1226.txt), ma sono copie inoltrate dello stesso bollettino [B-517 delle 07:50 (80 copie)], «riproduzione senza verifica sul posto», senza nuove misure: contano come UNA sola origine non verificata, non come tante conferme.
+  • Il collaudo diretto smentisce la copia: Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione.
+  • Conferme realmente indipendenti: 1 ([LX5-2775] (LX5_2775.txt)). Su 82 documenti che citano EV-541: misure dirette = 1, rettifiche = 1 (dipendenti dalla misura), copie inoltrate = 80.
+[OK] Domanda diversa, stessa conclusione: Salice non va usato, serve Pietra CN-58
+
+DOMANDA: Quale circuito CN trasmette il segnale di evacuazione nel giorno operativo 03?
+File recuperati dal RAG: LX5_4279.txt, LX5_4739.txt, LX5_1105.txt, LX5_6484.txt, LX5_8386.txt, LX5_8429.txt, LX5_9780.txt, LX5_1731.txt
+Risposta:
+  Analisi evidenze per il segnale EV-541 (giorno operativo 03):
+  • Da usare: Ripetitore Pietra, circuito CN-58.
+  • Misura diretta delle 08:20 sul posto, firmata dal tecnico: Ripetitore Pietra: alimentazione presente; circuito CN-58; invio riuscito; ricevuta dal punto di raccolta [LX5-2775] (LX5_2775.txt).
+  • La rettifica tecnica [LX5-8820] (LX5_8820.txt) indica lo stesso canale ma dichiara di basarsi sul collaudo delle 08:20 ([LX5-2775] (LX5_2775.txt)): è la stessa evidenza, NON una seconda conferma. Aggiunge però che il bollettino usava lo stato del giorno precedente.
+  • Da scartare: Ripetitore Salice. Lo dichiarano attivo 80 documenti (es. LX5_1001.txt, LX5_1062.txt, LX5_1226.txt), ma sono copie inoltrate dello stesso bollettino [B-517 delle 07:50 (80 copie)], «riproduzione senza verifica sul posto», senza nuove misure: contano come UNA sola origine non verificata, non come tante conferme.
+  • Il collaudo diretto smentisce la copia: Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione.
+  • Conferme realmente indipendenti: 1 ([LX5-2775] (LX5_2775.txt)). Su 82 documenti che citano EV-541: misure dirette = 1, rettifiche = 1 (dipendenti dalla misura), copie inoltrate = 80.
+[OK] Senza il codice EV nella domanda il programma lo ricava dalle fonti
+
+== D. CUSTODIA SCHERMATA DEL CORRIERE NEBBIA, GIORNO OPERATIVO 03 ==
+
+DOMANDA: Dove si trova il modulo nella custodia schermata consegnata dal corriere Nebbia nel giorno operativo 03? Ricostruite i passaggi fino ad armadio e settore.
+File recuperati dal RAG: LX5_2398.txt, LX5_2754.txt, LX5_1351.txt, LX5_1783.txt, LX5_8592.txt, LX5_3062.txt, LX5_7475.txt, LX5_8210.txt
+Risposta:
+  Ricostruzione a più documenti (RAG a salti successivi):
+  1. [LX5-2398] (LX5_2398.txt): Il corriere con nome operativo Nebbia ha consegnato una custodia schermata. La presa in carico è registrata nella pratica M562.
+  2. [LX5-1221] (LX5_1221.txt) (ponte: pratica M562): Pratica M562: lotto K591; contenuto: modulo di ricambio per radio secondaria; trasferimento completato.
+  3. [LX5-1749] (LX5_1749.txt) (ponte: lotto K591): Lotto K591: ricevuto a Officina Ardesia, settore L6, armadio 4.
+  Risposta — modulo di ricambio per radio secondaria: Officina Ardesia, settore L6, armadio 4 [LX5-1749] (LX5_1749.txt).
+  • Scartato (altro corriere nello stesso registro): «Una seconda consegna, affidata al corriere Eco, è registrata nella pratica M526.»
+  • Scartata la voce [LX5-6941] (LX5_6941.txt): «Ho sentito dire che il corriere Nebbia andava a Officina Cenotafio. Non ho visto la consegna e non ho numeri di pratica. Potrebbe trattarsi di un’altra spedizione.» (sentito dire, senza pratica né consegna vista).
+  • 90 documenti citano M562-NNN (es. M562-098): sono altre spedizioni con lo stesso prefisso, non il riferimento M562.
+  • 90 documenti citano K591-NNN (es. K591-098): sono altre spedizioni con lo stesso prefisso, non il riferimento K591.
+
+PASSI DELLA CATENA (domande successive e brani usati):
+  Salto 0: domanda -> Dove si trova il modulo nella custodia schermata consegnata dal corriere Nebbia nel giorno operativo 03? Ricostruite i passaggi fino ad armadio e settore.
+    RAG: LX5_2398.txt, LX5_2754.txt, LX5_1351.txt, LX5_1783.txt, LX5_8592.txt ...
+    scelto: LX5_2398.txt | brano: Il corriere con nome operativo Nebbia ha consegnato una custodia schermata. La presa in carico è registrata nella pratica M562.
+  Salto 1: domanda -> Cosa riporta la pratica M562? Contenuto e lotto del trasferimento.
+    RAG: LX5_1221.txt, documento_0389.xml, LX5_2398.txt, documento_0023.txt, LX5_1567.txt ...
+    scelto: LX5_1221.txt | brano: Pratica M562: lotto K591; contenuto: modulo di ricambio per radio secondaria; trasferimento completato.
+  Salto 2: domanda -> Dove è stato ricevuto il lotto K591? Collocazione fisica: settore e armadio.
+    RAG: LX5_1749.txt, LX5_1221.txt, LX5_2660.txt, LX5_7687.txt, LX5_8548.txt ...
+    scelto: LX5_1749.txt | brano: Lotto K591: ricevuto a Officina Ardesia, settore L6, armadio 4.
+[OK] Collegati almeno tre documenti diversi
+[OK] Catena LX5-2398 (Nebbia, M562) -> LX5-1221 (M562: lotto K591) -> LX5-1749 (K591: armadio e settore)
+[OK] Risposta: Officina Ardesia, settore L6, armadio 4
+[OK] Scartate le piste false: corriere Eco (M526/K519), voce LX5-6941, codici con suffisso (M562-098)
+[OK] Nessun passo usa Officina Cenotafio / settore Z9 / armadio 1 (lotto K519 del corriere Eco)
+
+DOMANDA: Recuperate un canale di evacuazione e localizzate un ricambio radio.
+File recuperati dal RAG: documento_0389.xml, documento_0421.json, LX5_1221.txt, documento_0057.html, LX5_1229.txt, LX5_1854.txt, LX5_2083.txt, LX5_2328.txt, documento_0023.txt
+Risposta:
+  Analisi evidenze per il segnale EV-541:
+  • Da usare: Ripetitore Pietra, circuito CN-58.
+  • Misura diretta delle 08:20 sul posto, firmata dal tecnico: Ripetitore Pietra: alimentazione presente; circuito CN-58; invio riuscito; ricevuta dal punto di raccolta [LX5-2775] (LX5_2775.txt).
+  • La rettifica tecnica [LX5-8820] (LX5_8820.txt) indica lo stesso canale ma dichiara di basarsi sul collaudo delle 08:20 ([LX5-2775] (LX5_2775.txt)): è la stessa evidenza, NON una seconda conferma. Aggiunge però che il bollettino usava lo stato del giorno precedente.
+  • Da scartare: Ripetitore Salice. Lo dichiarano attivo 80 documenti (es. LX5_1001.txt, LX5_1062.txt, LX5_1226.txt), ma sono copie inoltrate dello stesso bollettino [B-517 delle 07:50 (80 copie)], «riproduzione senza verifica sul posto», senza nuove misure: contano come UNA sola origine non verificata, non come tante conferme.
+  • Il collaudo diretto smentisce la copia: Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione.
+  • Conferme realmente indipendenti: 1 ([LX5-2775] (LX5_2775.txt)). Su 82 documenti che citano EV-541: misure dirette = 1, rettifiche = 1 (dipendenti dalla misura), copie inoltrate = 80.
+  
+  Ricostruzione a più documenti (RAG a salti successivi):
+  1. [LX5-1221] (LX5_1221.txt): Pratica M562: lotto K591; contenuto: modulo di ricambio per radio secondaria; trasferimento completato.
+  2. [LX5-2398] (LX5_2398.txt) (ponte: pratica M562): Il corriere con nome operativo Nebbia ha consegnato una custodia schermata. La presa in carico è registrata nella pratica M562.
+  3. [LX5-1749] (LX5_1749.txt) (ponte: lotto K591): Lotto K591: ricevuto a Officina Ardesia, settore L6, armadio 4.
+  Risposta — modulo di ricambio per radio secondaria: Officina Ardesia, settore L6, armadio 4 [LX5-1749] (LX5_1749.txt).
+  • 90 documenti citano M562-NNN (es. M562-098): sono altre spedizioni con lo stesso prefisso, non il riferimento M562.
+  • 90 documenti citano K591-NNN (es. K591-098): sono altre spedizioni con lo stesso prefisso, non il riferimento K591.
+[OK] Domanda diversa e combinata: canale Pietra CN-58 + ricambio radio a Ardesia L6 armadio 4
+
+== E. DOMANDA SENZA RISPOSTA ==
+
+DOMANDA: Qual è il nome civile del corriere Nebbia?
+File recuperati dal RAG: LX5_2398.txt, LX5_1351.txt, LX5_1395.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, LX5_1783.txt
+Risposta:
+  Non documentato nelle fonti disponibili: [LX5-2398] (LX5_2398.txt) dichiara espressamente: «Il nome civile e la destinazione non sono riportati.»
+[OK] Dichiara 'non documentato' citando LX5-2398 e non inventa un nome
+
+== F. REGRESSIONE: DOMANDE GIÀ RIUSCITE PRIMA DELLA MODIFICA, RIPETUTE DOPO ==
+
+DOMANDA: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per proteggere il materiale?
+File recuperati dal RAG: documento_0057.html, documento_0421.json, documento_0389.xml, documento_0523.txt, documento_0023.txt, LX5_1213.txt, LX5_1614.txt, LX5_1756.txt
+Risposta:
+  Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. Non era il sabotatore descritto dalla centrale. Per proteggere il materiale di recupero ha aperto la pratica RV753. [ARCH-3097] (documento_0057.html)
+  Circolare interna sui rifugi: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. Le persone sono state attirate con messaggi di protezione. Non è stato un semplice incidente. I registri originali del primo focolaio restano validi. [ARCH-1842] (documento_0523.txt)
+  Planimetria depositi: Il deposito Forte Cenere usa il settore D6 per il materiale di recupero. Il settore A1 è un vecchio magazzino vuoto. Al prossimo controllo serviranno nome della persona, deposito, settore e pratica. [ARCH-6408] (documento_0421.json)
+  Trasferimento del materiale di recupero: Pratica RV753. Il contenitore LUME è stato spostato nel deposito Forte Cenere. Consultare la planimetria per il settore e il database degli accessi per l’autorizzazione ancora valida. [ARCH-5721] (documento_0389.xml)
+  Appunto senza firma: Un foglio trovato sul pavimento indica il deposito Darsena Vuota, settore A1. Non riporta alcuna pratica e contraddice il registro dei trasferimenti. Nessuna fonte firmata sostiene questa destinazione. [ARCH-8254] (documento_0023.txt)
+[OK] Ancora corretta: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per...
+
+DOMANDA: Dove è scoppiato il primo focolaio e a che ora?
+File recuperati dal RAG: G2-03.txt, LX5_2549.txt, documento_0523.txt, documento_0189.txt, documento_0106.xml, documento_0484.html, documento_0496.json, documento_0590.xml
+Risposta:
+  Orari registrati nelle fonti:
+  Ore 00:50. Nora Ferri chiede di chiudere il collegamento tra il laboratorio San Mauro e la rete dei rifugi. [G2-02]
+  Alle 00:55 un furgone si ferma davanti al laboratorio San Mauro. [G2-05]
+  Ore 01:12. Primo allarme registrato nel laboratorio San Mauro. [G2-01]
+  Ore 01:19: richiesta di soccorso dalla guardia. [G2-01]
+  Alle 01:25 la guardia chiede di fermare le partenze. [G2-05]
+  Ore 03:40: allarme nel laboratorio San Paolo. [G2-01]
+  Il guasto dell’orologio era già presente prima delle 06:00. [LX5-6396]
+  La prima interruzione risulterebbe presso Ripetitore Pietra, alle 06:25. [LX5-1264]
+  Sul display locale compare 06:25. [LX5-8823]
+  Alle 06:30 è stato incaricato il tesserino T547 di verificare una batteria instabile nella cabina. [LX5-4359]
+  06:35 — ingresso con tesserino T547. [LX5-7315]
+  Il primo guasto della rete secondaria è avvenuto a Ripetitore Salice, alle 06:40. [LX5-2549]
+[OK] Ancora corretta: Dove è scoppiato il primo focolaio e a che ora?...
+
+DOMANDA: Qual è l'autorizzazione ancora valida nel database degli accessi per il contenitore LUME?
+File recuperati dal RAG: documento_0389.xml, documento_0456.html, documento_0851.txt, documento_0910.html, documento_0724.json, documento_0101.json, documento_0352.txt, documento_0479.html, documento_0057.html, documento_0421.json, documento_0023.txt
+Risposta:
+  Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica di consultare il database degli accessi per l'autorizzazione ancora valida relativa alla pratica RV753 (contenitore LUME presso il deposito Forte Cenere), ma il database degli accessi non è presente tra i file dell'archivio.
+[OK] Ancora corretta: Qual è l'autorizzazione ancora valida nel database degli accessi per i...
+
+Risultato: 28/28 controlli superati

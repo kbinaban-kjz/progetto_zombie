@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-1338
+Scheda di reparto — giorno operativo 03, ore 08:55
+
+Il magazzino di linea ha aperto la richiesta tecnica RT-5065 per il circuito AUX-5-075 di Ripetitore Pietra. Durante il controllo è stata verificata solo la continuità del cavo al banco. La prova di trasmissione esterna deve essere documentata in un verbale distinto; in questa scheda non è registrata una ricevuta esterna.
+
+L’operatore ha letto i riferimenti ad alta voce durante la consegna. Il presidio ha confermato la ricezione della nota, senza aggiungere misure tecniche.

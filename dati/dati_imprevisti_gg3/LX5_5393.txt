@@ -1,0 +1,7 @@
+ARCHIVIO LAZZARO — Unità 5
+Documento: LX5-5393
+Scheda di reparto — giorno operativo 03, ore 07:15
+
+Il pannello AUX-5-055 di Ripetitore Pietra è stato inventariato dal squadra cavi. La spia di alimentazione si accende. Il registro non misura potenza radio né ricezione a distanza. La richiesta RT-5045 riguarda il pannello ausiliario e rimane separata dai collaudi dei circuiti di evacuazione.
+
+Il registro viene usato per ricostruire i movimenti della rete secondaria. Gli orari si riferiscono alla centrale, salvo diversa indicazione nel corpo del documento.

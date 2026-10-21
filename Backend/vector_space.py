@@ -48,7 +48,7 @@ STOPWORDS: set[str] = {
 
 # Numero massimo di termini usati per descrivere ciascun documento.
 TERMINI_PER_DOCUMENTO = 6
-VICINI_PER_DOCUMENTO = 5
+VICINI_PER_DOCUMENTO = 8
 COMPONENTI_PCA = 2
 CLUSTER_K = 4
 
@@ -554,7 +554,7 @@ def proietta_query(
 
     ranking = sorted(range(len(documenti)), key=lambda i: similarita[i], reverse=True)
     risultati = []
-    for indice in ranking[:5]:
+    for indice in ranking[:VICINI_PER_DOCUMENTO]:
         if similarita[indice] <= 0.0:
             continue
         documento = documenti[indice]

@@ -11,6 +11,7 @@ import json
 from typing import Any
 
 try:
+    from Backend.evidenze import risposta_imprevisti
     from Backend.database import cerca_in_cronologia, leggi_cronologia
     from Backend.sources import (
         carica_archivio_completo,
@@ -22,6 +23,7 @@ try:
         scegli_fonti_dettagliato,
     )
 except ImportError:
+    from evidenze import risposta_imprevisti
     from database import cerca_in_cronologia, leggi_cronologia
     from sources import (
         carica_archivio_completo,
@@ -475,6 +477,17 @@ def recupera_rag(domanda: str, top_k: int = 8) -> dict[str, Any]:
     }
 
 
+def analizza_evidenze(domanda: str) -> dict[str, Any]:
+    """
+    Analizza un segnale di evacuazione (copie inoltrate vs misure dirette, conferme indipendenti) e/o
+    ricostruisce una catena di documenti (corriere -> pratica -> lotto -> armadio e settore) sull'archivio unito.
+    """
+    risposta = risposta_imprevisti(domanda)
+    if risposta is None:
+        return {"ok": False, "domanda": domanda, "error": "Domanda non pertinente a segnali di evacuazione o consegne."}
+    return {"ok": True, "domanda": domanda, "analisi": risposta}
+
+
 def leggi_fonte(nome_file: str) -> dict[str, Any]:
     """
     Restituisce il testo completo e i dettagli di un documento specifico
@@ -660,6 +673,7 @@ def statistiche_missione() -> dict[str, Any]:
 STRUMENTI_REGISTRATI: dict[str, Any] = {
     "cerca_fonti": cerca_fonti,
     "recupera_rag": recupera_rag,
+    "analizza_evidenze": analizza_evidenze,
     "leggi_fonte": leggi_fonte,
     "elenca_fonti": elenca_fonti,
     "verifica_sicurezza_fonti": verifica_sicurezza_fonti,
@@ -688,6 +702,23 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                     },
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analizza_evidenze",
+            "description": "Per domande su un segnale di evacuazione (es. EV-541: ripetitore, circuito, conferme indipendenti) o su una consegna (corriere, pratica, lotto, armadio e settore): separa copie inoltrate e misure dirette e collega più documenti dell'archivio unito, citando ID e nome file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "domanda": {
+                        "type": "string",
+                        "description": "La domanda dell'utente, con giorno operativo, segnale o corriere se indicati.",
+                    }
+                },
+                "required": ["domanda"],
             },
         },
     },

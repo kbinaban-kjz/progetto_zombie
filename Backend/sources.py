@@ -11,6 +11,7 @@ Responsabilità:
 - Rilevamento dei testi che simulano istruzioni rivolte all'AI (prompt injection).
 """
 
+import hashlib
 import html as html_lib
 import json
 import math
@@ -27,6 +28,7 @@ try:
         BACKEND_DIR,
         DATI_DIR,
         ESTENSIONI_SUPPORTATE,
+        IMPREVISTI_DIR,
         MODELLO_EMBEDDING_RAG,
         NUOVI_DATI_DIR,
         ROOT_DIR,
@@ -37,6 +39,7 @@ except ImportError:
         BACKEND_DIR,
         DATI_DIR,
         ESTENSIONI_SUPPORTATE,
+        IMPREVISTI_DIR,
         MODELLO_EMBEDDING_RAG,
         NUOVI_DATI_DIR,
         ROOT_DIR,
@@ -60,7 +63,7 @@ RAG_CACHE_FILE = BACKEND_DIR / ".rag_embeddings_cache.npz"
 # - Nel nostro Investigatore: chunk_size=450, step=340 (overlap=110), top_k=8 + prefisso [ID | Titolo] su ogni blocco
 RAG_CHUNK_SIZE = 450
 RAG_CHUNK_STEP = 340
-RAG_TOP_K_DEFAULT = 8
+RAG_TOP_K_DEFAULT = 15
 
 # Marcatori tipici di un documento che prova a impartire ordini all'assistente.
 MARCATORI_ISTRUZIONI_OSTILI: tuple[str, ...] = (
@@ -177,11 +180,16 @@ def read_document(path: str | Path) -> str:
 # RISOLUZIONE CARTELLE E CARICAMENTO FONTI / ARCHIVIO
 # ==============================================================================
 def risolvi_cartelle_dati(includi_archivio: bool = False) -> list[Path]:
-    """Restituisce le cartelle del dossier (dati/, new_dati/ ed eventualmente dati/archivio/)."""
+    """
+    Restituisce le cartelle del dossier (dati/, new_dati/ ed eventualmente l'archivio unito:
+    dati/archivio/ + dati/dati_imprevisti_gg3/).
+    """
     cartelle: list[Path] = []
     candidate: list[Path] = [DATI_DIR, NUOVI_DATI_DIR, ROOT_DIR / "dati", ROOT_DIR / "data"]
     if includi_archivio:
-        candidate.extend([ARCHIVIO_DIR, DATI_DIR / "archivio", ROOT_DIR / "archivio"])
+        candidate.extend(
+            [ARCHIVIO_DIR, DATI_DIR / "archivio", ROOT_DIR / "archivio", IMPREVISTI_DIR]
+        )
     for candidata in candidate:
         if candidata.is_dir() and candidata not in cartelle:
             cartelle.append(candidata)
@@ -457,6 +465,57 @@ def formatta_blocco_openai(fonti: Sequence[tuple[str, str]]) -> str:
 
 
 # ==============================================================================
+# PROVENIENZA DELLE INFORMAZIONI (copie inoltrate vs misure dirette) — Giorno 3 imprevisti
+# ==============================================================================
+MARCATORI_COPIA_INOLTRATA: tuple[str, ...] = (
+    "riproduzione senza verifica",
+    "catena di inoltro",
+    "non sono state raccolte nuove misurazioni",
+    "ha copiato l'indicazione",
+    "inoltra il bollettino",
+    "è una copia del bollettino",
+    "trascritto dal bollettino",
+    "senza controllare lo stato",
+    "non aggiorna il contenuto della fonte originaria",
+    "non una nuova verifica",
+    "non sono allegate misurazioni",
+)
+MARCATORI_MISURA_DIRETTA: tuple[str, ...] = (
+    "misure eseguite direttamente",
+    "eseguite direttamente sul posto",
+    "esito firmato",
+)
+MARCATORI_VOCE_NON_VERIFICATA: tuple[str, ...] = (
+    "ho sentito dire",
+    "non ho visto",
+    "non ho numeri di pratica",
+    "potrebbe trattarsi",
+)
+
+
+def classifica_provenienza(testo: str) -> str:
+    """
+    Distingue come un documento è venuto a conoscere ciò che afferma:
+    - 'misura_diretta': rilevazione fatta sul posto e firmata;
+    - 'rettifica': correzione che dichiara di basarsi su un altro documento;
+    - 'copia_inoltrata': riproduzione di un bollettino, senza verifica né nuove misure
+      (NON è una conferma indipendente: ripete la stessa origine);
+    - 'voce': sentito dire, senza riscontri;
+    - 'registro': tutto il resto (registri, ricevute, schede).
+    """
+    t = testo.lower().replace("’", "'")
+    if any(m in t for m in MARCATORI_MISURA_DIRETTA):
+        return "misura_diretta"
+    if "rettifica" in t[:260] or "rettifica è sostenuta" in t:
+        return "rettifica"
+    if any(m in t for m in MARCATORI_COPIA_INOLTRATA):
+        return "copia_inoltrata"
+    if any(m in t for m in MARCATORI_VOCE_NON_VERIFICATA):
+        return "voce"
+    return "registro"
+
+
+# ==============================================================================
 # MOTORE RAG (Giorno 3 — Operazione Esumazione: RAG_base.ipynb + Miglioramenti)
 # ==============================================================================
 def _ottieni_embedder_rag() -> Any:
@@ -504,6 +563,17 @@ def _tokenizza_rag(testo: str) -> list[str]:
     return tokens
 
 
+def _chiave_contenuto_archivio(documenti: Sequence[tuple[str, str]]) -> str:
+    """Impronta dell'archivio (nomi + testi): cambia se si aggiunge, toglie o modifica un file."""
+    h = hashlib.sha1()
+    for nome, testo in documenti:
+        h.update(nome.encode("utf-8"))
+        h.update(b"|")
+        h.update(testo.encode("utf-8", errors="replace"))
+        h.update(b"|")
+    return f"{len(documenti)}:{h.hexdigest()}"
+
+
 def costruisci_indice_rag(forza_ricalcolo: bool = False) -> dict[str, Any]:
     """
     Costruisce l'indice RAG su TUTTI i documenti di dati/, new_dati/ e dati/archivio/
@@ -518,7 +588,7 @@ def costruisci_indice_rag(forza_ricalcolo: bool = False) -> dict[str, Any]:
     """
     global _rag_indice_cache, _rag_chiave_cache
     tutti_doc = carica_archivio_completo()
-    chiave = (len(tutti_doc), tutti_doc[0][0] if tutti_doc else "", tutti_doc[-1][0] if tutti_doc else "")
+    chiave = _chiave_contenuto_archivio(tutti_doc)
     if not forza_ricalcolo and _rag_indice_cache is not None and _rag_chiave_cache == chiave:
         return _rag_indice_cache
 
@@ -589,7 +659,12 @@ def costruisci_indice_rag(forza_ricalcolo: bool = False) -> dict[str, Any]:
 
             if RAG_CACHE_FILE.is_file():
                 data_npz = np.load(str(RAG_CACHE_FILE))
-                if "vettori" in data_npz and len(data_npz["vettori"]) == len(blocchi):
+                if (
+                    "vettori" in data_npz
+                    and len(data_npz["vettori"]) == len(blocchi)
+                    and "chiave" in data_npz
+                    and str(data_npz["chiave"]) == chiave
+                ):
                     vettori_dense = data_npz["vettori"]
             if vettori_dense is None:
                 vettori_dense = embedder.encode(
@@ -598,7 +673,7 @@ def costruisci_indice_rag(forza_ricalcolo: bool = False) -> dict[str, Any]:
                     batch_size=64,
                     show_progress_bar=False,
                 )
-                np.savez_compressed(str(RAG_CACHE_FILE), vettori=vettori_dense)
+                np.savez_compressed(str(RAG_CACHE_FILE), vettori=vettori_dense, chiave=np.array(chiave))
         except Exception:
             vettori_dense = None
 
@@ -724,9 +799,27 @@ def scegli_fonti_dettagliato(
     fonti_scelte: list[tuple[str, str]] = []
     visti_file: set[str] = set()
 
+    # Le copie inoltrate dello stesso bollettino non sono conferme indipendenti: ne teniamo una
+    # sola come rappresentante, così non saturano i top_k e lasciano spazio alle misure dirette.
+    # (Non si collassa se la domanda chiede esplicitamente delle copie.)
+    collassa_copie = not re.search(r"copi|inoltr|duplicat|b-\d{3}", q_lower)
+    copie_ammesse = 0
+    copie_collassate: list[str] = []
+
     for score, idx in punteggi_blocchi:
         mb = meta_blocchi[idx]
         nome_f = mb["file"]
+        if collassa_copie and nome_f in copie_collassate:
+            continue
+        if (
+            collassa_copie
+            and nome_f not in visti_file
+            and classifica_provenienza(mappa_doc[nome_f][0]) == "copia_inoltrata"
+        ):
+            if copie_ammesse >= 1:
+                copie_collassate.append(nome_f)
+                continue
+            copie_ammesse += 1
         if len(blocchi_scelti) < top_k * 2:
             blocchi_scelti.append(
                 {
@@ -797,6 +890,7 @@ def scegli_fonti_dettagliato(
                 "titolo": meta_f["titolo"],
                 "formato": meta_f["formato"],
                 "fase": meta_f["fase"],
+                "provenienza": classifica_provenienza(testo_f),
                 "estratto": meta_f["corpo"][:180] + ("..." if len(meta_f["corpo"]) > 180 else ""),
             }
         )
@@ -809,6 +903,7 @@ def scegli_fonti_dettagliato(
         "chunk_size": RAG_CHUNK_SIZE,
         "chunk_step": RAG_CHUNK_STEP,
         "file_recuperati": file_scelti,
+        "copie_collassate": copie_collassate,
         "dettagli_file": dettagli_file,
         "blocchi_recuperati": blocchi_scelti[:top_k],
         "fonti": fonti_scelte,
