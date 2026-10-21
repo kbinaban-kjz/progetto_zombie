@@ -38,9 +38,9 @@ RISPOSTA:
   Collegamenti tra documenti:
   PERCORSO TRA «nora ferri» E «lume»: [ARCH-3097] (documento_0057.html) -> [ARCH-5721] (documento_0389.xml) --rv753--
   COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
-    • [ARCH-3097] (documento_0057.html) <-> [G2-02] (G2-02.txt): nora, nora ferri, ferri
-    • [ARCH-3097] (documento_0057.html) <-> [G1-02] (G1-02.txt): nora, nora ferri, ferri
-    • [G2-02] (G2-02.txt) <-> [G1-02] (G1-02.txt): nora, nora ferri, ferri
+    • [ARCH-3097] (documento_0057.html) <-> [G2-02] (G2-02.txt): nora ferri, nora, ferri
+    • [ARCH-3097] (documento_0057.html) <-> [G1-02] (G1-02.txt): nora ferri, nora, ferri
+    • [G2-02] (G2-02.txt) <-> [G1-02] (G1-02.txt): nora ferri, nora, ferri
     • [ARCH-5721] (documento_0389.xml) <-> [ARCH-3097] (documento_0057.html): rv753
   Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
 [OK] Collega almeno tre documenti (Nora, RV753, LUME)
@@ -92,8 +92,8 @@ RISPOSTA:
   
   Collegamenti tra documenti:
   COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
-    • [LX5-6396] (LX5_6396.txt) <-> [LX5-8823] (LX5_8823.txt): ripetitore pietra, pietra
-    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): 06:40, ripetitore salice, salice
+    • [LX5-6396] (LX5_6396.txt) <-> [LX5-8823] (LX5_8823.txt): pietra, ripetitore pietra
+    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): salice, 06:40, ripetitore salice
   Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
   Nessun collegamento diretto documentato tra le due entità citate: i documenti sopra sono i più pertinenti, ma non contengono un percorso verificabile.
 [OK] Dichiara che il collegamento diretto non è documentato

@@ -644,8 +644,11 @@ def risposta_locale_da_fonti(
         return "Non sono presenti messaggi precedenti nella memoria del database."
 
     includi_ostili = bool(documenti_citati)
-    includi_wikipedia = bool(re.search(r"\bwiki|wikipedia|encicloped", q)) or any(
-        c.startswith("wiki-") for c in documenti_citati
+    includi_wikipedia = (
+        bool(re.search(r"\bwiki|wikipedia|encicloped", q))
+        or any(c.startswith("wiki-") for c in documenti_citati)
+        or any(isinstance(f, str) and ("wiki" in f.lower() or f.lower().startswith("documento_")) for f in (file_prioritari or []))
+        or any(isinstance(fn, str) and ("wiki" in fn.lower() or fn.lower().startswith("documento_")) for fn, _ in fonti)
     )
     indice_documenti = _indice_documenti(
         fonti, includi_ostili=includi_ostili, includi_wikipedia=includi_wikipedia

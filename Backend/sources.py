@@ -814,14 +814,30 @@ def scegli_fonti_dettagliato(
         )
     }
 
-    # Le 1.000 voci Wikipedia dell'archivio sono rumore: si escludono, a meno che la domanda
-    # non chieda esplicitamente una voce enciclopedica o citi un ID WIKI-*/documento_*.
+    # Le voci Wikipedia dell'archivio (1.000 file) costituiscono un archivio enciclopedico di emergenza.
+    # Se la domanda trova riscontri solidi nel dossier operativo LAZZARO (G1, G2, LX5, ARCH),
+    # escludiamo le voci WIKI per evitare rumore fuori contesto (es. ARPANET per 'progetto').
+    # Se invece la richiesta verte su argomenti storici/enciclopedici presenti nell'archivio
+    # (es. 'Giulio Cesare', 'Cifrario di Cesare'), o cita Wikipedia, ammettiamo le voci WIKI!
     chiede_wikipedia = bool(
         re.search(r"\bwiki|wikipedia|encicloped|voce enciclopedica", q_lower)
     ) or any(c.startswith("WIKI-") for c in citazioni_esplicite)
 
+    ha_match_lazzaro_solido = False
+    if not chiede_wikipedia:
+        for mb in meta_blocchi:
+            if mb["is_lazzaro"]:
+                comuni = [t for t in q_tokens if t in mb["tokens"]]
+                if comuni:
+                    sc_quick = sum(idf.get(t, 2.0) for t in comuni)
+                    if sc_quick >= 7.0:
+                        ha_match_lazzaro_solido = True
+                        break
+
     def blocco_ammesso(mb: dict[str, Any]) -> bool:
-        return chiede_wikipedia or not str(mb["id"]).upper().startswith("WIKI-")
+        if mb["is_lazzaro"]:
+            return True
+        return chiede_wikipedia or not ha_match_lazzaro_solido
 
     def calcola_punteggi(tokens_extra: Sequence[str], is_feedback: bool = False) -> list[tuple[float, int]]:
         """Punteggio lessicale + semantico sui blocchi ammessi (una sola implementazione)."""
