@@ -85,6 +85,17 @@
     #sezione-lavagna:fullscreen #lavagna-vista-grafo {
       height: calc(100vh - 120px);
     }
+    #sezione-vettori:fullscreen {
+      height: 100vh;
+      border-radius: 0;
+      padding: 0;
+      background: #070808;
+    }
+    #sezione-vettori:fullscreen #vettori-vista {
+      flex: 1;
+      height: auto;
+      min-height: 0;
+    }
 
     /* Stili tipografici per Markdown nei messaggi di chat */
     .chat-markdown {
@@ -267,6 +278,9 @@
       <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
         <a href="#sezione-lavagna" class="px-3 py-1.5 rounded-lg bg-crimson-800 hover:bg-crimson-700 border border-crimson-500 text-white font-bold transition flex items-center gap-1.5 shadow">
           <span>🧩</span> Lavagna "Collega i Puntini"
+        </a>
+        <a href="#sezione-vettori" class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-200 font-bold transition flex items-center gap-1.5 shadow">
+          <span>🧬</span> Spazio Vettoriale
         </a>
         <a href="#sezione-mappa" class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-200 font-bold transition flex items-center gap-1.5 shadow">
           <span>🌍</span> Mappa Globale
@@ -650,6 +664,161 @@
       <!-- VISTA 4: RIFERIMENTI INCROCIATI -->
       <div id="lavagna-vista-matrice" class="hidden p-6 max-h-[640px] overflow-y-auto bg-bunker-950">
         <!-- Popolato dinamicamente -->
+      </div>
+    </section>
+
+    <!-- SEZIONE: SPAZIO VETTORIALE — DISTRIBUZIONE INTERATTIVA DEI DOCUMENTI -->
+    <section id="sezione-vettori" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col scroll-mt-20">
+      <!-- Header della sezione -->
+      <div class="bg-bunker-800 px-4 py-3.5 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse"></span>
+            <h2 class="font-display font-bold uppercase tracking-wider text-base sm:text-xl text-white flex items-center gap-2">
+              <span>🧬</span> Spazio Vettoriale — Distribuzione dei Documenti
+            </h2>
+            <span id="vettori-metodo-badge" class="px-2.5 py-0.5 rounded-full bg-sky-950 border border-sky-700 text-sky-300 text-xs font-mono font-bold">
+              TF-IDF + PCA 3D
+            </span>
+          </div>
+          <p class="text-xs font-mono text-stone-300 mt-1">
+            Ogni punto è un documento (embedding TF-IDF) proiettato in 3D: più i punti sono vicini, più i contenuti sono simili.
+            Trascina per ruotare lo spazio, Maiusc+trascina (o tasto destro) per spostarti, rotella per lo zoom; clicca un documento per ispezionarlo e proietta una domanda nello stesso spazio.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span id="vettori-varianza-badge" class="px-2.5 py-1.5 rounded-lg bg-bunker-950 border border-bunker-700 text-stone-300">
+            Varianza: in calcolo...
+          </span>
+          <button type="button" onclick="toggleSchermoInteroVettori()"
+            class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 transition flex items-center gap-1.5"
+            title="Ingrandisci la mappa vettoriale a schermo intero">
+            <span>⛶</span> Schermo intero
+          </button>
+          <button type="button" onclick="resetZoomVettori()"
+            class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 transition"
+            title="Ripristina zoom e posizione">
+            ↺ Reset vista
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra filtri, ricerca e opzioni di visualizzazione -->
+      <div class="bg-bunker-950/95 px-4 py-2.5 border-b border-bunker-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-stone-400 uppercase text-[11px] font-semibold mr-1">Fase:</span>
+          <div id="vettori-filtri-fase" class="flex flex-wrap items-center gap-1.5">
+            <!-- Popolato dinamicamente -->
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="bg-bunker-900 p-1 rounded-lg border border-bunker-700 flex items-center gap-1">
+            <button type="button" id="vettori-toggle-etichette" onclick="toggleEtichetteVettori()"
+              class="px-2.5 py-1 rounded-md text-[11px] font-bold transition bg-sky-900/80 text-sky-200 border border-sky-700"
+              title="Mostra o nascondi le etichette dei documenti">
+              🏷️ Etichette
+            </button>
+            <button type="button" id="vettori-toggle-vicini" onclick="toggleViciniVettori()"
+              class="px-2.5 py-1 rounded-md text-[11px] font-bold transition text-stone-400 hover:text-white"
+              title="Mostra le connessioni verso i documenti più simili">
+              🔗 Vicini
+            </button>
+            <button type="button" id="vettori-toggle-colore" onclick="toggleColoreVettori()"
+              class="px-2.5 py-1 rounded-md text-[11px] font-bold transition text-stone-400 hover:text-white"
+              title="Cambia la colorazione tra fase operativa e cluster">
+              🎨 Fase
+            </button>
+            <button type="button" id="vettori-toggle-rotazione" onclick="toggleRotazioneVettori()"
+              class="px-2.5 py-1 rounded-md text-[11px] font-bold transition text-stone-400 hover:text-white"
+              title="Rotazione automatica dello spazio 3D">
+              🔄 Rotazione
+            </button>
+            <button type="button" id="vettori-toggle-assi" onclick="toggleAssiVettori()"
+              class="px-2.5 py-1 rounded-md text-[11px] font-bold transition bg-sky-900/80 text-sky-200 border border-sky-700"
+              title="Mostra o nascondi assi e griglia 3D">
+              📐 Assi
+            </button>
+          </div>
+
+          <div class="relative w-full sm:w-64">
+            <input type="text" id="vettori-ricerca-input" oninput="eseguiRicercaVettori(this.value)"
+              placeholder="Cerca codice, titolo o termine..."
+              class="w-full bg-bunker-900 border border-bunker-700 focus:border-sky-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-stone-500 focus:outline-none transition">
+            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-500 text-xs">🔍</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Area principale: canvas + pannello di dettaglio -->
+      <div id="vettori-vista" class="relative w-full h-[640px] bg-bunker-950 overflow-hidden flex">
+        <div class="relative flex-1 h-full overflow-hidden" id="vettori-canvas-container">
+          <canvas id="vettori-canvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+          <!-- Tooltip flottante -->
+          <div id="vettori-tooltip" class="hidden absolute z-30 pointer-events-none max-w-xs p-2.5 rounded-lg bg-bunker-900/95 border border-sky-700 shadow-2xl backdrop-blur text-[11px] font-mono text-stone-200"></div>
+
+          <!-- Toolbar zoom -->
+          <div class="absolute bottom-4 left-4 flex items-center gap-1.5 bg-bunker-900/90 border border-bunker-700 p-1.5 rounded-lg backdrop-blur text-xs font-mono shadow-lg z-10">
+            <button type="button" onclick="zoomVettori(1.2)" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Ingrandisci">+</button>
+            <button type="button" onclick="zoomVettori(0.83)" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Rimpicciolisci">−</button>
+            <button type="button" onclick="resetZoomVettori()" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Ripristina vista">Reset</button>
+            <span class="h-4 w-px bg-bunker-700 mx-1"></span>
+            <span id="vettori-zoom-label" class="text-[11px] text-stone-400 px-1">100%</span>
+          </div>
+
+          <!-- Legenda -->
+          <div class="absolute top-4 left-4 bg-bunker-900/95 border border-bunker-700 p-3 rounded-xl backdrop-blur text-[11px] font-mono shadow-xl hidden md:block max-w-xs z-10 space-y-1.5">
+            <div class="text-sky-300 font-bold flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+              <span>🧭</span> Come leggere la mappa
+            </div>
+            <div class="text-stone-300 text-[10px] leading-tight">
+              Gli assi sono le tre componenti principali della PCA (PC1 rosso, PC2 verde, PC3 blu). La vicinanza indica similarità di contenuto;
+              la dimensione del punto riflette la lunghezza del documento e la prospettiva la profondità.
+            </div>
+            <div id="vettori-legenda" class="grid grid-cols-1 gap-1 pt-1.5 border-t border-bunker-800 text-[10px]">
+              <!-- Popolata dinamicamente -->
+            </div>
+          </div>
+
+          <!-- Messaggio spazio vuoto -->
+          <div id="vettori-vuoto" class="hidden absolute inset-0 flex items-center justify-center p-6 text-center text-xs font-mono text-stone-400 bg-bunker-950/80 z-20">
+            Nessun documento disponibile per la proiezione vettoriale.
+          </div>
+        </div>
+
+        <!-- Pannello di dettaglio del documento selezionato -->
+        <div id="vettori-drawer"
+          class="w-80 md:w-96 bg-bunker-900/95 border-l border-bunker-700 h-full p-4 flex flex-col justify-between overflow-y-auto backdrop-blur shadow-2xl transition-all z-20">
+          <div class="text-xs font-mono text-stone-500">
+            Seleziona un punto sulla mappa per leggere i dettagli del documento.
+          </div>
+        </div>
+      </div>
+
+      <!-- Proiezione di una domanda nello spazio vettoriale -->
+      <div class="bg-bunker-950 border-t border-bunker-800 px-4 py-3 space-y-2">
+        <form onsubmit="proiettaDomandaVettori(event)" class="flex flex-wrap items-center gap-2">
+          <label for="vettori-domanda-input" class="text-xs font-mono text-sky-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+            <span>🎯</span> Proietta una domanda:
+          </label>
+          <input id="vettori-domanda-input" type="text"
+            placeholder="es. Chi ha visto il furgone davanti al laboratorio San Mauro?"
+            class="flex-1 min-w-[220px] bg-bunker-900 border border-bunker-600 focus:border-sky-500 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-stone-500 focus:outline-none transition" />
+          <button type="submit" class="px-4 py-2 rounded-lg bg-sky-800 hover:bg-sky-700 border border-sky-600 text-white font-mono text-xs font-bold transition shrink-0">
+            Proietta
+          </button>
+          <button type="button" onclick="rimuoviQueryVettori()" id="vettori-query-rimuovi"
+            class="hidden px-3 py-2 rounded-lg bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-stone-300 text-xs font-mono transition shrink-0"
+            title="Rimuovi la domanda proiettata">
+            ✕ Rimuovi
+          </button>
+          <span id="vettori-query-stato" class="text-[11px] font-mono text-stone-400"></span>
+        </form>
+        <div id="vettori-query-risultati" class="hidden flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+          <!-- Popolato dinamicamente -->
+        </div>
       </div>
     </section>
 
@@ -1712,6 +1881,1640 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
     }
 
 
+    // =========================================================================
+    // MODULO DINAMICO: SPAZIO VETTORIALE — DISTRIBUZIONE INTERATTIVA DEI DOCUMENTI
+    // =========================================================================
+    const STOPWORDS_VETTORI = new Set([
+      "il", "lo", "la", "i", "gli", "le", "un", "una", "uno", "di", "da", "in",
+      "con", "su", "per", "tra", "fra", "del", "della", "dei", "delle", "dello",
+      "al", "alla", "alle", "ai", "nel", "nella", "nei", "nelle", "sul", "sulla",
+      "che", "chi", "cosa", "dove", "quando", "come", "quale", "quali", "sono",
+      "era", "erano", "stato", "stata", "stati", "state", "ha", "hanno", "non",
+      "più", "piu", "anche", "questo", "questa", "quello", "quella", "documento",
+      "file", "fonte", "fonti", "dimmi", "parlami", "trova", "cerca", "dossier",
+      "giorno", "operativo", "operativa", "aggiornamento", "rapporto", "registro",
+      "scheda", "verbale", "nota", "testo", "contenuto", "pagina"
+    ]);
+
+    const COLORI_FASE_VETTORI = {
+      "Giorno 1": { bg: "#064e3b", border: "#10b981", text: "#34d399" },
+      "Giorno 2": { bg: "#4c0519", border: "#f43f5e", text: "#fb7185" },
+      "Imprevisti": { bg: "#422006", border: "#f59e0b", text: "#fbbf24" },
+      "Giorno 3 (Archivio)": { bg: "#1e1b4b", border: "#818cf8", text: "#a5b4fc" },
+      "Archivio Wikipedia": { bg: "#1f2937", border: "#9ca3af", text: "#d1d5db" },
+      "Dossier": { bg: "#0c4a6e", border: "#38bdf8", text: "#7dd3fc" }
+    };
+
+    const COLORI_CLUSTER_VETTORI = [
+      { bg: "#0c4a6e", border: "#38bdf8", text: "#7dd3fc" },
+      { bg: "#3b0764", border: "#a855f7", text: "#c084fc" },
+      { bg: "#064e3b", border: "#10b981", text: "#34d399" },
+      { bg: "#422006", border: "#f59e0b", text: "#fbbf24" },
+      { bg: "#4c0519", border: "#f43f5e", text: "#fb7185" },
+      { bg: "#1e293b", border: "#64748b", text: "#cbd5e1" }
+    ];
+
+    let datiVettori = { documenti: [], fasi: [], varianza_spiegata: [0, 0] };
+    let modelloVettoriJs = null;
+    let vettoriFiltroFase = "tutti";
+    let vettoriRicerca = "";
+    let vettoreSelezionatoId = null;
+    let vettoreHoverId = null;
+    let mostraEtichetteVettori = true;
+    let mostraViciniVettori = false;
+    let coloraClusterVettori = false;
+    let canvasVettori = null;
+    let ctxVettori = null;
+    let vettoriZoom = 1.0;
+    let vettoriOffset = { x: 0, y: 0 };
+    let vettoriVista = null;
+    const VETTORI_YAW_INIZIALE = 0.6;
+    const VETTORI_PITCH_INIZIALE = 0.35;
+    let vettoriYaw = VETTORI_YAW_INIZIALE;
+    let vettoriPitch = VETTORI_PITCH_INIZIALE;
+    let vettoriRotazioneAuto = false;
+    let vettoriAnimazioneId = null;
+    let mostraAssiVettori = true;
+    let vettoriModalitaDrag = "ruota";
+    let vettoriDocGiu = null;
+    let vettoriProiettati = [];
+    let vettoriTrascinando = false;
+    let vettoriSpostato = false;
+    let vettoriUltimoMouse = { x: 0, y: 0 };
+    let vettoriMouseDown = null;
+    let queryVettori = null;
+
+    function stileFaseVettore(fase) {
+      return COLORI_FASE_VETTORI[fase] || COLORI_FASE_VETTORI.Dossier;
+    }
+
+    function stileVettore(documento) {
+      if (!documento) return stileFaseVettore("Dossier");
+      if (coloraClusterVettori) {
+        return COLORI_CLUSTER_VETTORI[(documento.cluster || 0) % COLORI_CLUSTER_VETTORI.length];
+      }
+      return stileFaseVettore(documento.fase);
+    }
+
+    async function caricaSpazioVettoriale() {
+      let spazio = null;
+      modelloVettoriJs = null;
+
+      if (apiBase !== null) {
+        try {
+          const risposta = await fetch(`${apiBase}/api/vector-map`);
+          if (risposta.ok) {
+            const dati = await risposta.json();
+            if (dati && dati.ok && Array.isArray(dati.documenti)
+                && dati.documenti.every(d => Number.isFinite(d.z))) {
+              const nomiLocali = fonti.map(f => f.nome).sort().join("|");
+              const nomiServer = dati.documenti.map(d => d.id).sort().join("|");
+              if (nomiLocali === nomiServer) {
+                spazio = dati;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!spazio) {
+        const fontiVettori = await caricaFontiVettori();
+        const risultato = costruisciSpazioVettorialeJs(fontiVettori);
+        spazio = risultato.spazio;
+        modelloVettoriJs = risultato.modello;
+      }
+
+      datiVettori = spazio;
+      if (!vettoreSelezionatoId || !(spazio.documenti || []).some(d => d.id === vettoreSelezionatoId)) {
+        vettoreSelezionatoId = (spazio.documenti || [])[0]?.id || null;
+      }
+      if (vettoriFiltroFase !== "tutti" && !(spazio.fasi || []).some(f => f.nome === vettoriFiltroFase)) {
+        vettoriFiltroFase = "tutti";
+      }
+      aggiornaVistaVettoriCompleta();
+    }
+
+    // Fonti per lo spazio vettoriale: archivio completo (HTML, JSON, XML, WIKI...) se il server lo offre.
+    const MAX_DOCUMENTI_VETTORI = 250;
+
+    // Limita i punti per mantenere fluida la mappa: tengono la precedenza i documenti del dossier,
+    // il resto (WIKI e simili) viene campionato a intervalli regolari in modo deterministico.
+    function limitaFontiVettori(elenco) {
+      if (!Array.isArray(elenco) || elenco.length <= MAX_DOCUMENTI_VETTORI) return elenco;
+      const e_secondario = f => /^wiki/i.test(String(f.nome || ""));
+      const principali = elenco.filter(f => !e_secondario(f));
+      const secondari = elenco.filter(e_secondario);
+      if (principali.length >= MAX_DOCUMENTI_VETTORI) {
+        const passo = principali.length / MAX_DOCUMENTI_VETTORI;
+        return Array.from({ length: MAX_DOCUMENTI_VETTORI }, (_, i) => principali[Math.floor(i * passo)]);
+      }
+      const posti = MAX_DOCUMENTI_VETTORI - principali.length;
+      const passo = secondari.length / posti;
+      const scelti = Array.from({ length: Math.min(posti, secondari.length) }, (_, i) => secondari[Math.floor(i * passo)]);
+      const nomi = new Set(principali.concat(scelti).map(f => f.nome));
+      return elenco.filter(f => nomi.has(f.nome));
+    }
+
+    let fontiVettoriCache = null;
+    async function caricaFontiVettori() {
+      if (fontiVettoriCache) return fontiVettoriCache;
+      if (apiBase !== null) {
+        try {
+          const risposta = await fetch(`${apiBase}/api/vector-sources`);
+          if (risposta.ok) {
+            const dati = await risposta.json();
+            if (dati && dati.ok && Array.isArray(dati.fonti) && dati.fonti.length > 0) {
+              fontiVettoriCache = limitaFontiVettori(dati.fonti);
+              return fontiVettoriCache;
+            }
+          }
+        } catch (_) {}
+      }
+      return limitaFontiVettori(fonti);
+    }
+
+    function aggiornaVistaVettoriCompleta() {
+      const documenti = datiVettori.documenti || [];
+      const badgeMetodo = document.getElementById("vettori-metodo-badge");
+      const badgeVarianza = document.getElementById("vettori-varianza-badge");
+      const vuoto = document.getElementById("vettori-vuoto");
+
+      if (badgeMetodo) badgeMetodo.textContent = datiVettori.metodo || "TF-IDF + PCA 3D";
+      if (badgeVarianza) {
+        const varianza = Array.isArray(datiVettori.varianza_spiegata) ? datiVettori.varianza_spiegata : [0, 0, 0];
+        const totaleVarianza = Math.round(((varianza[0] || 0) + (varianza[1] || 0) + (varianza[2] || 0)) * 10) / 10;
+        badgeVarianza.textContent = `PC1 ${varianza[0] || 0}% • PC2 ${varianza[1] || 0}% • PC3 ${varianza[2] || 0}% (Σ ${totaleVarianza}%)`;
+        badgeVarianza.className = "px-2.5 py-1.5 rounded-lg bg-bunker-950 border border-sky-800 text-sky-300";
+      }
+      if (vuoto) vuoto.classList.toggle("hidden", documenti.length > 0);
+      if (documenti.length > 60 && !etichetteVettoriImpostateDaUtente) {
+        mostraEtichetteVettori = false;
+        aggiornaPulsanteVettore("vettori-toggle-etichette", false);
+      }
+
+      renderFiltriVettori();
+      renderLegendaVettori();
+      renderDettaglioVettore(vettoreSelezionatoId);
+      aggiornaUiQueryVettori();
+      ridimensionaCanvasVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function renderFiltriVettori() {
+      const container = document.getElementById("vettori-filtri-fase");
+      if (!container) return;
+      const fasi = datiVettori.fasi || [];
+      const totale = (datiVettori.documenti || []).length;
+      const voci = [{ nome: "tutti", totale: totale, stile: null }].concat(
+        fasi.map(f => ({ nome: f.nome, totale: f.totale, stile: stileFaseVettore(f.nome) }))
+      );
+
+      container.innerHTML = voci.map(voce => {
+        const attivo = vettoriFiltroFase === voce.nome;
+        const stile = voce.stile || { border: "#38bdf8" };
+        const classi = attivo
+          ? "px-2.5 py-1 rounded-md bg-sky-900 border border-sky-600 text-white font-bold transition shadow"
+          : "px-2.5 py-1 rounded-md bg-bunker-900 hover:bg-bunker-800 border border-bunker-700 text-stone-300 transition";
+        const etichetta = voce.nome === "tutti" ? "Tutti" : voce.nome;
+        return `
+          <button type="button" onclick="filtraVettori('${escapeHtml(voce.nome)}')" class="${classi}">
+            <span class="inline-block w-1.5 h-1.5 rounded-full mr-1" style="background:${stile.border}"></span>
+            ${escapeHtml(etichetta)} (<span>${voce.totale}</span>)
+          </button>
+        `;
+      }).join("");
+    }
+
+    function renderLegendaVettori() {
+      const container = document.getElementById("vettori-legenda");
+      if (!container) return;
+      const documenti = datiVettori.documenti || [];
+      const voci = [];
+
+      if (coloraClusterVettori) {
+        (datiVettori.clusters || []).forEach(cluster => {
+          const stile = COLORI_CLUSTER_VETTORI[(cluster.id || 0) % COLORI_CLUSTER_VETTORI.length];
+          const totale = documenti.filter(d => (d.cluster || 0) === cluster.id).length;
+          voci.push({ etichetta: `Cluster ${(cluster.id || 0) + 1} · ${cluster.nome || "gruppo"}`, totale, stile });
+        });
+      } else {
+        (datiVettori.fasi || []).forEach(fase => {
+          voci.push({ etichetta: fase.nome, totale: fase.totale, stile: stileFaseVettore(fase.nome) });
+        });
+      }
+
+      container.innerHTML = voci.map(voce => `
+        <div class="flex items-center justify-between gap-2">
+          <span class="flex items-center gap-1.5 text-stone-300">
+            <span class="w-2.5 h-2.5 rounded-full" style="background:${voce.stile.bg}; border:1px solid ${voce.stile.border}"></span>
+            ${escapeHtml(voce.etichetta)}
+          </span>
+          <span class="text-stone-500">${voce.totale}</span>
+        </div>
+      `).join("") + `
+        <div class="flex items-center justify-between gap-2 pt-1 border-t border-bunker-800">
+          <span class="flex items-center gap-1.5 text-sky-300">
+            <span class="w-2.5 h-2.5 rotate-45 border border-sky-300 bg-sky-500/40"></span>
+            Domanda proiettata
+          </span>
+          <span class="text-stone-500">${queryVettori ? "1" : "—"}</span>
+        </div>
+      `;
+    }
+
+    function filtraVettori(fase) {
+      vettoriFiltroFase = fase || "tutti";
+      renderFiltriVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function eseguiRicercaVettori(query) {
+      vettoriRicerca = (query || "").trim().toLowerCase();
+      ridisegnaCanvasVettori();
+    }
+
+    function aggiornaPulsanteVettore(id, attivo) {
+      const bottone = document.getElementById(id);
+      if (!bottone) return;
+      bottone.className = attivo
+        ? "px-2.5 py-1 rounded-md text-[11px] font-bold transition bg-sky-900/80 text-sky-200 border border-sky-700"
+        : "px-2.5 py-1 rounded-md text-[11px] font-bold transition text-stone-400 hover:text-white";
+    }
+
+    let etichetteVettoriImpostateDaUtente = false;
+    function toggleEtichetteVettori() {
+      etichetteVettoriImpostateDaUtente = true;
+      mostraEtichetteVettori = !mostraEtichetteVettori;
+      aggiornaPulsanteVettore("vettori-toggle-etichette", mostraEtichetteVettori);
+      ridisegnaCanvasVettori();
+    }
+
+    function toggleViciniVettori() {
+      mostraViciniVettori = !mostraViciniVettori;
+      aggiornaPulsanteVettore("vettori-toggle-vicini", mostraViciniVettori);
+      ridisegnaCanvasVettori();
+    }
+
+    function toggleColoreVettori() {
+      coloraClusterVettori = !coloraClusterVettori;
+      const bottone = document.getElementById("vettori-toggle-colore");
+      if (bottone) bottone.textContent = coloraClusterVettori ? "🎨 Cluster" : "🎨 Fase";
+      aggiornaPulsanteVettore("vettori-toggle-colore", coloraClusterVettori);
+      renderLegendaVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function toggleAssiVettori() {
+      mostraAssiVettori = !mostraAssiVettori;
+      aggiornaPulsanteVettore("vettori-toggle-assi", mostraAssiVettori);
+      ridisegnaCanvasVettori();
+    }
+
+    function toggleRotazioneVettori() {
+      vettoriRotazioneAuto = !vettoriRotazioneAuto;
+      aggiornaPulsanteVettore("vettori-toggle-rotazione", vettoriRotazioneAuto);
+      if (vettoriRotazioneAuto && vettoriAnimazioneId === null) {
+        vettoriAnimazioneId = requestAnimationFrame(animaRotazioneVettori);
+      }
+    }
+
+    function animaRotazioneVettori() {
+      vettoriAnimazioneId = null;
+      if (!vettoriRotazioneAuto) return;
+      if (!vettoriTrascinando && !document.hidden) {
+        vettoriYaw += 0.006;
+        ridisegnaCanvasVettori();
+      }
+      vettoriAnimazioneId = requestAnimationFrame(animaRotazioneVettori);
+    }
+
+    function toggleSchermoInteroVettori() {
+      const sezione = document.getElementById("sezione-vettori");
+      if (!sezione) return;
+      if (!document.fullscreenElement) {
+        sezione.requestFullscreen?.().then(() => {
+          setTimeout(() => {
+            ridimensionaCanvasVettori();
+            ridisegnaCanvasVettori();
+          }, 160);
+        });
+      } else {
+        document.exitFullscreen?.().then(() => {
+          setTimeout(() => {
+            ridimensionaCanvasVettori();
+            ridisegnaCanvasVettori();
+          }, 160);
+        });
+      }
+    }
+
+    function inizializzaCanvasVettori() {
+      canvasVettori = document.getElementById("vettori-canvas");
+      if (!canvasVettori) return;
+      ctxVettori = canvasVettori.getContext("2d");
+      ridimensionaCanvasVettori();
+
+      window.addEventListener("resize", () => {
+        ridimensionaCanvasVettori();
+        ridisegnaCanvasVettori();
+      });
+
+      canvasVettori.addEventListener("mousedown", onMouseDownVettori);
+      window.addEventListener("mousemove", onMouseMoveVettori);
+      window.addEventListener("mouseup", onMouseUpVettori);
+      canvasVettori.addEventListener("mouseleave", () => {
+        vettoreHoverId = null;
+        nascondiTooltipVettori();
+        if (canvasVettori) canvasVettori.style.cursor = "crosshair";
+        ridisegnaCanvasVettori();
+      });
+      canvasVettori.addEventListener("wheel", onWheelVettori, { passive: false });
+      canvasVettori.addEventListener("contextmenu", evento => evento.preventDefault());
+    }
+
+    function ridimensionaCanvasVettori() {
+      if (!canvasVettori) return;
+      const rect = canvasVettori.getBoundingClientRect();
+      const parent = canvasVettori.parentElement;
+      const larghezza = Math.floor(rect.width || (parent ? parent.clientWidth : 0) || 800);
+      const altezza = Math.floor(rect.height || (parent ? parent.clientHeight : 0) || 640);
+      const dpr = window.devicePixelRatio || 1;
+      canvasVettori.width = Math.max(300, Math.floor(larghezza * dpr));
+      canvasVettori.height = Math.max(300, Math.floor(altezza * dpr));
+      if (ctxVettori) ctxVettori.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function aggiornaVistaVettori(larghezza, altezza) {
+      const punti = (datiVettori.documenti || []).map(d => [d.x, d.y, d.z || 0]);
+      if (queryVettori && Number.isFinite(queryVettori.x) && Number.isFinite(queryVettori.y)) {
+        punti.push([queryVettori.x, queryVettori.y, queryVettori.z || 0]);
+      }
+      if (punti.length === 0) punti.push([-1, -1, -1], [1, 1, 1]);
+
+      const minimi = [0, 1, 2].map(i => punti.reduce((m, p) => Math.min(m, p[i]), Infinity));
+      const massimi = [0, 1, 2].map(i => punti.reduce((m, p) => Math.max(m, p[i]), -Infinity));
+      const centro = [0, 1, 2].map(i => (minimi[i] + massimi[i]) / 2);
+      const raggio = punti.reduce(
+        (m, p) => Math.max(m, Math.hypot(p[0] - centro[0], p[1] - centro[1], p[2] - centro[2])),
+        1
+      );
+
+      const margineSchermo = 46;
+      vettoriVista = {
+        larghezza,
+        altezza,
+        raggio,
+        centro,
+        distanza: raggio * 3.4,
+        scalaBase: Math.max(1e-6, (Math.min(larghezza, altezza) / 2 - margineSchermo) / raggio)
+      };
+    }
+
+    // Proiezione prospettica: rotazione (yaw attorno a Y, pitch attorno a X) + prospettiva.
+    function mondoASchermoVettori(x, y, z) {
+      if (!vettoriVista) return { x: 0, y: 0, f: 1, z: 0, profondita: 0.5 };
+      const v = vettoriVista;
+      const dx = x - v.centro[0];
+      const dy = y - v.centro[1];
+      const dz = (z || 0) - v.centro[2];
+      const cy = Math.cos(vettoriYaw), sy = Math.sin(vettoriYaw);
+      const cp = Math.cos(vettoriPitch), sp = Math.sin(vettoriPitch);
+      const x1 = dx * cy + dz * sy;
+      const z1 = -dx * sy + dz * cy;
+      const y2 = dy * cp - z1 * sp;
+      const z2 = dy * sp + z1 * cp;
+      const f = v.distanza / Math.max(v.distanza * 0.15, v.distanza - z2);
+      const scala = v.scalaBase * vettoriZoom * f;
+      return {
+        x: v.larghezza / 2 + x1 * scala + vettoriOffset.x,
+        y: v.altezza / 2 - y2 * scala + vettoriOffset.y,
+        f,
+        z: z2,
+        profondita: Math.max(0, Math.min(1, (z2 / v.raggio + 1) / 2))
+      };
+    }
+
+    function documentiVisibiliVettori() {
+      const documenti = datiVettori.documenti || [];
+      if (vettoriFiltroFase === "tutti") return documenti;
+      return documenti.filter(d => d.fase === vettoriFiltroFase);
+    }
+
+    function documentoCorrispondeRicercaVettori(documento) {
+      if (!vettoriRicerca) return true;
+      const testo = [
+        documento.id,
+        documento.codice,
+        documento.titolo,
+        documento.fase,
+        documento.cluster_nome,
+        (documento.termini || []).join(" "),
+        documento.anteprima
+      ].join(" ").toLowerCase();
+      return testo.includes(vettoriRicerca);
+    }
+
+    function raggioVettore(documento) {
+      const lunghezza = Number(documento.lunghezza) || 200;
+      return Math.max(5.5, Math.min(15, 4.5 + Math.sqrt(lunghezza) / 5.2));
+    }
+
+    function trovaDocumentoVettore(xSchermo, ySchermo) {
+      // vettoriProiettati è ordinato dal più lontano al più vicino: si controlla dal fondo.
+      for (let i = vettoriProiettati.length - 1; i >= 0; i--) {
+        const { documento, punto } = vettoriProiettati[i];
+        if (vettoriFiltroFase !== "tutti" && documento.fase !== vettoriFiltroFase) continue;
+        const raggio = raggioVettore(documento) * punto.f + 5;
+        if (Math.hypot(xSchermo - punto.x, ySchermo - punto.y) <= raggio) {
+          return documento;
+        }
+      }
+      return null;
+    }
+
+    function disegnaFrecciaVettori(ctx, x1, y1, x2, y2) {
+      const angolo = Math.atan2(y2 - y1, x2 - x1);
+      const lunghezza = 7;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(
+        x2 - lunghezza * Math.cos(angolo - Math.PI / 7),
+        y2 - lunghezza * Math.sin(angolo - Math.PI / 7)
+      );
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(
+        x2 - lunghezza * Math.cos(angolo + Math.PI / 7),
+        y2 - lunghezza * Math.sin(angolo + Math.PI / 7)
+      );
+      ctx.stroke();
+    }
+
+    function ridisegnaCanvasVettori() {
+      if (!ctxVettori || !canvasVettori) return;
+
+      const rect = canvasVettori.getBoundingClientRect();
+      const parent = canvasVettori.parentElement;
+      const larghezza = rect.width || (parent ? parent.clientWidth : 0) || 800;
+      const altezza = rect.height || (parent ? parent.clientHeight : 0) || 640;
+
+      aggiornaVistaVettori(larghezza, altezza);
+
+      const ctx = ctxVettori;
+      ctx.save();
+      ctx.clearRect(0, 0, larghezza, altezza);
+
+      // Sfondo con alone molto leggero
+      const gradiente = ctx.createRadialGradient(
+        larghezza * 0.5, altezza * 0.45, 20,
+        larghezza * 0.5, altezza * 0.45, Math.max(larghezza, altezza) * 0.7
+      );
+      gradiente.addColorStop(0, "rgba(14, 116, 144, 0.14)");
+      gradiente.addColorStop(1, "rgba(7, 8, 8, 0)");
+      ctx.fillStyle = gradiente;
+      ctx.fillRect(0, 0, larghezza, altezza);
+
+      const raggioScena = vettoriVista.raggio;
+      const centro = vettoriVista.centro;
+
+      const linea3d = (a, b) => {
+        const pa = mondoASchermoVettori(a[0], a[1], a[2]);
+        const pb = mondoASchermoVettori(b[0], b[1], b[2]);
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+      };
+
+      if (mostraAssiVettori) {
+        // Griglia di base (piano XZ sotto la nuvola di punti)
+        const yBase = centro[1] - raggioScena;
+        const divisioni = 8;
+        ctx.save();
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.14)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i <= divisioni; i++) {
+          const t = -raggioScena + (2 * raggioScena * i) / divisioni;
+          linea3d([centro[0] + t, yBase, centro[2] - raggioScena], [centro[0] + t, yBase, centro[2] + raggioScena]);
+          linea3d([centro[0] - raggioScena, yBase, centro[2] + t], [centro[0] + raggioScena, yBase, centro[2] + t]);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Assi PCA passanti per l'origine
+        const lunghezzaAsse = raggioScena * 1.15;
+        const varianza = Array.isArray(datiVettori.varianza_spiegata) ? datiVettori.varianza_spiegata : [];
+        const assi = [
+          { dir: [1, 0, 0], colore: "248, 113, 113", nome: "PC1", var: varianza[0] },
+          { dir: [0, 1, 0], colore: "74, 222, 128", nome: "PC2", var: varianza[1] },
+          { dir: [0, 0, 1], colore: "96, 165, 250", nome: "PC3", var: varianza[2] }
+        ];
+        assi.forEach(asse => {
+          const da = asse.dir.map(c => -c * lunghezzaAsse);
+          const a = asse.dir.map(c => c * lunghezzaAsse);
+          ctx.save();
+          ctx.setLineDash([5, 6]);
+          ctx.strokeStyle = `rgba(${asse.colore}, 0.45)`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          linea3d(da, a);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          const fine = mondoASchermoVettori(a[0], a[1], a[2]);
+          const inizio = mondoASchermoVettori(0, 0, 0);
+          ctx.strokeStyle = `rgba(${asse.colore}, 0.85)`;
+          disegnaFrecciaVettori(ctx, inizio.x, inizio.y, fine.x, fine.y);
+          ctx.fillStyle = `rgba(${asse.colore}, 0.95)`;
+          ctx.font = "bold 10px 'Share Tech Mono', monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(`${asse.nome}${Number.isFinite(asse.var) ? ` ${asse.var}%` : ""}`, fine.x, fine.y - 5);
+          ctx.restore();
+        });
+      }
+
+      // Indicatore di orientamento
+      ctx.fillStyle = "rgba(125, 211, 252, 0.55)";
+      ctx.font = "10px 'Share Tech Mono', monospace";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      const yawGradi = ((Math.round(vettoriYaw * 180 / Math.PI) % 360) + 360) % 360;
+      ctx.fillText(
+        `yaw ${yawGradi}° • pitch ${Math.round(vettoriPitch * 180 / Math.PI)}°`,
+        larghezza - 12, altezza - 10
+      );
+
+      const visibili = documentiVisibiliVettori();
+      const visibiliIds = new Set(visibili.map(d => d.id));
+      const mappaDocumenti = new Map((datiVettori.documenti || []).map(d => [d.id, d]));
+      const attivoRicerca = vettoriRicerca.length > 0;
+
+      // Proiezione di tutti i documenti, ordinati dal più lontano al più vicino
+      vettoriProiettati = (datiVettori.documenti || [])
+        .map(documento => ({ documento, punto: mondoASchermoVettori(documento.x, documento.y, documento.z) }))
+        .sort((a, b) => a.punto.z - b.punto.z);
+      const proiezioni = new Map(vettoriProiettati.map(e => [e.documento.id, e.punto]));
+      const puntoQuery = queryVettori && Number.isFinite(queryVettori.x) && Number.isFinite(queryVettori.y)
+        ? mondoASchermoVettori(queryVettori.x, queryVettori.y, queryVettori.z)
+        : null;
+
+      // 1. Linee di similarità
+      const coppieDisegnate = new Set();
+      const disegnaLineaVettori = (puntoDa, puntoA, intensita, etichetta) => {
+        ctx.save();
+        ctx.strokeStyle = `rgba(56, 189, 248, ${Math.max(0.12, Math.min(0.72, intensita))})`;
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.lineWidth = 1.1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(puntoDa.x, puntoDa.y);
+        ctx.lineTo(puntoA.x, puntoA.y);
+        ctx.stroke();
+        disegnaFrecciaVettori(ctx, puntoDa.x, puntoDa.y, puntoA.x, puntoA.y);
+        if (etichetta) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = "rgba(186, 230, 253, 0.9)";
+          ctx.font = "9px 'Share Tech Mono', monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(etichetta, (puntoDa.x + puntoA.x) / 2, (puntoDa.y + puntoA.y) / 2 - 5);
+        }
+        ctx.restore();
+      };
+
+      if (mostraViciniVettori) {
+        visibili.forEach(documento => {
+          (documento.vicini || []).forEach(vicino => {
+            if (!visibiliIds.has(vicino.id)) return;
+            const chiave = [documento.id, vicino.id].sort().join("::");
+            if (coppieDisegnate.has(chiave)) return;
+            coppieDisegnate.add(chiave);
+            const da = proiezioni.get(documento.id);
+            const a = proiezioni.get(vicino.id);
+            if (da && a) disegnaLineaVettori(da, a, (vicino.similarita || 0) / 180, "");
+          });
+        });
+      } else if (vettoreSelezionatoId) {
+        const selezionato = mappaDocumenti.get(vettoreSelezionatoId);
+        const da = proiezioni.get(vettoreSelezionatoId);
+        if (selezionato && da) {
+          (selezionato.vicini || []).forEach(vicino => {
+            const a = proiezioni.get(vicino.id);
+            if (a && visibiliIds.has(vicino.id)) {
+              disegnaLineaVettori(da, a, (vicino.similarita || 0) / 110, `${vicino.similarita}%`);
+            }
+          });
+        }
+      }
+
+      if (puntoQuery && Array.isArray(queryVettori.risultati)) {
+        queryVettori.risultati.forEach(risultato => {
+          const a = proiezioni.get(risultato.id);
+          if (a && visibiliIds.has(risultato.id)) {
+            disegnaLineaVettori(puntoQuery, a, (risultato.similarita || 0) / 130, `${risultato.similarita}%`);
+          }
+        });
+      }
+
+      // Linea di proiezione sul piano di base per il punto selezionato (aiuta a leggere la profondità)
+      if (mostraAssiVettori && vettoreSelezionatoId) {
+        const selezionato = mappaDocumenti.get(vettoreSelezionatoId);
+        const alto = proiezioni.get(vettoreSelezionatoId);
+        if (selezionato && alto) {
+          const basso = mondoASchermoVettori(selezionato.x, centro[1] - raggioScena, selezionato.z);
+          ctx.save();
+          ctx.setLineDash([3, 4]);
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+          ctx.beginPath();
+          ctx.moveTo(alto.x, alto.y);
+          ctx.lineTo(basso.x, basso.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.ellipse(basso.x, basso.y, 6 * basso.f, 2.5 * basso.f, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 2. Punti documento (dal fondo verso il primo piano)
+      vettoriProiettati.forEach(({ documento, punto }) => {
+        const raggio = Math.max(2.5, raggioVettore(documento) * punto.f);
+        const stile = stileVettore(documento);
+        const visibile = visibiliIds.has(documento.id);
+        const corrisponde = documentoCorrispondeRicercaVettori(documento);
+        const selezionato = documento.id === vettoreSelezionatoId;
+        const hover = documento.id === vettoreHoverId;
+        const opacitaProfondita = 0.45 + 0.55 * punto.profondita;
+
+        ctx.save();
+        ctx.globalAlpha = (!visibile || (attivoRicerca && !corrisponde)) ? 0.12 : opacitaProfondita;
+
+        if (selezionato || hover) {
+          ctx.beginPath();
+          ctx.arc(punto.x, punto.y, raggio + 8, 0, Math.PI * 2);
+          ctx.fillStyle = stile.border;
+          ctx.globalAlpha *= 0.28;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        // Sfera: gradiente radiale con riflesso in alto a sinistra
+        const sfera = ctx.createRadialGradient(
+          punto.x - raggio * 0.35, punto.y - raggio * 0.35, raggio * 0.1,
+          punto.x, punto.y, raggio
+        );
+        sfera.addColorStop(0, stile.border);
+        sfera.addColorStop(1, stile.bg);
+        ctx.beginPath();
+        ctx.arc(punto.x, punto.y, raggio, 0, Math.PI * 2);
+        ctx.fillStyle = sfera;
+        ctx.fill();
+        ctx.lineWidth = selezionato ? 3 : (hover ? 2.4 : 1.4);
+        ctx.strokeStyle = selezionato ? "#ffffff" : stile.border;
+        ctx.stroke();
+
+        if (documento.sospetto) {
+          ctx.fillStyle = "#c084fc";
+          ctx.beginPath();
+          ctx.arc(punto.x, punto.y, Math.max(2, raggio * 0.32), 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        if (mostraEtichetteVettori || hover || selezionato || vettoriZoom >= 1.35) {
+          const etichetta = documento.codice || documento.id;
+          ctx.font = "bold 10px 'Rajdhani', 'Inter', sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          const larghezzaTesto = ctx.measureText(etichetta).width;
+          ctx.fillStyle = "rgba(7, 8, 8, 0.85)";
+          ctx.beginPath();
+          ctx.roundRect(punto.x - larghezzaTesto / 2 - 4, punto.y + raggio + 3, larghezzaTesto + 8, 14, 3);
+          ctx.fill();
+          ctx.fillStyle = selezionato ? "#ffffff" : stile.text;
+          ctx.fillText(etichetta, punto.x, punto.y + raggio + 4);
+        }
+
+        ctx.restore();
+      });
+
+      // 3. Punto della domanda proiettata
+      if (puntoQuery) {
+        const punto = puntoQuery;
+        const scalaQuery = Math.max(0.6, punto.f);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(punto.x, punto.y, 16 * scalaQuery, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
+        ctx.fill();
+
+        ctx.translate(punto.x, punto.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.scale(scalaQuery, scalaQuery);
+        ctx.fillStyle = "#0c4a6e";
+        ctx.strokeStyle = "#7dd3fc";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.rect(-7, -7, 14, 14);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.font = "bold 10px 'Share Tech Mono', monospace";
+        ctx.fillStyle = "#e0f2fe";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("DOMANDA", punto.x, punto.y - 20 * scalaQuery);
+      }
+
+      ctx.restore();
+    }
+
+    function onMouseDownVettori(evento) {
+      if (!canvasVettori) return;
+      const rect = canvasVettori.getBoundingClientRect();
+      const x = evento.clientX - rect.left;
+      const y = evento.clientY - rect.top;
+      vettoriDocGiu = evento.button === 0 ? trovaDocumentoVettore(x, y) : null;
+      vettoriModalitaDrag = (evento.shiftKey || evento.button === 2) ? "sposta" : "ruota";
+      vettoriTrascinando = true;
+      vettoriSpostato = false;
+      vettoriMouseDown = { x: evento.clientX, y: evento.clientY };
+      vettoriUltimoMouse = { x: evento.clientX, y: evento.clientY };
+      if (canvasVettori) canvasVettori.style.cursor = "grabbing";
+    }
+
+    function onMouseMoveVettori(evento) {
+      if (!canvasVettori) return;
+
+      if (vettoriTrascinando) {
+        const dx = evento.clientX - vettoriUltimoMouse.x;
+        const dy = evento.clientY - vettoriUltimoMouse.y;
+        if (Math.hypot(evento.clientX - (vettoriMouseDown?.x || evento.clientX), evento.clientY - (vettoriMouseDown?.y || evento.clientY)) > 3) {
+          vettoriSpostato = true;
+        }
+        if (vettoriSpostato) {
+          if (vettoriModalitaDrag === "sposta") {
+            vettoriOffset.x += dx;
+            vettoriOffset.y += dy;
+          } else {
+            vettoriYaw += dx * 0.008;
+            vettoriPitch = Math.max(-1.5, Math.min(1.5, vettoriPitch + dy * 0.008));
+          }
+          nascondiTooltipVettori();
+        }
+        vettoriUltimoMouse = { x: evento.clientX, y: evento.clientY };
+        ridisegnaCanvasVettori();
+        return;
+      }
+
+      const rect = canvasVettori.getBoundingClientRect();
+      const x = evento.clientX - rect.left;
+      const y = evento.clientY - rect.top;
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+        if (vettoreHoverId !== null) {
+          vettoreHoverId = null;
+          nascondiTooltipVettori();
+          ridisegnaCanvasVettori();
+        }
+        return;
+      }
+
+      const documento = trovaDocumentoVettore(x, y);
+      const nuovoHover = documento ? documento.id : null;
+      if (nuovoHover !== vettoreHoverId) {
+        vettoreHoverId = nuovoHover;
+        ridisegnaCanvasVettori();
+      }
+      if (documento) {
+        canvasVettori.style.cursor = "pointer";
+        mostraTooltipVettore(documento, evento.clientX, evento.clientY);
+      } else {
+        canvasVettori.style.cursor = "crosshair";
+        nascondiTooltipVettori();
+      }
+    }
+
+    function onMouseUpVettori() {
+      if (vettoriTrascinando && !vettoriSpostato && vettoriDocGiu) {
+        selezionaVettore(vettoriDocGiu.id);
+      }
+      vettoriDocGiu = null;
+      vettoriTrascinando = false;
+      if (canvasVettori) canvasVettori.style.cursor = "crosshair";
+    }
+
+    function onWheelVettori(evento) {
+      evento.preventDefault();
+      if (!canvasVettori || !vettoriVista) return;
+      const fattore = evento.deltaY < 0 ? 1.12 : 0.89;
+      vettoriZoom = Math.max(0.35, Math.min(6.0, vettoriZoom * fattore));
+      aggiornaZoomLabelVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function aggiornaZoomLabelVettori() {
+      const label = document.getElementById("vettori-zoom-label");
+      if (label) label.textContent = `${Math.round(vettoriZoom * 100)}%`;
+    }
+
+    function zoomVettori(fattore) {
+      if (!vettoriVista) return;
+      vettoriZoom = Math.max(0.35, Math.min(6.0, vettoriZoom * fattore));
+      aggiornaZoomLabelVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function resetZoomVettori() {
+      vettoriZoom = 1.0;
+      vettoriOffset = { x: 0, y: 0 };
+      vettoriYaw = VETTORI_YAW_INIZIALE;
+      vettoriPitch = VETTORI_PITCH_INIZIALE;
+      aggiornaZoomLabelVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function mostraTooltipVettore(documento, clientX, clientY) {
+      const tooltip = document.getElementById("vettori-tooltip");
+      if (!tooltip) return;
+      const contenitore = tooltip.parentElement;
+      const rect = contenitore.getBoundingClientRect();
+      const stile = stileVettore(documento);
+      const left = Math.max(8, Math.min(clientX - rect.left + 14, rect.width - 250));
+      const top = Math.max(8, Math.min(clientY - rect.top + 14, rect.height - 110));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+      tooltip.innerHTML = `
+        <div class="flex items-center gap-1.5 font-bold text-white">
+          <span class="w-2 h-2 rounded-full" style="background:${stile.border}"></span>
+          [${escapeHtml(documento.codice)}]
+        </div>
+        <div class="text-stone-300 mt-0.5">${escapeHtml(documento.titolo)}</div>
+        <div class="text-[10px] text-stone-400 mt-1">${escapeHtml(documento.fase)} • ${documento.lunghezza} caratteri</div>
+        <div class="flex flex-wrap gap-1 mt-1.5">
+          ${(documento.termini || []).slice(0, 4).map(t => `<span class="px-1 py-0.5 rounded bg-bunker-950 border border-bunker-700 text-stone-300 text-[9px]">${escapeHtml(t)}</span>`).join("")}
+        </div>
+      `;
+      tooltip.classList.remove("hidden");
+    }
+
+    function nascondiTooltipVettori() {
+      const tooltip = document.getElementById("vettori-tooltip");
+      if (tooltip) tooltip.classList.add("hidden");
+    }
+
+    function selezionaVettore(id) {
+      vettoreSelezionatoId = id;
+      renderDettaglioVettore(id);
+      ridisegnaCanvasVettori();
+    }
+
+    function apriVettoreInLavagna(id) {
+      impostaSubmodalitaLavagna("grafo");
+      selezionaNodoLavagna(id);
+      document.getElementById("sezione-lavagna")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderDettaglioVettore(id) {
+      const drawer = document.getElementById("vettori-drawer");
+      if (!drawer) return;
+      const documenti = datiVettori.documenti || [];
+      const documento = documenti.find(d => d.id === id);
+      if (!documento) {
+        drawer.innerHTML = `
+          <div class="text-xs font-mono text-stone-500">
+            Seleziona un punto sulla mappa per leggere i dettagli del documento.
+          </div>
+        `;
+        return;
+      }
+
+      const stile = stileVettore(documento);
+      const vicini = (documento.vicini || []).map(vicino => {
+        const altro = documenti.find(d => d.id === vicino.id);
+        return altro ? { ...vicino, documento: altro } : null;
+      }).filter(Boolean);
+
+      const htmlVicini = vicini.map(vicino => `
+        <button type="button" onclick="selezionaVettore('${escapeHtml(vicino.id)}')"
+          class="w-full text-left p-2 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-800 hover:border-sky-600 transition space-y-1 group">
+          <div class="flex items-center justify-between gap-2 text-[11px] font-mono">
+            <span class="text-white group-hover:text-sky-300 font-bold">[${escapeHtml(vicino.documento.codice)}]</span>
+            <span class="text-sky-300 font-bold">${vicino.similarita}%</span>
+          </div>
+          <div class="text-[10px] text-stone-400 line-clamp-1">${escapeHtml(vicino.documento.titolo)}</div>
+          <div class="h-1 rounded bg-bunker-800 overflow-hidden">
+            <div class="h-full rounded bg-sky-500" style="width:${Math.max(3, Math.min(100, vicino.similarita))}%"></div>
+          </div>
+        </button>
+      `).join("") || `<div class="text-[11px] font-mono text-stone-500 italic">Nessun documento sufficientemente simile.</div>`;
+
+      const termini = (documento.termini || []).map(termine =>
+        `<span class="px-1.5 py-0.5 rounded bg-sky-950/70 border border-sky-800 text-sky-200 text-[10px]">${escapeHtml(termine)}</span>`
+      ).join(" ");
+
+      const avviso = documento.sospetto
+        ? `<div class="p-2 rounded-lg bg-purple-950/80 border border-purple-600 text-purple-200 text-[11px] font-mono">
+             ⚠️ Il documento contiene possibili istruzioni ostili (prompt injection).
+           </div>`
+        : "";
+
+      drawer.innerHTML = `
+        <div class="space-y-4">
+          <div class="border-b border-bunker-800 pb-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider"
+                style="background:${stile.bg}; color:${stile.text}; border:1px solid ${stile.border}">
+                ${escapeHtml(documento.fase)}
+              </span>
+              <span class="text-[10px] font-mono text-stone-400 bg-bunker-950 px-2 py-0.5 rounded border border-bunker-800">
+                ${escapeHtml(documento.formato || "txt")}
+              </span>
+            </div>
+            <h3 class="font-display font-bold uppercase tracking-wider text-base text-white mt-2">
+              [${escapeHtml(documento.codice)}] ${escapeHtml(documento.titolo)}
+            </h3>
+            <div class="text-[10px] font-mono text-stone-500 mt-1 break-all">${escapeHtml(documento.id)}</div>
+            ${avviso}
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-[10px] font-mono">
+            <div class="p-2 rounded-lg bg-bunker-950 border border-bunker-800">
+              <div class="text-stone-500 uppercase">PC1</div>
+              <div class="text-sky-300 font-bold text-sm">${documento.x}</div>
+            </div>
+            <div class="p-2 rounded-lg bg-bunker-950 border border-bunker-800">
+              <div class="text-stone-500 uppercase">PC2</div>
+              <div class="text-sky-300 font-bold text-sm">${documento.y}</div>
+            </div>
+            <div class="p-2 rounded-lg bg-bunker-950 border border-bunker-800">
+              <div class="text-stone-500 uppercase">PC3</div>
+              <div class="text-sky-300 font-bold text-sm">${documento.z ?? 0}</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+            <div class="p-2 rounded-lg bg-bunker-950 border border-bunker-800">
+              <div class="text-stone-500 uppercase">Cluster</div>
+              <div class="text-white font-bold">${Number(documento.cluster || 0) + 1}
+                <span class="text-[9px] text-stone-400 font-normal">· ${escapeHtml(documento.cluster_nome || "gruppo")}</span>
+              </div>
+            </div>
+            <div class="p-2 rounded-lg bg-bunker-950 border border-bunker-800">
+              <div class="text-stone-500 uppercase">Lunghezza</div>
+              <div class="text-white font-bold">${documento.lunghezza} caratteri</div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-mono uppercase text-stone-400 font-bold">Termini più caratteristici</div>
+            <div class="flex flex-wrap gap-1">${termini || '<span class="text-stone-500 text-[11px]">Nessun termine.</span>'}</div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="text-[11px] font-mono uppercase text-stone-400 font-bold">Anteprima</div>
+            <div class="p-2.5 rounded-lg bg-bunker-950 border border-bunker-800 text-[11px] font-mono text-stone-300 leading-relaxed max-h-32 overflow-y-auto">
+              ${escapeHtml(documento.anteprima || "Nessuna anteprima disponibile.")}
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-mono uppercase text-stone-400 font-bold">
+              <span>Documenti più simili</span>
+              <span class="text-[10px] text-stone-500">cosine</span>
+            </div>
+            <div class="space-y-1.5 max-h-52 overflow-y-auto">${htmlVicini}</div>
+          </div>
+        </div>
+
+        <div class="pt-4 mt-4 border-t border-bunker-800 space-y-2">
+          <button type="button" onclick="apriVettoreInLavagna('${escapeHtml(documento.id)}')"
+            class="w-full py-2 px-3 rounded-lg bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-200 font-mono text-xs font-bold transition flex items-center justify-center gap-2">
+            <span>🧩</span> Apri nella Lavagna
+          </button>
+          <button type="button" onclick="interrogaArmandoDaNodo('Cosa dice il documento ${escapeHtml(documento.codice)} (${escapeHtml(documento.titolo)}) e a quali altri documenti è collegato?')"
+            class="w-full py-2.5 px-3 rounded-lg bg-sky-800 hover:bg-sky-700 text-white font-mono text-xs font-bold transition flex items-center justify-center gap-2 border border-sky-600">
+            <span>💬</span> Chiedi ad Armando
+          </button>
+        </div>
+      `;
+    }
+
+    // -------------------------------------------------------------------------
+    // Proiezione di una domanda nello spazio vettoriale
+    // -------------------------------------------------------------------------
+    async function proiettaDomandaVettori(evento) {
+      evento.preventDefault();
+      const input = document.getElementById("vettori-domanda-input");
+      const stato = document.getElementById("vettori-query-stato");
+      const testo = (input?.value || "").trim();
+      if (!testo) {
+        if (stato) stato.textContent = "Scrivi una domanda da proiettare.";
+        return;
+      }
+
+      if (stato) stato.textContent = "Calcolo della proiezione...";
+      let risultato = null;
+
+      if (apiBase !== null && modelloVettoriJs === null) {
+        try {
+          const risposta = await fetch(`${apiBase}/api/vector-map/query`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ testo: testo })
+          });
+          const dati = await risposta.json();
+          if (risposta.ok && dati.ok && Number.isFinite(dati.z)) risultato = dati;
+        } catch (_) {}
+      }
+
+      if (!risultato) {
+        if (!modelloVettoriJs) {
+          // Il backend non ha risposto: ricostruisce lo spazio in locale per non
+          // lasciare la sezione senza proiezione della domanda.
+          const fallback = costruisciSpazioVettorialeJs(await caricaFontiVettori());
+          if (fallback.modello) {
+            modelloVettoriJs = fallback.modello;
+            datiVettori = fallback.spazio;
+            aggiornaVistaVettoriCompleta();
+          }
+        }
+        risultato = proiettaQueryVettoriJs(testo);
+      }
+
+      if (!risultato || !risultato.ok) {
+        if (stato) stato.textContent = risultato?.error || "Proiezione non riuscita.";
+        return;
+      }
+
+      queryVettori = risultato;
+      if (stato) stato.textContent = `Proiezione: PC1 ${risultato.x} • PC2 ${risultato.y} • PC3 ${risultato.z}`;
+      renderLegendaVettori();
+      aggiornaUiQueryVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function aggiornaUiQueryVettori() {
+      const risultati = document.getElementById("vettori-query-risultati");
+      const rimuovi = document.getElementById("vettori-query-rimuovi");
+      const stato = document.getElementById("vettori-query-stato");
+      if (!risultati || !rimuovi) return;
+
+      if (!queryVettori) {
+        risultati.classList.add("hidden");
+        risultati.innerHTML = "";
+        rimuovi.classList.add("hidden");
+        if (stato) stato.textContent = "";
+        return;
+      }
+
+      rimuovi.classList.remove("hidden");
+      risultati.classList.remove("hidden");
+
+      const elenco = Array.isArray(queryVettori.risultati) ? queryVettori.risultati : [];
+      if (elenco.length === 0) {
+        risultati.innerHTML = `<span class="text-stone-500">Nessun termine del vocabolario riconosciuto nella domanda.</span>`;
+        return;
+      }
+
+      risultati.innerHTML = `<span class="text-sky-300 uppercase tracking-wider font-bold">Documenti più vicini:</span>` + elenco.map(risultato => `
+        <button type="button" onclick="selezionaVettore('${escapeHtml(risultato.id)}')"
+          class="px-2 py-1 rounded bg-sky-950/70 hover:bg-sky-900 border border-sky-800 hover:border-sky-600 text-sky-200 transition">
+          [${escapeHtml(risultato.codice)}] <span class="text-white font-bold">${risultato.similarita}%</span>
+        </button>
+      `).join("");
+    }
+
+    function rimuoviQueryVettori() {
+      queryVettori = null;
+      aggiornaUiQueryVettori();
+      renderLegendaVettori();
+      ridisegnaCanvasVettori();
+    }
+
+    function proiettaQueryVettoriJs(testo) {
+      if (!modelloVettoriJs) {
+        return { ok: false, error: "Spazio vettoriale non disponibile." };
+      }
+      const contatore = new Map();
+      tokenizzaVettori(testo).forEach(termine => {
+        contatore.set(termine, (contatore.get(termine) || 0) + 1);
+      });
+
+      const idf = modelloVettoriJs.idf;
+      const vettoreQuery = {};
+      contatore.forEach((frequenza, termine) => {
+        if (Object.prototype.hasOwnProperty.call(idf, termine)) {
+          vettoreQuery[termine] = (1 + Math.log(frequenza)) * idf[termine];
+        }
+      });
+      const queryNormalizzata = normalizzaVettoreJs(vettoreQuery);
+      const terminiRiconosciuti = Object.keys(queryNormalizzata);
+
+      const similarita = modelloVettoriJs.vettori.map(vettore => Math.max(0, Math.min(1, prodottoScalareJs(queryNormalizzata, vettore))));
+      let x = 0;
+      let y = 0;
+      let z = 0;
+      let peso = 0;
+      modelloVettoriJs.documenti.forEach((documento, indice) => {
+        const w = Math.pow(Math.max(0, similarita[indice]), 2);
+        x += documento.x * w;
+        y += documento.y * w;
+        z += (documento.z || 0) * w;
+        peso += w;
+      });
+      if (peso > 1e-12) {
+        x /= peso;
+        y /= peso;
+        z /= peso;
+      } else {
+        x = 0;
+        y = 0;
+        z = 0;
+      }
+
+      const ranking = similarita
+        .map((punteggio, indice) => ({ indice, punteggio }))
+        .filter(elemento => elemento.punteggio > 0)
+        .sort((a, b) => b.punteggio - a.punteggio)
+        .slice(0, 5);
+
+      return {
+        ok: true,
+        domanda: testo,
+        x: Math.round(x * 100) / 100,
+        y: Math.round(y * 100) / 100,
+        z: Math.round(z * 100) / 100,
+        termini_riconosciuti: terminiRiconosciuti.sort(),
+        risultati: ranking.map(elemento => {
+          const documento = modelloVettoriJs.documenti[elemento.indice];
+          return {
+            id: documento.id,
+            codice: documento.codice,
+            titolo: documento.titolo,
+            fase: documento.fase,
+            similarita: Math.round(elemento.punteggio * 1000) / 10,
+            x: documento.x,
+            y: documento.y,
+            z: documento.z
+          };
+        })
+      };
+    }
+
+    // -------------------------------------------------------------------------
+    // Calcolo nel browser: TF-IDF + PCA 3D (fallback senza server Python)
+    // -------------------------------------------------------------------------
+    function tokenizzaVettori(testo) {
+      const parole = (String(testo || "").toLowerCase().replace(/\u2019/g, "'").match(/[a-zàèéìòù0-9_-]+/g) || []);
+      const tokens = [];
+      parole.forEach(parola => {
+        if (parola.length <= 2 || STOPWORDS_VETTORI.has(parola)) return;
+        tokens.push(parola);
+        if (parola.length > 5 && !/[0-9]/.test(parola)) tokens.push(parola.slice(0, 5));
+      });
+      return tokens;
+    }
+
+    function normalizzaVettoreJs(vettore) {
+      let norma = 0;
+      Object.values(vettore).forEach(valore => { norma += valore * valore; });
+      norma = Math.sqrt(norma);
+      if (norma <= 1e-12) return {};
+      const normalizzato = {};
+      Object.entries(vettore).forEach(([termine, valore]) => {
+        normalizzato[termine] = valore / norma;
+      });
+      return normalizzato;
+    }
+
+    function prodottoScalareJs(a, b) {
+      const [corto, lungo] = Object.keys(a).length <= Object.keys(b).length ? [a, b] : [b, a];
+      let totale = 0;
+      Object.entries(corto).forEach(([termine, valore]) => {
+        if (lungo[termine] !== undefined) totale += valore * lungo[termine];
+      });
+      return totale;
+    }
+
+    function pulisciTestoHtmlVettori(testo) {
+      return String(testo || "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function estraiMetaVettore(nome, contenuto) {
+      const raw = String(contenuto || "").trim();
+      const suffisso = (String(nome).split(".").pop() || "").toLowerCase();
+      const campi = {};
+
+      if (suffisso === "json" || (raw.startsWith("{") && raw.endsWith("}"))) {
+        try {
+          const dati = JSON.parse(raw);
+          if (dati && typeof dati === "object") {
+            ["id", "title", "text", "source", "license"].forEach(campo => {
+              if (dati[campo] !== undefined) campi[campo] = String(dati[campo]).trim();
+            });
+          }
+        } catch (_) {}
+      }
+
+      if (Object.keys(campi).length === 0 && (suffisso === "xml" || raw.startsWith("<?xml") || raw.startsWith("<documento"))) {
+        ["id", "title", "text", "source", "license"].forEach(campo => {
+          const match = raw.match(new RegExp(`<${campo}>([\\s\\S]*?)</${campo}>`, "i"));
+          if (match) campi[campo] = pulisciTestoHtmlVettori(match[1]);
+        });
+      }
+
+      if (Object.keys(campi).length === 0 && (suffisso === "html" || raw.toLowerCase().startsWith("<!doctype") || raw.toLowerCase().includes("<article"))) {
+        const regex = /<p><b>([^<]+)<\/b>:\s*([\s\S]*?)<\/p>/gi;
+        let match;
+        while ((match = regex.exec(raw)) !== null) {
+          campi[match[1].trim().toLowerCase()] = pulisciTestoHtmlVettori(match[2]);
+        }
+      }
+
+      if (Object.keys(campi).length === 0) {
+        raw.split(/\r?\n/).forEach(riga => {
+          const match = riga.match(/^(id|title|text|source|license)\s*:\s*(.*)$/i);
+          if (match) campi[match[1].toLowerCase()] = match[2].trim();
+        });
+      }
+
+      const stem = String(nome).replace(/\.[^.]+$/, "").replace(/_/g, "-");
+      let codice = stem;
+      let titolo = "Documento";
+      let corpo = "";
+
+      if (campi.id && (campi.title || campi.text)) {
+        codice = campi.id || stem;
+        titolo = campi.title || "Documento";
+        corpo = campi.text || "";
+      } else {
+        const righe = raw.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+        let corpoRighe = righe;
+        if (righe.length > 0 && /^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)/i.test(righe[0])) {
+          const match = righe[0].match(/^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)/i);
+          codice = match ? match[1] : stem;
+          titolo = righe[1] || "Documento";
+          corpoRighe = righe.slice(2);
+        } else if (righe.length > 1 && /^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)/i.test(righe[1])) {
+          const match = righe[1].match(/^(?:ID|Documento:?)\s*([A-Za-z0-9_-]+)/i);
+          codice = match ? match[1] : stem;
+          titolo = righe[2] || righe[0] || "Documento";
+          corpoRighe = righe.slice(3);
+        } else if (righe.length > 0) {
+          codice = righe[0].replace(/^ID\s*/i, "").trim() || stem;
+          titolo = righe[1] || "Documento";
+          corpoRighe = righe.slice(2);
+        }
+        corpo = corpoRighe.join(" ") || raw;
+      }
+
+      const idUpper = String(codice).toUpperCase();
+      const nomeLower = String(nome).toLowerCase();
+      let fase = "Dossier";
+      if (nomeLower.startsWith("g1") || idUpper.startsWith("G1")) fase = "Giorno 1";
+      else if (nomeLower.startsWith("g2") || idUpper.startsWith("G2")) fase = "Giorno 2";
+      else if (nomeLower.startsWith("lx5") || idUpper.startsWith("LX5")) fase = "Imprevisti";
+      else if (idUpper.startsWith("ARCH") || nomeLower.startsWith("arch-")) fase = "Giorno 3 (Archivio)";
+      else if (idUpper.startsWith("WIKI") || nomeLower.startsWith("wiki-")) fase = "Archivio Wikipedia";
+
+      return {
+        codice,
+        titolo,
+        corpo: corpo || raw,
+        fase,
+        formato: suffisso || "txt",
+        sospetto: rilevaIstruzioniOstiliJs(raw).length > 0
+      };
+    }
+
+    function normalizzaArrayJs(vettore) {
+      const norma = Math.sqrt(vettore.reduce((totale, valore) => totale + valore * valore, 0));
+      if (norma <= 1e-12) return vettore.slice();
+      return vettore.map(valore => valore / norma);
+    }
+
+    function prodottoScalareArrayJs(a, b) {
+      let totale = 0;
+      for (let i = 0; i < a.length; i++) totale += a[i] * b[i];
+      return totale;
+    }
+
+    function componentiPrincipaliGramJs(matrice, quanti) {
+      const dimensione = matrice.length;
+      if (dimensione === 0) return { componenti: [], autovalori: [] };
+      let matriceDeflata = matrice.map(riga => riga.slice());
+      const componenti = [];
+      const autovalori = [];
+
+      for (let indiceComponente = 0; indiceComponente < Math.min(quanti, dimensione); indiceComponente++) {
+        let vettore = Array.from({ length: dimensione }, (_, posizione) =>
+          Math.sin((posizione + 1) * (indiceComponente + 1) * 1.7) + 0.5
+        );
+        vettore = normalizzaArrayJs(vettore);
+
+        for (let iterazione = 0; iterazione < 240; iterazione++) {
+          let nuovo = matriceDeflata.map(riga => prodottoScalareArrayJs(riga, vettore));
+          componenti.forEach(componente => {
+            const proiezione = prodottoScalareArrayJs(nuovo, componente);
+            nuovo = nuovo.map((valore, i) => valore - proiezione * componente[i]);
+          });
+          const norma = Math.sqrt(nuovo.reduce((totale, valore) => totale + valore * valore, 0));
+          if (norma <= 1e-12) break;
+          nuovo = nuovo.map(valore => valore / norma);
+          let differenza = 0;
+          for (let i = 0; i < dimensione; i++) differenza += Math.abs(nuovo[i] - vettore[i]);
+          vettore = nuovo;
+          if (differenza <= 1e-10) break;
+        }
+
+        let autovalore = 0;
+        for (let i = 0; i < dimensione; i++) {
+          autovalore += vettore[i] * prodottoScalareArrayJs(matriceDeflata[i], vettore);
+        }
+        if (!(autovalore > 1e-10)) break;
+        if (vettore.reduce((totale, valore) => totale + valore, 0) < 0) {
+          vettore = vettore.map(valore => -valore);
+        }
+        componenti.push(vettore);
+        autovalori.push(autovalore);
+
+        for (let i = 0; i < dimensione; i++) {
+          for (let j = 0; j < dimensione; j++) {
+            matriceDeflata[i][j] -= autovalore * vettore[i] * vettore[j];
+          }
+        }
+      }
+      return { componenti, autovalori };
+    }
+
+    function calcolaClusterJs(punti, k) {
+      const totale = punti.length;
+      if (totale === 0) return [];
+      k = Math.max(1, Math.min(k, totale));
+      if (k === 1) return new Array(totale).fill(0);
+      const dimensioni = punti[0].length;
+      const distanza = (a, b) => {
+        let somma = 0;
+        for (let d = 0; d < dimensioni; d++) somma += (a[d] - b[d]) * (a[d] - b[d]);
+        return Math.sqrt(somma);
+      };
+
+      // Inizializzazione farthest-point deterministica
+      let primo = 0;
+      let massimaDistanza = -1;
+      const origine = new Array(dimensioni).fill(0);
+      punti.forEach((punto, indice) => {
+        const d = distanza(punto, origine);
+        if (d > massimaDistanza) {
+          massimaDistanza = d;
+          primo = indice;
+        }
+      });
+
+      const centri = [punti[primo].slice()];
+      while (centri.length < k) {
+        let candidato = 0;
+        let migliore = -1;
+        punti.forEach((punto, indice) => {
+          let d = Infinity;
+          centri.forEach(centro => { d = Math.min(d, distanza(punto, centro)); });
+          if (d > migliore) {
+            migliore = d;
+            candidato = indice;
+          }
+        });
+        centri.push(punti[candidato].slice());
+      }
+
+      let assegnazioni = new Array(totale).fill(0);
+      for (let iterazione = 0; iterazione < 40; iterazione++) {
+        const nuove = punti.map(punto => {
+          let migliore = 0;
+          let distanzaMinima = Infinity;
+          centri.forEach((centro, indice) => {
+            const d = distanza(punto, centro);
+            if (d < distanzaMinima) {
+              distanzaMinima = d;
+              migliore = indice;
+            }
+          });
+          return migliore;
+        });
+
+        if (nuove.every((valore, indice) => valore === assegnazioni[indice])) break;
+        assegnazioni = nuove;
+
+        for (let indiceCluster = 0; indiceCluster < k; indiceCluster++) {
+          const membri = punti.filter((_, indice) => assegnazioni[indice] === indiceCluster);
+          if (membri.length === 0) continue;
+          centri[indiceCluster] = Array.from({ length: dimensioni }, (_, d) =>
+            membri.reduce((totaleD, punto) => totaleD + punto[d], 0) / membri.length
+          );
+        }
+      }
+      return assegnazioni;
+    }
+
+    function costruisciSpazioVettorialeJs(fontiArray) {
+      const elenco = [];
+      const visti = new Set();
+      (Array.isArray(fontiArray) ? fontiArray : []).forEach(fonte => {
+        if (!fonte || !fonte.nome || visti.has(fonte.nome)) return;
+        visti.add(fonte.nome);
+        elenco.push(fonte);
+      });
+
+      const spazioVuoto = {
+        ok: true,
+        metodo: "TF-IDF + PCA 3D (calcolo nel browser)",
+        descrizione: "Nessun documento disponibile per la proiezione vettoriale.",
+        totale_documenti: 0,
+        vocabolario: 0,
+        varianza_spiegata: [0, 0, 0],
+        limite: 100,
+        assi: { x: "Componente principale 1", y: "Componente principale 2", z: "Componente principale 3" },
+        documenti: [],
+        fasi: [],
+        clusters: []
+      };
+      if (elenco.length === 0) return { spazio: spazioVuoto, modello: null };
+
+      const metadati = elenco.map(fonte => estraiMetaVettore(fonte.nome, fonte.contenuto));
+      const contatori = elenco.map((fonte, indice) => {
+        const meta = metadati[indice];
+        const testoVettoriale = [
+          meta.codice,
+          meta.titolo,
+          meta.titolo,
+          meta.fase,
+          meta.corpo
+        ].join(" ");
+        const contatore = new Map();
+        tokenizzaVettori(testoVettoriale).forEach(termine => {
+          contatore.set(termine, (contatore.get(termine) || 0) + 1);
+        });
+        return contatore;
+      });
+
+      const totaleDocumenti = elenco.length;
+      const df = new Map();
+      contatori.forEach(contatore => {
+        contatore.forEach((_, termine) => {
+          df.set(termine, (df.get(termine) || 0) + 1);
+        });
+      });
+
+      const idf = {};
+      df.forEach((frequenza, termine) => {
+        idf[termine] = Math.log((1 + totaleDocumenti) / (1 + frequenza)) + 1;
+      });
+
+      const vettori = contatori.map(contatore => {
+        const vettore = {};
+        contatore.forEach((frequenza, termine) => {
+          vettore[termine] = (1 + Math.log(frequenza)) * idf[termine];
+        });
+        return normalizzaVettoreJs(vettore);
+      });
+
+      const gram = Array.from({ length: totaleDocumenti }, (_, i) =>
+        Array.from({ length: totaleDocumenti }, (_, j) => prodottoScalareJs(vettori[i], vettori[j]))
+      );
+      const medieRiga = gram.map(riga => riga.reduce((totale, valore) => totale + valore, 0) / totaleDocumenti);
+      const mediaGenerale = medieRiga.reduce((totale, valore) => totale + valore, 0) / totaleDocumenti;
+      const gramCentrata = gram.map((riga, i) =>
+        riga.map((valore, j) => valore - medieRiga[i] - medieRiga[j] + mediaGenerale)
+      );
+
+      const { componenti, autovalori } = componentiPrincipaliGramJs(gramCentrata, 3);
+      const varianzaTotale = gramCentrata.reduce((totale, riga, indice) => totale + riga[indice], 0);
+      const varianzaSpiegata = [0, 0, 0];
+      autovalori.forEach((autovalore, indice) => {
+        varianzaSpiegata[indice] = varianzaTotale > 1e-12
+          ? Math.round((autovalore / varianzaTotale) * 1000) / 10
+          : 0;
+      });
+
+      let coordinateGrezze = [];
+      if (componenti.length >= 1) {
+        coordinateGrezze = Array.from({ length: totaleDocumenti }, (_, indice) =>
+          [0, 1, 2].map(c => componenti.length > c
+            ? componenti[c][indice] * Math.sqrt(Math.max(0, autovalori[c]))
+            : 0)
+        );
+      } else {
+        // PCA non calcolabile: distribuisce i documenti su una sfera (spirale di Fibonacci).
+        coordinateGrezze = Array.from({ length: totaleDocumenti }, (_, indice) => {
+          const t = totaleDocumenti > 1 ? indice / (totaleDocumenti - 1) : 0.5;
+          const quota = 1 - 2 * t;
+          const raggioOrizzontale = Math.sqrt(Math.max(0, 1 - quota * quota));
+          const angolo = indice * Math.PI * (3 - Math.sqrt(5));
+          return [100 * raggioOrizzontale * Math.cos(angolo), 100 * quota, 100 * raggioOrizzontale * Math.sin(angolo)];
+        });
+      }
+
+      const massimo = coordinateGrezze.reduce((m, c) => Math.max(m, ...c.map(Math.abs)), 0);
+      const scala = massimo > 1e-12 ? 100 / massimo : 1;
+      const coordinate = coordinateGrezze.map(c => c.map(v => Math.round(v * scala * 100) / 100));
+
+      const assegnazioni = calcolaClusterJs(coordinate, 4);
+      const nomiCluster = {};
+      assegnazioni.forEach((indiceCluster, indice) => {
+        if (!nomiCluster[indiceCluster]) nomiCluster[indiceCluster] = [];
+        nomiCluster[indiceCluster].push(metadati[indice].fase);
+      });
+      Object.keys(nomiCluster).forEach(indiceCluster => {
+        const conteggio = {};
+        nomiCluster[indiceCluster].forEach(fase => {
+          conteggio[fase] = (conteggio[fase] || 0) + 1;
+        });
+        nomiCluster[indiceCluster] = Object.entries(conteggio).sort((a, b) => b[1] - a[1])[0][0];
+      });
+
+      const similarita = Array.from({ length: totaleDocumenti }, (_, i) =>
+        Array.from({ length: totaleDocumenti }, (_, j) => Math.max(0, Math.min(1, prodottoScalareJs(vettori[i], vettori[j]))))
+      );
+
+      const documenti = elenco.map((fonte, indice) => {
+        const meta = metadati[indice];
+        const termini = Object.entries(vettori[indice])
+          .filter(([termine]) => !/^\d+$/.test(termine) && termine.length > 2)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([termine]) => termine);
+
+        const vicini = similarita[indice]
+          .map((punteggio, altro) => ({ altro, punteggio }))
+          .filter(elemento => elemento.altro !== indice && elemento.punteggio > 0)
+          .sort((a, b) => b.punteggio - a.punteggio)
+          .slice(0, 5)
+          .map(elemento => ({
+            id: elenco[elemento.altro].nome,
+            similarita: Math.round(elemento.punteggio * 1000) / 10
+          }));
+
+        const indiceCluster = assegnazioni[indice] || 0;
+        return {
+          id: fonte.nome,
+          codice: meta.codice,
+          titolo: meta.titolo,
+          fase: meta.fase,
+          formato: meta.formato,
+          sospetto: meta.sospetto,
+          lunghezza: String(fonte.contenuto || "").length,
+          anteprima: String(meta.corpo || "").slice(0, 220),
+          termini,
+          x: coordinate[indice][0],
+          y: coordinate[indice][1],
+          z: coordinate[indice][2],
+          cluster: indiceCluster,
+          cluster_nome: nomiCluster[indiceCluster] || `Gruppo ${indiceCluster + 1}`,
+          vicini
+        };
+      });
+
+      const conteggioFasi = {};
+      documenti.forEach(documento => {
+        conteggioFasi[documento.fase] = (conteggioFasi[documento.fase] || 0) + 1;
+      });
+      const fasi = Object.keys(conteggioFasi).sort().map(nome => ({ nome, totale: conteggioFasi[nome] }));
+      const clusters = Object.keys(nomiCluster).map(id => ({
+        id: Number(id),
+        nome: nomiCluster[id]
+      })).sort((a, b) => a.id - b.id);
+
+      const spazio = {
+        ok: true,
+        metodo: "TF-IDF + PCA 3D (calcolo nel browser)",
+        descrizione: "Proiezione 3D calcolata localmente sui documenti caricati, senza dipendenze esterne.",
+        totale_documenti: totaleDocumenti,
+        vocabolario: Object.keys(idf).length,
+        varianza_spiegata: varianzaSpiegata,
+        limite: 100,
+        assi: { x: "Componente principale 1", y: "Componente principale 2", z: "Componente principale 3" },
+        documenti,
+        fasi,
+        clusters
+      };
+
+      return {
+        spazio,
+        modello: {
+          idf,
+          vettori,
+          documenti
+        }
+      };
+    }
+
+
     function inizializzaMappa() {
       const urlMappa = (window.location.protocol === 'file:' || window.location.pathname.includes('/Frontend/'))
         ? 'mappa/index.html'
@@ -1739,15 +3542,25 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
     async function init() {
       inizializzaMappa();
       inizializzaCanvasLavagna();
+      inizializzaCanvasVettori();
       const istrEl = document.getElementById('istruzioni-view');
       if (istrEl) istrEl.value = ISTRUZIONI;
       await rilevaServerBackend();
+      if (apiBase === null && window.location.protocol !== 'file:') {
+        // Primo tentativo andato a vuoto (server appena avviato o risposta lenta):
+        // riprova una volta prima di passare alla modalità browser.
+        await new Promise(resolve => setTimeout(resolve, 700));
+        await rilevaServerBackend();
+      }
       renderFonti();
       aggiornaAnteprimaComplessita();
       await caricaDatiLavagna();
+      await caricaSpazioVettoriale();
       setTimeout(() => {
         ridimensionaCanvasLavagna();
         ridisegnaCanvasLavagna();
+        ridimensionaCanvasVettori();
+        ridisegnaCanvasVettori();
       }, 60);
     }
 
@@ -1826,7 +3639,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         if (base === '' && window.location.protocol === 'file:') continue;
         try {
           const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 1200);
+          const t = setTimeout(() => ctrl.abort(), 2000);
           const r = await fetch(`${base}/api/status`, { signal: ctrl.signal });
           clearTimeout(t);
           if (r.ok) {
@@ -2070,6 +3883,7 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
             fonti.sort((a, b) => a.nome.localeCompare(b.nome));
             renderFonti();
             caricaDatiLavagna();
+            caricaSpazioVettoriale();
           }
         };
         reader.readAsText(file);

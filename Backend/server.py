@@ -9,6 +9,7 @@ Responsabilità:
     POST /api/history/clear  -> Rimuove tutta la cronologia da SQLite
     DELETE /api/history      -> Rimuove tutta la cronologia da SQLite
     GET  /api/sources        -> Elenco e contenuto delle fonti del dossier
+    GET  /api/vector-sources -> Archivio completo (anche HTML/WIKI) per lo spazio vettoriale
     GET  /api/tools          -> Catalogo degli strumenti operativi disponibili
     POST /api/chat           -> Esecuzione query ibrida (Locale vs Cloud)
     POST /api/tools/execute  -> Invocazione diretta di un tool da API
@@ -207,6 +208,18 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                             "formattata": f"--- Fonte: {nome} ---\n{contenuto}",
                         }
                         for nome, contenuto in fonti
+                    ],
+                }
+            )
+
+        # API: Archivio completo (inclusi HTML, JSON, XML e voci WIKI) per lo spazio vettoriale
+        if path == "/api/vector-sources":
+            return self._send_json(
+                {
+                    "ok": True,
+                    "fonti": [
+                        {"nome": nome, "contenuto": contenuto}
+                        for nome, contenuto in carica_archivio_completo()
                     ],
                 }
             )
