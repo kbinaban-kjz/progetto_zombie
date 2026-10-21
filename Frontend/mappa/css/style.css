@@ -156,7 +156,7 @@ body.is-hovering-node #globe {
 
 .stage-frame {
   position: fixed;
-  inset: 92px 18px 54px;
+  inset: 92px 18px 16px;
   z-index: 2;
   pointer-events: none;
   opacity: 0.6;
@@ -238,7 +238,7 @@ body.is-hovering-node #globe {
 .coord-readout {
   position: fixed;
   left: 50%;
-  bottom: 66px;
+  bottom: 16px;
   z-index: 10;
   display: flex;
   gap: 16px;
@@ -476,7 +476,7 @@ body.is-hovering-node #globe {
   position: fixed;
   z-index: 15;
   top: 108px;
-  bottom: 58px;
+  bottom: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -565,8 +565,7 @@ body.is-hovering-node #globe {
   letter-spacing: 0.14em;
 }
 
-.panel-foot i.blink,
-.ticker-label i.rec {
+.panel-foot i.blink {
   display: inline-block;
   width: 5px;
   height: 5px;
@@ -1214,7 +1213,7 @@ body.is-hovering-node #globe {
 .map-controls {
   position: fixed;
   right: 380px;
-  bottom: 64px;
+  bottom: 16px;
   z-index: 14;
   display: flex;
   flex-direction: column;
@@ -1311,96 +1310,6 @@ body.is-hovering-node #globe {
 .tip-meta b {
   color: var(--muted);
   font-weight: 400;
-}
-
-/* =========================================================================
-   TICKER
-   ========================================================================= */
-
-.ticker {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  display: flex;
-  align-items: stretch;
-  height: 44px;
-  border-top: 1px solid var(--line);
-  background: rgba(4, 8, 6, 0.9);
-  backdrop-filter: blur(8px);
-}
-
-.ticker-label {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-  width: 174px;
-  padding: 0 14px;
-  border-right: 1px solid var(--line);
-  color: var(--red);
-  font-size: 8px;
-  letter-spacing: 0.18em;
-}
-
-.ticker-label i.rec {
-  background: var(--red);
-  box-shadow: 0 0 8px var(--red);
-}
-
-.ticker-viewport {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
-}
-
-.ticker-track {
-  display: flex;
-  width: max-content;
-  animation: ticker 56s linear infinite;
-}
-
-.ticker:hover .ticker-track {
-  animation-play-state: paused;
-}
-
-.ticker-half {
-  display: flex;
-  align-items: center;
-}
-
-.ticker-item {
-  position: relative;
-  padding-right: 44px;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-}
-
-.ticker-item::after {
-  content: "◆";
-  position: absolute;
-  right: 19px;
-  color: var(--red);
-  font-size: 5px;
-  opacity: 0.6;
-  top: 1px;
-}
-
-.ticker-side {
-  display: flex;
-  align-items: center;
-  flex: none;
-  padding: 0 16px;
-  border-left: 1px solid var(--line);
-  color: var(--dim);
-  font-size: 7.5px;
-  letter-spacing: 0.16em;
 }
 
 /* =========================================================================
@@ -1597,11 +1506,6 @@ body.is-hovering-node #globe {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes ticker {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-50%, 0, 0); }
-}
-
 @keyframes wave {
   0%, 100% { transform: scaleY(0.55); opacity: 0.35; }
   50% { transform: scaleY(1); opacity: 0.9; }
@@ -1652,16 +1556,12 @@ body.is-hovering-node #globe {
     top: 96px;
     right: 12px;
     width: 302px;
-    bottom: 54px;
+    bottom: 16px;
   }
 
   .map-controls {
     right: 326px;
-    bottom: 60px;
-  }
-
-  .ticker-side {
-    display: none;
+    bottom: 16px;
   }
 
   .stage-hint {
@@ -1673,7 +1573,7 @@ body.is-hovering-node #globe {
   }
 
   .stage-frame {
-    inset: 84px 12px 48px;
+    inset: 84px 12px 16px;
   }
 }
 
@@ -1714,7 +1614,7 @@ body.is-hovering-node #globe {
 
   .map-controls {
     right: 312px;
-    bottom: 56px;
+    bottom: 16px;
   }
 }
 
@@ -1762,7 +1662,7 @@ body.is-hovering-node #globe {
 
   .panel-left {
     top: 78px;
-    bottom: 52px;
+    bottom: 14px;
     width: min(300px, calc(100vw - 34px));
   }
 
@@ -1770,7 +1670,7 @@ body.is-hovering-node #globe {
     top: auto;
     left: 10px;
     right: 10px;
-    bottom: 50px;
+    bottom: 14px;
     width: auto;
     max-height: 43dvh;
     display: none;
@@ -1847,7 +1747,7 @@ body.is-hovering-node #globe {
     position: fixed;
     left: 10px;
     right: 10px;
-    bottom: 50px;
+    bottom: 14px;
     z-index: 12;
     display: block;
     padding: 9px 11px 8px;
@@ -1914,32 +1814,12 @@ body.is-hovering-node #globe {
   }
 
   .stage-frame {
-    inset: 70px 8px 46px;
+    inset: 70px 8px 14px;
   }
 
   .corner {
     width: 14px;
     height: 14px;
-  }
-
-  .ticker {
-    height: 40px;
-  }
-
-  .ticker-label {
-    width: 138px;
-    padding: 0 10px;
-    font-size: 7px;
-    letter-spacing: 0.1em;
-  }
-
-  .ticker-item {
-    font-size: 8px;
-    padding-right: 36px;
-  }
-
-  .ticker-item::after {
-    right: 15px;
   }
 
   .boot-title {
@@ -1976,10 +1856,6 @@ body.is-hovering-node #globe {
 
   .dossier-grid {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .ticker-item {
-    font-size: 7.5px;
   }
 
   .boot-log p {

@@ -23,16 +23,19 @@
     .map(([from, to]) => ({ from: BY_ID.get(from), to: BY_ID.get(to) }))
     .filter((l) => l.from && l.to);
 
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* ------------------------------------------------- vista iniziale: ITALIA */
+  // La mappa resta ferma (nessuna rotazione automatica) ed è incentrata
+  // sull'Italia: lat/lon del centro e zoom iniziale calibrati sul teatro
+  // nazionale (Ravenna, San Mauro, San Paolo, Ripetitori Pietra e Salice).
+  const ITALY_VIEW = { lat: 43.0, lon: 11.5, zoom: 5 };
 
   /* ---------------------------------------------------------------- stato */
 
   const state = {
-    yaw: -10 * DEG,
-    pitch: 20 * DEG,
-    zoom: 1,
+    yaw: -ITALY_VIEW.lon * DEG,
+    pitch: ITALY_VIEW.lat * DEG,
+    zoom: ITALY_VIEW.zoom,
     baseR: 300,
-    spin: true,
     activeId: null,
     hoverId: null,
     hoverSource: null,
@@ -750,7 +753,7 @@
   /* --------------------------------------------------------------- zoom */
 
   function setZoom(value) {
-    state.zoom = clamp(value, 0.62, 2.6);
+    state.zoom = clamp(value, 0.62, 7);
     const zoomEl = document.getElementById('zoomRead');
     if (zoomEl) zoomEl.textContent = `ZOOM  ${state.zoom.toFixed(2)}×`;
     state.lastInteraction = performance.now();
@@ -792,14 +795,12 @@
     zoomRead: document.getElementById('zoomRead'),
     btnNodes: document.getElementById('btnNodes'),
     btnReset: document.getElementById('btnReset'),
-    toggleSpin: document.getElementById('toggleSpin'),
     panelNodes: document.getElementById('panelNodes'),
     zoomIn: document.getElementById('zoomIn'),
     zoomOut: document.getElementById('zoomOut'),
     boot: document.getElementById('boot'),
     bootBar: document.getElementById('bootBar'),
-    bootPct: document.getElementById('bootPct'),
-    tickerTrack: document.getElementById('tickerTrack')
+    bootPct: document.getElementById('bootPct')
   };
 
   function countByType(type) {
@@ -1045,26 +1046,18 @@
     if (!state.hoverId) hideTip();
   }
 
-  function updateSpinButton() {
-    ui.toggleSpin.setAttribute('aria-pressed', String(!state.spin));
-    ui.toggleSpin.setAttribute('aria-label', state.spin ? 'Pausa rotazione' : 'Riprendi rotazione');
-    ui.toggleSpin.setAttribute('title', state.spin ? 'Pausa rotazione' : 'Riprendi rotazione');
-  }
-
   function resetView() {
-    state.yaw = -10 * DEG;
-    state.pitch = 20 * DEG;
-    state.zoom = 1;
+    state.yaw = -ITALY_VIEW.lon * DEG;
+    state.pitch = ITALY_VIEW.lat * DEG;
+    state.zoom = ITALY_VIEW.zoom;
     state.focusTarget = null;
-    state.spin = true;
     state.pinnedId = null;
     state.hoverId = null;
     state.hoverSource = null;
     state.lastInteraction = performance.now();
     refreshActive();
     hideTip();
-    setZoom(1);
-    updateSpinButton();
+    setZoom(ITALY_VIEW.zoom);
     toggleNodesPanel(false);
   }
 
@@ -1149,12 +1142,6 @@
 
     ui.btnNodes.addEventListener('click', () => toggleNodesPanel());
     ui.btnReset.addEventListener('click', resetView);
-
-    ui.toggleSpin.addEventListener('click', () => {
-      state.spin = !state.spin;
-      state.lastInteraction = performance.now();
-      updateSpinButton();
-    });
 
     ui.zoomIn.addEventListener('click', () => setZoom(state.zoom * 1.14));
     ui.zoomOut.addEventListener('click', () => setZoom(state.zoom / 1.14));
@@ -1295,14 +1282,7 @@
     }
   }
 
-  /* ------------------------------------------------------- ticker / ora */
-
-  function buildTicker() {
-    const half = `<div class="ticker-half">${DATA.ticker
-      .map((line) => `<span class="ticker-item">${esc(line)}</span>`)
-      .join('')}</div>`;
-    ui.tickerTrack.innerHTML = half + half;
-  }
+  /* --------------------------------------------------------------- ora */
 
   function startClock() {
     const tick = () => {
@@ -1347,19 +1327,6 @@
         state.pitch = target.pitch;
         state.focusTarget = null;
       }
-      return;
-    }
-
-    if (
-      state.spin &&
-      !state.activeId &&
-      !state.dragging &&
-      !state.pointerDown &&
-      now - state.lastInteraction > 2400 &&
-      !prefersReduced
-    ) {
-      const dt = Math.min(50, now - lastFrame);
-      state.yaw += dt * 0.000026;
     }
   }
 
@@ -1411,9 +1378,8 @@
     layout();
     bindUi();
     bindCanvas();
-    buildTicker();
+    setZoom(ITALY_VIEW.zoom);
     startClock();
-    updateSpinButton();
     window.addEventListener('resize', layout);
     window.addEventListener('orientationchange', layout);
     window.requestAnimationFrame((now) => {

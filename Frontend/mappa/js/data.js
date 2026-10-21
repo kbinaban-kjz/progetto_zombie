@@ -208,24 +208,5 @@ window.MAP_DATA = {
     ['pietra', 'salice'],
     ['salice', 'laz01'],
     ['pietra', 'laz01']
-  ],
-
-  ticker: [
-    'T-00:12 // RAVENNA: direttiva trasmessa ai rifugi. Pausa di 3,0 s rilevata.',
-    'T-00:50 // SAN MAURO: Nora Ferri richiede l\'isolamento del laboratorio verso la rete rifugi.',
-    'T-00:55 // SAN MAURO: furgone non registrato staziona davanti al varco primario.',
-    'T-01:12 // SAN MAURO: PRIMO ALLARME. Breccia biologica confermata. Soccorso guardia ore 01:19.',
-    'T-01:25 // SAN MAURO: la guardia richiede il blocco immediato di tutte le partenze.',
-    'T-03:40 // SAN PAOLO: allarme tardivo scattato. Il custode conferma sirene da San Mauro dopo le 03:00.',
-    'T-04:37 // APPENNINO: ultima voce Nora Ferri: «Conservate i registri originali». Freq. 87.4 muta.',
-    'T-06:35 // CABINA PIETRA: Livia Serra (T547) accede regolarmente per verifica batteria instabile.',
-    'T-06:40 // RIPETITORE SALICE: guasto radio alla rete secondaria. Orologi sincronizzati.',
-    'T-06:50 // RIPETITORE PIETRA: caduta segnale (display locale a 06:25 con scarto di 25 min).',
-    'T-07:15 // ARCHIVIO DOSSIER: neutralizzato tentativo di prompt injection in G2-04 (falsa pista).',
-    'T-08:20 // ANTARTIDE: Echo ripete il messaggio della centrale sotto il ghiaccio. Pausa identica.',
-    'T-09:05 // GENOVA: movimento anomalo al molo 7. Droni ricognizione persi: 2.',
-    'T-10:18 // BERLINO: Muro 7 al 91% di capienza. Filtri sanitari attivi.',
-    'T-11:42 // LONDRA: Zona 0 in blackout da 11 ore. Segnali di attività nel sottosuolo.',
-    'T-12:30 // TOKYO: 84 nuovi arrivi al filtro porto Haku.'
   ]
 };

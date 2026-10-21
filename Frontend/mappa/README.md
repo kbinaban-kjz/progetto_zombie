@@ -17,20 +17,32 @@ python -m http.server 8080
 ## Interazioni
 
 - **Hover su un nodo** — mostra tooltip, reticolo e dossier completo nel pannello destro.
-- **Click su un nodo** — fissa il dossier e interrompe la rotazione automatica.
-- **Trascina** — ruota il globo; **rotella** — zoom.
+- **Click su un nodo** — fissa il dossier.
+- **Trascina** — ruota il globo manualmente; **rotella** — zoom.
 - **Lista "Nodi di rete"** — hover per l'anteprima, click per centrare il globo sul nodo.
 - **Filtri** — attiva/disattiva rifugi, focolai, segnali e anomalie.
-- **Reset** — ripristina vista e rotazione.
+- **Reset** — ripristina la vista (vista fissa incentrata sull'Italia).
 - **✕ nel dossier (mobile)** — chiude la scheda.
+
+## Vista iniziale
+
+La mappa **non ruota più da sola**: resta ferma e apre già incentrata sull'Italia.
+Il riquadro è in `js/app.js`:
+
+```js
+const ITALY_VIEW = { lat: 43.0, lon: 11.5, zoom: 5 };
+```
+
+Modificando `lat`, `lon` e `zoom` cambiano il centro e il livello di dettaglio iniziali
+(anche del pulsante RESET). Lo zoom massimo è impostato in `setZoom`.
 
 ## File
 
 ```text
 Frontend/mappa/
-├── index.html          # struttura HUD, pannelli, ticker
+├── index.html          # struttura HUD, pannelli
 ├── css/style.css       # estetica apocalittica, responsive, animazioni
-├── js/data.js          # nodi, collegamenti, testi del ticker
+├── js/data.js          # nodi e collegamenti
 ├── js/landmask.js      # maschera terrestre (Natural Earth 110m, 288×144)
 └── js/app.js           # globo Canvas, hover picking, zoom, rotazione, UI
 ```
