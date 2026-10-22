@@ -43,6 +43,69 @@ def _sanifica_tipo_mermaid(tipo: str) -> str:
     return t or "TEXT"
 
 
+# Dizionario semantico delle descrizioni di dominio per il database investigativo
+DESCRIZIONI_COLONNE_NOTE: dict[tuple[str, str], str] = {
+    ("operatori", "id"): "Identificativo progressivo univoco dell'operatore autorizzato (Chiave Primaria).",
+    ("operatori", "nome"): "Nome in codice o matricola identificativa dell'operatore autorizzato (es. Operatore 098).",
+    ("depositi", "id"): "Identificativo progressivo univoco del deposito o struttura logistica (Chiave Primaria).",
+    ("depositi", "nome"): "Denominazione identificativa o codice del deposito (es. Deposito 030).",
+    ("depositi", "settore"): "Settore geografico o zona perimetrale di appartenenza del deposito (es. Z3, Z6, Z8).",
+    ("accessi", "id"): "Identificativo progressivo univoco della registrazione del transito o accesso (Chiave Primaria).",
+    ("accessi", "operatore_id"): "Chiave esterna (FK): riferimento all'operatore che ha effettuato l'accesso (operatori.id).",
+    ("accessi", "deposito_id"): "Chiave esterna (FK): riferimento alla struttura/deposito di destinazione (depositi.id).",
+    ("accessi", "pratica"): "Codice identificativo alfanumerico del fascicolo o pratica autorizzativa (es. PX0398).",
+    ("accessi", "codice"): "Codice di sicurezza o PIN crittografico numerico di sblocco varco (es. 151977).",
+    ("accessi", "stato"): "Stato di validità dell'accesso: 'attivo' (transito autorizzato) oppure 'revocato' (annullato o respinto).",
+    ("accessi", "valido_fino"): "Data e ora limite di validità dell'autorizzazione al transito (formato standard YYYY-MM-DD HH:MM).",
+}
+
+
+def determina_descrizione_colonna(
+    nome_tab: str,
+    col_name: str,
+    col_type: str,
+    is_pk: bool,
+    is_fk: bool,
+    fks_colonna: list[dict[str, Any]],
+    notnull: bool,
+) -> str:
+    """
+    Restituisce una descrizione esaustiva per la colonna.
+    Usa la conoscenza di dominio specifica se nota, oppure genera euristicamente
+    una descrizione dinamica basata su vincoli relazionali, tipo e semantica del nome.
+    """
+    key = (nome_tab.lower(), col_name.lower())
+    if key in DESCRIZIONI_COLONNE_NOTE:
+        return DESCRIZIONI_COLONNE_NOTE[key]
+
+    if is_fk and fks_colonna:
+        dest_tab = fks_colonna[0].get("tabella_destinazione", "tabella")
+        dest_col = fks_colonna[0].get("colonna_destinazione", "id")
+        return f"Chiave esterna (FK) con vincolo di integrità referenziale collegata a {dest_tab}.{dest_col}."
+
+    if is_pk:
+        return f"Chiave primaria (PK) che identifica in modo univoco ogni record della tabella {nome_tab}."
+
+    c_low = col_name.lower()
+    if c_low in {"nome", "name", "denominazione", "titolo", "title"}:
+        return f"Nome identificativo o etichetta descrittiva del record in {nome_tab}."
+    if c_low in {"stato", "status", "stato_accesso", "condizione"}:
+        return "Stato o condizione operativa corrente associata al record."
+    if any(k in c_low for k in ["data", "date", "created_at", "updated_at", "timestamp", "scadenza", "valido_fino"]):
+        return "Riferimento temporale (data/ora) registrato in formato ISO/standard."
+    if any(k in c_low for k in ["codice", "code", "pin", "token", "hash"]):
+        return "Codice alfanumerico o sequenza di sicurezza per autenticazione e tracciamento."
+    if any(k in c_low for k in ["pratica", "dossier", "fascicolo", "protocollo"]):
+        return "Numero di fascicolo o codice della pratica di missione autorizzativa."
+    if any(k in c_low for k in ["settore", "zona", "area", "regione", "luogo"]):
+        return "Delimitazione territoriale o settore geografico operativo assegnato."
+    if any(k in c_low for k in ["descrizione", "note", "dettagli", "commento"]):
+        return "Note esplicative o dettagli informativi aggiuntivi."
+
+    obbl = "obbligatorio (NOT NULL)" if notnull else "opzionale (accetta NULL)"
+    return f"Colonna {col_name} di tipo {col_type or 'TEXT'} ({obbl}) per la tabella {nome_tab}."
+
+
 def estrai_schema_database(db_path: str | Path | None = None) -> dict[str, Any]:
     """
     Introspezione completa e dinamica del database SQLite.
@@ -177,6 +240,34 @@ def estrai_schema_database(db_path: str | Path | None = None) -> dict[str, Any]:
                     chiavi_primarie.append(col_name)
 
                 fks_colonna = colonne_fk_map.get(col_name, [])
+
+                # Estrazione dinamica di valori di esempio reali dal database
+                esempi: list[Any] = []
+                try:
+                    cur.execute(
+                        f'SELECT DISTINCT "{col_name}" FROM "{nome_tab}" WHERE "{col_name}" IS NOT NULL LIMIT 4'
+                    )
+                    for r in cur.fetchall():
+                        v = r[0]
+                        if isinstance(v, bytes):
+                            esempi.append("<blob>")
+                        elif isinstance(v, str):
+                            esempi.append(v[:60] if len(v) > 60 else v)
+                        else:
+                            esempi.append(v)
+                except Exception:
+                    esempi = []
+
+                desc = determina_descrizione_colonna(
+                    nome_tab=nome_tab,
+                    col_name=col_name,
+                    col_type=col_type or "TEXT",
+                    is_pk=is_pk,
+                    is_fk=len(fks_colonna) > 0,
+                    fks_colonna=fks_colonna,
+                    notnull=bool(notnull),
+                )
+
                 colonne_dettaglio.append(
                     {
                         "cid": cid,
@@ -187,6 +278,8 @@ def estrai_schema_database(db_path: str | Path | None = None) -> dict[str, Any]:
                         "pk": is_pk,
                         "fk": len(fks_colonna) > 0,
                         "relazioni_fk": fks_colonna,
+                        "descrizione": desc,
+                        "esempi": esempi,
                     }
                 )
 
@@ -215,7 +308,7 @@ def estrai_schema_database(db_path: str | Path | None = None) -> dict[str, Any]:
         else:
             mermaid_lines.append("    %% Nessuna foreign key definita esplicitamente")
 
-        # Entità e attributi
+        # Entità e attributi con descrizioni ed esempi
         for nome_tab, t_info in tabelle_info.items():
             mermaid_lines.append(f"    {nome_tab} {{")
             for c in t_info["colonne"]:
@@ -227,7 +320,27 @@ def estrai_schema_database(db_path: str | Path | None = None) -> dict[str, Any]:
                 if c["fk"]:
                     tags.append("FK")
                 tag_str = (" " + ",".join(tags)) if tags else ""
-                mermaid_lines.append(f"        {san_tipo} {san_nome}{tag_str}")
+
+                comment_parts = []
+                desc_txt = c.get("descrizione") or ""
+                if desc_txt:
+                    frase = desc_txt.split(".")[0].strip()
+                    if len(frase) > 38:
+                        frase = frase[:35] + "..."
+                    comment_parts.append(frase)
+                es_lista = c.get("esempi") or []
+                if es_lista:
+                    es_str = ", ".join(str(x) for x in es_lista[:2])
+                    if len(es_str) > 22:
+                        es_str = es_str[:19] + "..."
+                    comment_parts.append(f"Es: {es_str}")
+
+                comment_txt = " | ".join(comment_parts)
+                comment_txt = re.sub(r'["\r\n\\]', '', comment_txt).strip()
+                if comment_txt:
+                    mermaid_lines.append(f'        {san_tipo} {san_nome}{tag_str} "{comment_txt}"')
+                else:
+                    mermaid_lines.append(f"        {san_tipo} {san_nome}{tag_str}")
             mermaid_lines.append("    }")
 
         codice_mermaid = "\n".join(mermaid_lines)
