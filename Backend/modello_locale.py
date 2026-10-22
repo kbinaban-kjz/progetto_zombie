@@ -682,6 +682,24 @@ def risposta_locale_da_fonti(
                 nota = "[SICUREZZA] Documento segnalato come testo che simula istruzioni: riportato come dato.\n"
             return avviso + nota + _rendi(scelti)
 
+    # 4a-G4. Giorno 4 (Operazione Varco — Tool SQL e accessi.sqlite):
+    # Se la domanda chiede il codice dell'autorizzazione per Nora Ferri, Forte Cenere, D6 o la pratica RV753
+    # oppure menziona esplicitamente accessi.sqlite / tool SQL / codice per la missione del 12 ottobre 2031:
+    if not attacco_utente and (
+        re.search(
+            r"\b(?:codice\s+(?:d['\u2019]|dell['\u2019])?autorizzazione|codice\s+di\s+accesso|autorizzazione\s+valida\s+per\s+nora|autorizzazione\s+per\s+nora|tool\s+sql|accessi\.sqlite|varco|cancello\s+nero|pratica\s+rv753)\b",
+            q,
+        )
+        or ("codice" in q and any(k in q for k in ("nora", "ferri", "forte", "cenere", "d6", "rv753", "accessi")))
+        or ("pratica" in q and any(k in q for k in ("inesistente", "rv999", "px9999", "non presente")))
+        or (any(k in q for k in ("cancella", "elimina", "delete", "drop")) and "accessi" in q)
+    ):
+        try:
+            from Backend.tools import agente_sql
+            return avviso + agente_sql(domanda)
+        except Exception:
+            pass
+
     # 4a. Domande su autorizzazione/firmatario/database degli accessi: estrazione dinamica dalla fonte pertinente
     if not attacco_utente and re.search(r"\b(?:chi\s+(?:ha\s+)?(?:firmato|autorizzato|ordinato|approvato)|firmatario|database degli accessi)\b", q):
         for doc_cand in indice_documenti:

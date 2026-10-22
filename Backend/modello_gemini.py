@@ -45,6 +45,7 @@ try:
         ottieni_dettaglio_nodo,
         cerca_cronologia,
         statistiche_missione,
+        interroga_accessi_sql,
     )
     from Backend.prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 except ImportError:
@@ -74,6 +75,7 @@ except ImportError:
         ottieni_dettaglio_nodo,
         cerca_cronologia,
         statistiche_missione,
+        interroga_accessi_sql,
     )
     from prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 
@@ -295,6 +297,7 @@ def genera_risposta(
                 ottieni_dettaglio_nodo,
                 cerca_cronologia,
                 statistiche_missione,
+                interroga_accessi_sql,
             ]
 
         # Costruzione cronologia messaggi per SDK google-genai (ultimi 10 scambi)

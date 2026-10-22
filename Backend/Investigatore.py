@@ -69,6 +69,9 @@ try:
         ottieni_nodi_mappa,
         ottieni_dettaglio_nodo,
         statistiche_missione,
+        interroga_accessi_sql,
+        interroga_database,
+        agente_sql,
     )
     from Backend.prompts import (
         PROMPT_SISTEMA,
@@ -136,6 +139,9 @@ except ImportError:
         ottieni_nodi_mappa,
         ottieni_dettaglio_nodo,
         statistiche_missione,
+        interroga_accessi_sql,
+        interroga_database,
+        agente_sql,
     )
     from modello_locale import (
         carica_modello_locale,

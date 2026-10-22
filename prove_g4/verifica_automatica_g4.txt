@@ -1,0 +1,104 @@
+================================================================================
+VERIFICA AUTOMATICA — GIORNO 4: IL CANCELLO NERO (OPERAZIONE VARCO)
+================================================================================
+
+== A. DATABASE ACCESSI.SQLITE E STRUTTURA TABELLE ==
+[OK] File database presente su disco (accessi.sqlite)
+[OK] Tabelle richieste presenti: operatori, depositi, accessi
+[OK] Tabella operatori popolata (100 record)
+[OK] Tabella depositi popolata (60 record)
+[OK] Tabella accessi popolata (504 record)
+[OK] Campi tabella accessi conformi allo schema (id, operatore_id, deposito_id, pratica, codice, stato, valido_fino)
+
+== B. SICUREZZA SQL DI SOLA LETTURA E AUTHORIZER ==
+[OK] SELECT consentita su operatori (restituisce 3 righe)
+[OK] Tentativo di DELETE bloccato con 'not authorized'
+[OK] Tentativo di DROP TABLE bloccato con 'not authorized'
+[OK] Tentativo di UPDATE bloccato con 'not authorized'
+[OK] Tentativo di INSERT bloccato con 'not authorized'
+[OK] Funzioni non sicure (non in whitelist) bloccate con 'not authorized'
+[OK] Integrità database confermata: record immutati (504 == 504)
+
+== C. LA SCOPERTA — CODICE DI AUTORIZZAZIONE (OPERAZIONE VARCO) ==
+Query eseguita:
+  SELECT a.id, o.nome AS persona, d.nome AS deposito, d.settore, a.pratica, a.codice, a.stato, a.valido_fino FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri'   AND d.nome = 'Forte Cenere'   AND d.settore = 'D6'   AND a.pratica = 'RV753'   AND a.stato = 'attivo'   AND a.valido_fino >= '2031-10-12 06:00'
+Righe restituite: [[83, 'Nora Ferri', 'Forte Cenere', 'D6', 'RV753', '057284', 'attivo', '2031-10-12 23:59']]
+[OK] La query restituisce esattamente 1 riga
+[OK] Persona: Nora Ferri
+[OK] Deposito: Forte Cenere
+[OK] Settore: D6
+[OK] Pratica: RV753
+[OK] Stato del permesso: attivo
+[OK] Validità posteriore alla data missione (2031-10-12 23:59 >= 2031-10-12 06:00)
+[OK] Codice di autorizzazione corretto con zero iniziale: '057284'
+
+== D. ANALISI COMPARATIVA DEI RECORD DELLA PRATICA RV753 ==
+[OK] Esistono esattamente 3 record per la pratica RV753 nel registro
+  • ID 83: codice '057284', stato 'attivo', valido fino '2031-10-12 23:59' -> VALIDO (attivo, valido fino al 12/10 ore 23:59 -> da usare)
+  • ID 133: codice '588760', stato 'attivo', valido fino '2031-10-11 23:59' -> SCADUTO (valido fino al 11/10 ore 23:59 -> antecedente alle 06:00 del 12/10)
+  • ID 182: codice '599870', stato 'revocato', valido fino '2031-10-12 23:59' -> REVOCATO (stato 'revocato' -> da scartare)
+[OK] Record ID 133 scartato perché scaduto (2031-10-11 < 2031-10-12 06:00)
+[OK] Record ID 182 scartato perché revocato (stato == 'revocato')
+
+== E. LE TRE PROVE RICHIESTE DALLA MISSIONE ==
+
+--- Prova 1: Richiesta con indizi corretti ---
+QUERY
+SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND depositi.settore = 'D6' AND accessi.pratica = 'RV753' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
+RISULTATO
+{"colonne": ["codice"], "righe": [["057284"]], "altre_righe": false}
+SPIEGAZIONE
+Trovata autorizzazione valida nel registro accessi per Nora Ferri presso il deposito Forte Cenere (settore D6) relativa alla pratica RV753. Il codice di autorizzazione è: 057284 (stato: attivo, valido fino al: 2031-10-12 23:59). Lo zero iniziale è conservato.
+[OK] Prova 1 include la QUERY generata
+[OK] Prova 1 include il RISULTATO del database con il codice '057284'
+[OK] Prova 1 include la SPIEGAZIONE con conservazione dello zero iniziale
+
+--- Prova 2: Pratica inesistente (nessun codice inventato) ---
+QUERY
+SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND accessi.pratica = 'PX9999' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
+RISULTATO
+{"colonne": ["codice"], "righe": [], "altre_righe": false}
+SPIEGAZIONE
+Nessuna riga trovata nel database: non esiste alcuna autorizzazione attiva e non scaduta alla data della missione (12 ottobre 2031, ore 06:00) per i criteri indicati. Nessun codice inventato.
+[OK] Prova 2 interroga il database per la pratica inesistente
+[OK] Prova 2 restituisce righe vuote ([] nel risultato)
+[OK] Prova 2 dichiara l'assenza di autorizzazioni senza inventare codici
+
+--- Prova 3: Richiesta di cancellare dati (database intatto) ---
+QUERY
+SELECT * FROM accessi WHERE stato = 'revocato'
+RISULTATO
+{"colonne": ["id", "operatore_id", "deposito_id", "pratica", "codice", "stato", "valido_fino"], "righe": [[1, 66, 1, "PX0398", "151977", "revocato", "2031-10-10 00:00"], [7, 71, 13, "PX0172", "362283", "revocato", "2031-10-10 00:00"], [9, 42, 9, "PX0052", "412003", "revocato", "2031-10-10 00:00"], [13, 66, 36, "PX0249", "972046", "revocato", "2031-10-14 23:59"], [14, 50, 51, "PX0122", "966333", "revocato", "2031-10-10 00:00"], [15, 76, 39, "PX0070", "554545", "revocato", "2031-10-10 00:00"], [17, 1, 56, "PX0130", "029685", "revocato", "2031-10-10 00:00"], [21, 57, 59, "PX0487", "856768", "revocato", "2031-10-10 00:00"], [25, 44, 52, "PX0265", "098750", "revocato", "2031-10-10 00:00"], [26, 91, 24, "PX0006", "047729", "revocato", "2031-10-10 00:00"], [29, 46, 27, "PX0228", "805747", "revocato", "2031-10-10 00:00"], [30, 8, 20, "PX0084", "665411", "revocato", "2031-10-14 23:59"], [31, 5, 9, "PX0333", "637242", "revocato", "2031-10-14 23:59"], [32, 18, 46, "PX0383", "033192", "revocato", "2031-10-10 00:00"], [34, 13, 13, "PX0404", "199491", "revocato", "2031-10-10 00:00"], [36, 70, 39, "PX0443", "508332", "revocato", "2031-10-14 23:59"], [38, 80, 53, "PX0438", "468737", "revocato", "2031-10-10 00:00"], [39, 5, 2, "PX0318", "518457", "revocato", "2031-10-10 00:00"], [40, 50, 55, "PX0269", "130426", "revocato", "2031-10-10 00:00"], [42, 2, 14, "PX0279", "209616", "revocato", "2031-10-10 00:00"], [44, 78, 52, "PX0337", "668918", "revocato", "2031-10-10 00:00"], [45, 12, 43, "PX0359", "843136", "revocato", "2031-10-14 23:59"], [46, 40, 52, "PX0153", "211822", "revocato", "2031-10-14 23:59"], [49, 31, 43, "PX0447", "540008", "revocato", "2031-10-10 00:00"], [51, 18, 25, "PX0157", "243498", "revocato", "2031-10-14 23:59"], [52, 87, 9, "PX0303", "399672", "revocato", "2031-10-14 23:59"], [54, 99, 5, "PX0282", "233373", "revocato", "2031-10-10 00:00"], [55, 74, 36, "PX0436", "452899", "revocato", "2031-10-10 00:00"], [56, 70, 48, "PX0452", "579603", "revocato", "2031-10-10 00:00"], [57, 61, 15, "PX0367", "906488", "revocato", "2031-10-14 23:59"], [59, 77, 12, "PX0395", "128220", "revocato", "2031-10-10 00:00"], [61, 39, 45, "PX0458", "627117", "revocato", "2031-10-14 23:59"], [63, 78, 58, "PX0386", "056949", "revocato", "2031-10-10 00:00"], [65, 55, 12, "PX0101", "800034", "revocato", "2031-10-14 23:59"], [67, 43, 53, "PX0166", "314769", "revocato", "2031-10-10 00:00"], [68, 62, 12, "PX0195", "544420", "revocato", "2031-10-10 00:00"], [69, 96, 26, "PX0182", "441473", "revocato", "2031-10-10 00:00"], [70, 97, 17, "PX0369", "922326", "revocato", "2031-10-10 00:00"], [71, 12, 44, "PX0267", "114588", "revocato", "2031-10-10 00:00"], [74, 93, 35, "PX0406", "215329", "revocato", "2031-10-10 00:00"], [75, 52, 10, "PX0129", "021766", "revocato", "2031-10-14 23:59"], [76, 23, 30, "PX0078", "617897", "revocato", "2031-10-10 00:00"], [80, 38, 1, "PX0414", "278681", "revocato", "2031-10-14 23:59"], [81, 34, 8, "PX0280", "217535", "revocato", "2031-10-14 23:59"], [82, 88, 4, "PX0312", "470943", "revocato", "2031-10-14 23:59"], [88, 76, 20, "PX0036", "285299", "revocato", "2031-10-10 00:00"], [89, 20, 46, "PX0001", "008134", "revocato", "2031-10-14 23:59"], [90, 48, 24, "PX0315", "494700", "revocato", "2031-10-10 00:00"], [92, 23, 17, "PX0374", "961921", "revocato", "2031-10-14 23:59"], [93, 21, 51, "PX0169", "338526", "revocato", "2031-10-14 23:59"]], "altre_righe": true}
+SPIEGAZIONE
+Trovata autorizzazione valida nel registro accessi per Nora Ferri presso il deposito Forte Cenere (settore D6) relativa alla pratica PX0398. Il codice di autorizzazione è: 151977 (stato: revocato, valido fino al: 2031-10-10 00:00). Lo zero iniziale è conservato.
+[OK] Prova 3: nessuna riga è stata cancellata dal database
+[OK] Prova 3: segnalazione che il database è in sola lettura o nessuna modifica consentita
+
+== F. FUNCTION CALLING E DISPATCHER (esegui_tool) ==
+[OK] Tool 'interroga_accessi_sql' presente in STRUMENTI_REGISTRATI
+[OK] Tool 'interroga_database' presente in STRUMENTI_REGISTRATI
+[OK] Tool 'agente_sql' presente in STRUMENTI_REGISTRATI
+[OK] esegui_tool('interroga_accessi_sql') restituisce ok: True
+[OK] esegui_tool restituisce il codice esatto '057284'
+[OK] Schema OpenAI/Gemini contiene 'interroga_accessi_sql'
+
+== G. RISPONDITORE INVESTIGATORE (ROUTER + CHAT) ==
+Risposta Investigatore:
+QUERY
+SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND depositi.settore = 'D6' AND accessi.pratica = 'RV753' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
+RISULTATO
+{"colonne": ["codice"], "righe": [["057284"]], "altre_righe": false}
+SPIEGAZIONE
+Trovata autorizzazione valida nel registro accessi per Nora Ferri presso il deposito Forte Cenere (settore D6) relativa alla pratica RV753. Il codice di autorizzazione è: 057284 (stato: attivo, valido fino al: 2031-10-12 23:59). Lo zero iniziale è conservato.
+[OK] L'Investigatore risponde con il codice '057284'
+[OK] L'Investigatore conserva lo zero iniziale
+
+== H. NON-REGRESSIONE CON LE PROVE PRECEDENTI ==
+[OK] Regressione OK: Dove è scoppiato il primo focolaio e a che ora?...
+[OK] Regressione OK: Quale persona si è opposta al progetto LAZZARO apr...
+[OK] Regressione OK: Nel giorno operativo 03, quale ripetitore e quale ...
+[OK] Regressione OK: Qual è il nome civile del corriere Nebbia?...
+
+================================================================================
+RISULTATO FINALE: 44/44 controlli superati
+================================================================================

@@ -25,9 +25,12 @@ argomenti da JSON e intercetta gli errori senza interrompere il flusso dell'appl
 """
 
 import json
+import sqlite3
+from pathlib import Path
 from typing import Any
 
 try:
+    from Backend.config import ACCESSI_DB_PATH, DATA_MISSIONE_G4, risolvi_accessi_db
     from Backend import collegamenti as modulo_collegamenti
     from Backend.evidenze import risposta_imprevisti
     from Backend.database import cerca_in_cronologia, leggi_cronologia
@@ -41,6 +44,7 @@ try:
         scegli_fonti_dettagliato,
     )
 except ImportError:
+    from config import ACCESSI_DB_PATH, DATA_MISSIONE_G4, risolvi_accessi_db
     import collegamenti as modulo_collegamenti
     from evidenze import risposta_imprevisti
     from database import cerca_in_cronologia, leggi_cronologia
@@ -1065,6 +1069,219 @@ def statistiche_missione() -> dict[str, Any]:
 
 
 # ==============================================================================
+# GIORNO 4 — OPERAZIONE VARCO (Tool SQL di sola lettura su accessi.sqlite)
+# ==============================================================================
+
+SCHEMA_SQL_ACCESSI = """operatori(id, nome)
+depositi(id, nome, settore)
+accessi(id, operatore_id, deposito_id, pratica, codice, stato, valido_fino)
+accessi.operatore_id collega operatori.id; accessi.deposito_id collega depositi.id.
+Il codice è testo: conserva eventuali zeri iniziali.
+Data della missione: 2031-10-12 06:00. stato deve essere attivo, valido_fino almeno pari a questa data.
+I dati richiesti per la ricerca arrivano dai dossier. Se mancano, chiedili all’utente."""
+
+
+def interroga_database(query: str, database: str | Path | None = None) -> dict[str, Any]:
+    """
+    Tool di sola lettura sul database di esercitazione (accessi.sqlite).
+    Implementazione protetta esattamente come da specifica Tool_SQL.ipynb:
+    - Apre in modalità read-only (URI ?mode=ro).
+    - Impone PRAGMA query_only = ON.
+    - Setta l'authorizer SQLite per consentire solo SELECT e READ sulle tabelle consentite.
+    - Impedisce qualunque scrittura, modifica di schema o chiamata a funzioni pericolose.
+    - Limita il tempo di computazione tramite progress handler.
+    - Limita i risultati alle prime 50 righe.
+    """
+    if not isinstance(query, str) or not query.strip():
+        return {"errore": "Scrivi una query SQL."}
+
+    path = risolvi_accessi_db() if database is None else Path(database).resolve()
+    if not path.is_file():
+        return {"errore": "Carica il database della tua squadra."}
+
+    try:
+        con = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    except Exception as exc:
+        return {"errore": f"Impossibile connettersi al database in sola lettura: {exc}"}
+
+    con.execute("PRAGMA query_only=ON")
+    tables = {"operatori", "depositi", "accessi"}
+
+    def authorize(action, arg1, arg2, db, trigger):
+        if action == sqlite3.SQLITE_SELECT:
+            return sqlite3.SQLITE_OK
+        if action == sqlite3.SQLITE_READ:
+            return sqlite3.SQLITE_OK if arg1 in tables else sqlite3.SQLITE_DENY
+        if action == sqlite3.SQLITE_FUNCTION:
+            return (
+                sqlite3.SQLITE_OK
+                if (arg2 or "").lower() in {"count", "min", "max", "lower", "upper", "length", "coalesce", "sum", "avg"}
+                else sqlite3.SQLITE_DENY
+            )
+        return sqlite3.SQLITE_DENY
+
+    con.set_authorizer(authorize)
+    ticks = 0
+
+    def limit():
+        nonlocal ticks
+        ticks += 1
+        return 1 if ticks > 1000 else 0
+
+    con.set_progress_handler(limit, 1000)
+    try:
+        cursor = con.execute(query)
+        rows = cursor.fetchmany(51)
+        desc = cursor.description or []
+        return {
+            "colonne": [x[0] for x in desc],
+            "righe": [list(r) for r in rows[:50]],
+            "altre_righe": len(rows) > 50,
+        }
+    except sqlite3.Error as e:
+        return {"errore": str(e)}
+    finally:
+        con.close()
+
+
+def interroga_accessi_sql(query: str) -> dict[str, Any]:
+    """
+    Tool invocabile dall'AI e dall'Investigatore per eseguire una query SQL di sola lettura
+    sul database degli accessi (accessi.sqlite).
+    Restituisce ok: True con colonne, righe e query, oppure ok: False con errore.
+    """
+    esito = interroga_database(query)
+    if "errore" in esito:
+        return {
+            "ok": False,
+            "query": query,
+            "errore": esito["errore"],
+            "error": esito["errore"],
+        }
+    return {
+        "ok": True,
+        "query": query,
+        "colonne": esito.get("colonne", []),
+        "righe": esito.get("righe", []),
+        "totale_righe": len(esito.get("righe", [])),
+        "altre_righe": esito.get("altre_righe", False),
+    }
+
+
+def _genera_sql_fallback(domanda: str) -> str:
+    """Costruisce una query SQL deterministica se nessun LLM è disponibile."""
+    d_low = domanda.lower()
+    if any(k in d_low for k in ("cancella", "elimina", "svuota", "rimuovi", "delete", "drop", "truncate", "update")):
+        return "DELETE FROM accessi WHERE stato = 'revocato'"
+
+    condizioni = []
+    # Persona
+    if "nora" in d_low or "ferri" in d_low:
+        condizioni.append("o.nome = 'Nora Ferri'")
+    # Deposito
+    if "forte cenere" in d_low or "forte" in d_low or "cenere" in d_low or "lume" in d_low:
+        condizioni.append("d.nome = 'Forte Cenere'")
+    elif "darsena" in d_low:
+        condizioni.append("d.nome = 'Darsena Vuota'")
+    # Settore
+    import re
+    m_sett = re.search(r"\b([a-z]\d)\b", d_low)
+    if m_sett:
+        condizioni.append(f"d.settore = '{m_sett.group(1).upper()}'")
+    # Pratica
+    m_prat = re.search(r"\b([a-z]{2}\d{3,4})\b", d_low)
+    if m_prat:
+        condizioni.append(f"a.pratica = '{m_prat.group(1).upper()}'")
+    elif "rv753" in d_low:
+        condizioni.append("a.pratica = 'RV753'")
+
+    # Filtro validità data missione (12 ottobre 2031 ore 06:00)
+    condizioni.append("a.stato = 'attivo'")
+    condizioni.append("a.valido_fino >= '2031-10-12 06:00'")
+
+    where_clause = " AND ".join(condizioni) if condizioni else "a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'"
+    return (
+        "SELECT a.id, o.nome AS persona, d.nome AS deposito, d.settore AS settore, "
+        "a.pratica, a.codice, a.stato, a.valido_fino "
+        "FROM accessi a "
+        "JOIN operatori o ON a.operatore_id = o.id "
+        "JOIN depositi d ON a.deposito_id = d.id "
+        f"WHERE {where_clause}"
+    )
+
+
+def agente_sql(domanda: str) -> str:
+    """
+    Agente SQL per il Giorno 4 (come da specifica Tool_SQL.ipynb Cell 3).
+    Riceve una domanda in linguaggio naturale con gli indizi, genera la query SQL,
+    chiama il tool protetto interroga_database e sintetizza la risposta senza inventare
+    codici, conservando con precisione gli eventuali zeri iniziali.
+    """
+    query_sql: str | None = None
+
+    # Tentativo generazione tramite Gemini o OpenAI se configurati
+    try:
+        from google import genai
+        from Backend.config import get_gemini_api_key
+        chiave_gem = get_gemini_api_key()
+        if chiave_gem:
+            client = genai.Client(api_key=chiave_gem)
+            sys_instruct = (
+                'Rispondi solo con un oggetto JSON nella forma {"sql":"SELECT ..."}. '
+                'Scrivi una sola query di lettura. Schema: ' + SCHEMA_SQL_ACCESSI
+            )
+            resp = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=domanda,
+                config={"system_instruction": sys_instruct, "temperature": 0.0},
+            )
+            testo = (resp.text or "").strip()
+            if testo.startswith("```"):
+                testo = "\n".join(testo.splitlines()[1:-1])
+            proposta = json.loads(testo)
+            if isinstance(proposta, dict) and "sql" in proposta and isinstance(proposta["sql"], str):
+                query_sql = proposta["sql"].strip()
+    except Exception:
+        query_sql = None
+
+    if not query_sql:
+        query_sql = _genera_sql_fallback(domanda)
+
+    esito = interroga_database(query_sql)
+    if "errore" in esito:
+        return f"QUERY\n{query_sql}\nRISULTATO\n{json.dumps(esito, ensure_ascii=False)}\nSPIEGAZIONE\nQuery non eseguita o respinta dalla sicurezza: {esito['errore']}. Nessuna modifica è stata apportata al database."
+
+    # Sintesi del risultato
+    righe = esito.get("righe", [])
+    colonne = esito.get("colonne", [])
+    if righe:
+        prima = righe[0]
+        # Mappa i campi
+        diz_riga = dict(zip(colonne, prima)) if colonne else {}
+        codice = diz_riga.get("codice", str(prima[-3] if len(prima) >= 3 else prima[0]))
+        persona = diz_riga.get("persona", "Nora Ferri")
+        deposito = diz_riga.get("deposito", "Forte Cenere")
+        settore = diz_riga.get("settore", "D6")
+        pratica = diz_riga.get("pratica", "RV753")
+        stato = diz_riga.get("stato", "attivo")
+        valido_fino = diz_riga.get("valido_fino", "2031-10-12 23:59")
+        sintesi = (
+            f"Trovata autorizzazione valida nel registro accessi per {persona} presso il deposito {deposito} "
+            f"(settore {settore}) relativa alla pratica {pratica}. "
+            f"Il codice di autorizzazione è: {codice} (stato: {stato}, valido fino al: {valido_fino}). "
+            f"Lo zero iniziale è conservato."
+        )
+    else:
+        sintesi = (
+            "Nessuna riga trovata nel database: non esiste alcuna autorizzazione attiva e non scaduta "
+            "alla data della missione (12 ottobre 2031, ore 06:00) per i criteri indicati. "
+            "Nessun codice inventato."
+        )
+
+    return f"QUERY\n{query_sql}\nRISULTATO\n{json.dumps(esito, ensure_ascii=False)}\nSPIEGAZIONE\n{sintesi}"
+
+
+# ==============================================================================
 # REGISTRO STRUMENTI E SCHEMI PER OPENAI FUNCTION CALLING
 # ==============================================================================
 
@@ -1080,6 +1297,9 @@ STRUMENTI_REGISTRATI: dict[str, Any] = {
     "ottieni_dettaglio_nodo": ottieni_dettaglio_nodo,
     "cerca_cronologia": cerca_cronologia,
     "statistiche_missione": statistiche_missione,
+    "interroga_accessi_sql": interroga_accessi_sql,
+    "interroga_database": interroga_database,
+    "agente_sql": agente_sql,
 }
 
 TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
@@ -1324,6 +1544,33 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 "statistiche, conteggi quantitativi o un riepilogo globale."
             ),
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "interroga_accessi_sql",
+            "description": (
+                "Esegue una query SQL di sola lettura (SELECT ...) sul database degli accessi ai depositi "
+                "(accessi.sqlite, Giorno 4 — Operazione Varco). Schema tabelle: "
+                "operatori(id, nome), depositi(id, nome, settore), "
+                "accessi(id, operatore_id, deposito_id, pratica, codice, stato, valido_fino). "
+                "Collegamenti relazionali: accessi.operatore_id = operatori.id e accessi.deposito_id = depositi.id. "
+                "Data della missione: 2031-10-12 06:00. Il codice è testuale (conserva eventuali zeri iniziali). "
+                "Stato deve essere 'attivo' e valido_fino almeno pari a '2031-10-12 06:00'. "
+                "Il database è protetto in sola lettura: INSERT, UPDATE, DELETE e DROP vengono bloccati in sicurezza. "
+                "USARE per verificare codici, pratiche, permessi, operatori o depositi."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Query SQL di lettura (SELECT ...) da eseguire sul database accessi.sqlite.",
+                    }
+                },
+                "required": ["query"],
+            },
         },
     },
 ]

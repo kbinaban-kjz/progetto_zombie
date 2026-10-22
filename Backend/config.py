@@ -65,8 +65,27 @@ def valore_env(nome: str, default: str | None = None) -> str | None:
     """Restituisce il valore di una variabile d'ambiente (da os.environ o da .env)."""
     return os.environ.get(nome) or carica_env().get(nome) or default
 
-# Configurazione Database SQLite
+# Configurazione Database SQLite (Cronologia conversazioni)
 DB_PATH = Path(valore_env("SQLITE_DB_PATH", str(BACKEND_DIR / "cronologia.db")))
+
+# Configurazione Database Accessi (Giorno 4 — Operazione Varco: accessi.sqlite)
+DATA_MISSIONE_G4 = "2031-10-12 06:00"
+
+def risolvi_accessi_db() -> Path:
+    """Restituisce il percorso valido del database accessi.sqlite controllando le posizioni note."""
+    percorsi_candidati = [
+        Path(valore_env("ACCESSI_DB_PATH", "")),
+        ROOT_DIR / "accessi.sqlite",
+        BACKEND_DIR / "accessi.sqlite",
+        ROOT_DIR / "New information" / "accessi.sqlite",
+        Path("accessi.sqlite"),
+    ]
+    for p in percorsi_candidati:
+        if p and p.is_file():
+            return p.resolve()
+    return (ROOT_DIR / "accessi.sqlite").resolve()
+
+ACCESSI_DB_PATH = risolvi_accessi_db()
 
 # Modello Locale (Investigatore.py)
 MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"

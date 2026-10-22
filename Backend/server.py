@@ -18,7 +18,7 @@ Responsabilità:
 import json
 import os
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from typing import Any
 
 try:
@@ -52,7 +52,8 @@ try:
         risolvi_cartella_dati,
         scegli_fonti_dettagliato,
     )
-    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
+    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO, interroga_database
+    from Backend.schema_inspector import estrai_schema_database, leggi_dati_tabella
     from Backend.modello_locale import is_modello_caricato
     from Backend.router import genera_risposta_ibrida
     import Backend.modello_openai as modello_openai
@@ -88,7 +89,8 @@ except ImportError:
         risolvi_cartella_dati,
         scegli_fonti_dettagliato,
     )
-    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO
+    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO, interroga_database
+    from schema_inspector import estrai_schema_database, leggi_dati_tabella
     from modello_locale import is_modello_caricato
     from router import genera_risposta_ibrida
     import modello_openai
@@ -260,6 +262,24 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                 }
             )
 
+        # API: Schema dinamico e Diagramma ER del database accessi.sqlite
+        if path in {"/api/database/schema", "/api/schema/accessi", "/api/accessi/schema", "/api/er-diagram"}:
+            schema_db = estrai_schema_database()
+            return self._send_json(schema_db, status=200 if schema_db.get("ok") else 500)
+
+        # API: Ispezione dati riga di una tabella di accessi.sqlite
+        if path == "/api/database/table":
+            query_params = parse_qs(urlparse(self.path).query)
+            nome_tab = (query_params.get("name", [""])[0] or query_params.get("tabella", [""])[0]).strip()
+            limite_val = query_params.get("limit", ["50"])[0]
+            offset_val = query_params.get("offset", ["0"])[0]
+            limite = int(limite_val) if limite_val.isdigit() else 50
+            offset = int(offset_val) if offset_val.isdigit() else 0
+            if not nome_tab:
+                return self._send_json({"ok": False, "error": "Parametro 'name' mancante."}, status=400)
+            dati = leggi_dati_tabella(nome_tab, limite=limite, offset=offset)
+            return self._send_json(dati, status=200 if dati.get("ok") else 400)
+
         # Sicurezza file statici: consenti solo risorse dentro /Frontend/
         norm_path = os.path.normpath(path).replace("\\", "/")
         if ".." in path or not norm_path.startswith("/Frontend/"):
@@ -302,6 +322,24 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                 )
             esito = esegui_tool(nome_tool, argomenti)
             return self._send_json(esito)
+
+        # API: Query diretta di sola lettura su accessi.sqlite per l'ispettore ER
+        if path in {"/api/database/query", "/api/accessi/query"}:
+            query_sql = (payload.get("query") or payload.get("sql") or "").strip()
+            if not query_sql:
+                return self._send_json({"ok": False, "error": "Query SQL mancante."}, status=400)
+            res = interroga_database(query_sql)
+            if "errore" in res:
+                return self._send_json({"ok": False, "error": res["errore"]}, status=400)
+            return self._send_json(
+                {
+                    "ok": True,
+                    "query": query_sql,
+                    "colonne": res.get("colonne", []),
+                    "righe": res.get("righe", []),
+                    "altre_righe": res.get("altre_righe", False),
+                }
+            )
 
         # API: Chat principale dell'Investigatore
         if path == "/api/chat":

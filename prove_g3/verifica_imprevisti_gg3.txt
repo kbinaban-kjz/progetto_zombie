@@ -146,7 +146,7 @@ Risposta:
 [OK] Ancora corretta: Dove è scoppiato il primo focolaio e a che ora?...
 
 DOMANDA: Qual è l'autorizzazione ancora valida nel database degli accessi per il contenitore LUME?
-File recuperati dal RAG: documento_0389.xml, documento_0523.txt, LX5_1264.txt, LX5_1062.txt, LX5_1151.txt, LX5_1889.txt, LX5_1951.txt, LX5_1994.txt, documento_0421.json, documento_0057.html, G2-03.txt, G2-04.txt
+File recuperati dal RAG: documento_0389.xml, documento_0523.txt, LX5_1264.txt, LX5_1062.txt, LX5_1151.txt, LX5_1889.txt, LX5_1951.txt, LX5_1994.txt, documento_0057.html, documento_0421.json, G2-03.txt, G2-04.txt
 Risposta:
   Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica: «Consultare la planimetria per il settore e il database degli accessi per l’autorizzazione ancora valida.», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio.
 [OK] Ancora corretta: Qual è l'autorizzazione ancora valida nel database degli accessi per i...

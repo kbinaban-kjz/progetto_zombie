@@ -10,7 +10,7 @@ RISPOSTA:
 [OK] Fonte corretta [ARCH-3097]
 
 DOMANDA: Dove è scoppiato il primo focolaio e a che ora?
-FILE RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, G2-01.txt, G1-02.txt, G2-02.txt, documento_0057.html, G2-04.txt, G2-06.txt, G2-05.txt
+FILE RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, G2-01.txt, G2-04.txt, G2-06.txt, G1-02.txt, G2-02.txt, documento_0057.html, G2-05.txt
 RISPOSTA:
   Ore 01:12. Primo allarme registrato nel laboratorio San Mauro. [G2-01]
 [OK] Risposta secca: San Mauro e 01:12
@@ -48,7 +48,7 @@ RISPOSTA:
 [OK] Percorso verificato sulle entità condivise (rv753)
 
 DOMANDA: Chi ha autorizzato il trasferimento del contenitore LUME?
-FILE RAG: documento_0389.xml, LX5_1221.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, LX5_1974.txt, LX5_1984.txt, documento_0421.json, documento_0057.html, LX5_1749.txt, LX5_2398.txt
+FILE RAG: documento_0389.xml, LX5_1221.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, LX5_1974.txt, LX5_1984.txt, documento_0057.html, documento_0421.json, LX5_1749.txt, LX5_2398.txt
 RISPOSTA:
   Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica: «Consultare la planimetria per il settore e il database degli accessi per l’autorizzazione ancora valida.», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio.
 [OK] Dichiara 'non documentato' citando ARCH-5721
@@ -81,7 +81,7 @@ RISPOSTA:
 [OK] Risponde Forte Cenere, settore D6 con [ARCH-5721] e [ARCH-6408]
 
 DOMANDA: Come si collega il guasto del Ripetitore Pietra al primo focolaio?
-FILE RAG: LX5_2549.txt, LX5_6396.txt, LX5_8823.txt, G2-03.txt, documento_0523.txt, LX5_9242.txt, LX5_1151.txt, LX5_1889.txt, G1-02.txt, G2-02.txt, documento_0057.html, G2-01.txt, G2-04.txt, G2-06.txt
+FILE RAG: LX5_2549.txt, LX5_6396.txt, LX5_8823.txt, G2-03.txt, documento_0523.txt, LX5_9242.txt, LX5_1151.txt, LX5_1889.txt, G2-01.txt, G2-04.txt, G2-06.txt, G1-02.txt, G2-02.txt, documento_0057.html
 RISPOSTA:
   Rapporto intervento — giorno operativo 02, ore 08:00: Il primo guasto della rete secondaria è avvenuto a Ripetitore Salice, alle 06:40. È un guasto radio, non un nuovo focolaio. [LX5-2549]
   Scheda manutenzione orologi — giorno operativo 02, ore 07:20: L’orologio locale di Ripetitore Pietra è indietro di 25 minuti. Il guasto dell’orologio era già presente prima delle 06:00. [LX5-6396]
@@ -92,7 +92,7 @@ RISPOSTA:
   Collegamenti tra documenti:
   COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
     • [LX5-6396] (LX5_6396.txt) <-> [LX5-8823] (LX5_8823.txt): pietra, ripetitore pietra
-    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): 06:40, ripetitore salice, salice
+    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): ripetitore salice, salice, 06:40
   Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
   Nessun collegamento diretto documentato tra le due entità citate: i documenti sopra sono i più pertinenti, ma non contengono un percorso verificabile.
 [OK] Dichiara che il collegamento diretto non è documentato

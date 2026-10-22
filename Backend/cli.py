@@ -26,6 +26,8 @@ try:
         statistiche_missione,
         ottieni_dettaglio_nodo,
         cerca_fonti,
+        interroga_database,
+        agente_sql,
     )
 except ImportError:
     from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
@@ -42,6 +44,8 @@ except ImportError:
         statistiche_missione,
         ottieni_dettaglio_nodo,
         cerca_fonti,
+        interroga_database,
+        agente_sql,
     )
 
 
@@ -56,6 +60,7 @@ def stampa_guida_comandi() -> None:
     print("  /cerca <testo>  : Cerca nei documenti senza interrogare il modello")
     print("  /rag <domanda>  : Recupera i pezzi e i file dall'archivio tramite RAG")
     print("  /catena <testo> : Analisi evidenze (copie vs misure dirette) e catena multi-documento")
+    print("  /sql <domanda>  : Esegue l'agente SQL mostrando QUERY, RISULTATO e SPIEGAZIONE")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
 
@@ -200,6 +205,25 @@ def avvia_cli() -> int:
             else:
                 print()
                 print(risposta_imprevisti(query) or "Domanda non pertinente al pacchetto imprevisti.")
+            continue
+
+        if cmd_lower.startswith("/sql"):
+            parti = domanda.split(maxsplit=1)
+            param = parti[1].strip() if len(parti) > 1 else ""
+            if not param:
+                print("Uso: /sql <domanda con gli indizi OPPURE query SQL diretta>")
+                print("  Es. 1: /sql Qual è il codice di autorizzazione per Nora Ferri al deposito Forte Cenere, settore D6, pratica RV753?")
+                print("  Es. 2: /sql SELECT a.codice, a.stato, a.valido_fino FROM accessi a WHERE a.pratica = 'RV753'")
+            else:
+                if param.strip().upper().startswith("SELECT"):
+                    esito = interroga_database(param)
+                    print("\nQUERY ESEGUITA:")
+                    print(f"  {param}")
+                    print("\nRISULTATO:")
+                    import json
+                    print(f"  {json.dumps(esito, ensure_ascii=False, indent=2)}")
+                else:
+                    print("\n" + agente_sql(param))
             continue
 
         # Invia la richiesta al router ibrido

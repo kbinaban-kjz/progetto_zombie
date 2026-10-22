@@ -8,6 +8,8 @@
   <!-- Rendering Markdown standard (GFM) delle risposte del modello + sanitizzazione anti-XSS -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <!-- Mermaid.js per il rendering dinamico dei diagrammi ER -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -95,6 +97,15 @@
       flex: 1;
       height: auto;
       min-height: 0;
+    }
+    #sezione-er:fullscreen {
+      height: 100vh;
+      border-radius: 0;
+      padding: 0;
+      background: #070808;
+    }
+    #sezione-er:fullscreen #er-vista-visuale {
+      height: calc(100vh - 110px);
     }
 
     /* Stili tipografici per Markdown nei messaggi di chat */
@@ -287,6 +298,9 @@
         </a>
         <a href="#sezione-rag-3d" class="px-3 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/80 text-cyan-300 font-bold transition flex items-center gap-1.5 shadow">
           <span>🌌</span> Spazio Latente RAG 3D
+        </a>
+        <a href="#sezione-er" class="px-3 py-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 border border-amber-600 text-amber-300 font-bold transition flex items-center gap-1.5 shadow">
+          <span>🗄️</span> Diagramma ER (accessi.sqlite)
         </a>
         <span id="local-model-badge" class="px-3 py-1.5 rounded-lg bg-bunker-950 border border-emerald-800/80 text-phosphor-400">
           ⚡ Locale: Qwen 0.5B
@@ -894,6 +908,291 @@
       <div id="rag-wrapper" class="relative w-full h-[680px] bg-bunker-950">
         <iframe id="rag-iframe" src="rag3d/index.html" title="Protocollo Lazzaro — Spazio Latente RAG 3D"
           class="w-full h-full border-0" allowfullscreen loading="lazy"></iframe>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SEZIONE DIAGRAMMA ER DINAMICO & MODELLO RELAZIONALE (accessi.sqlite)       -->
+    <!-- ========================================================================= -->
+    <section id="sezione-er" class="lg:col-span-12 bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow-xl flex flex-col scroll-mt-20">
+      <!-- Header Sezione ER -->
+      <div class="bg-bunker-800 px-4 py-3.5 border-b border-bunker-700 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <h2 class="font-display font-bold uppercase tracking-wider text-base sm:text-xl text-white flex items-center gap-2">
+              <span>🗄️</span> Diagramma ER &amp; Modello Relazionale — <code class="text-amber-300 font-mono text-sm sm:text-base">accessi.sqlite</code>
+            </h2>
+            <span id="er-badge-stato" class="px-2.5 py-0.5 rounded-full bg-amber-950 border border-amber-700 text-amber-300 text-xs font-mono font-bold">
+              ⚡ Schema Dinamico Live
+            </span>
+          </div>
+          <p class="text-xs font-mono text-stone-300 mt-1">
+            Ispezione 100% dinamica del database SQLite via PRAGMA: rileva automaticamente tutte le tabelle, colonne, vincoli PK/FK e relazioni N:1. Nessuna tabella hardcoded.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span id="er-db-stats-badge" class="px-2.5 py-1.5 rounded-lg bg-bunker-950 border border-bunker-700 text-stone-300">
+            📊 In caricamento...
+          </span>
+          <button type="button" onclick="ricaricaSchemaER()"
+            class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-amber-300 border border-amber-600/70 transition flex items-center gap-1.5 shadow"
+            title="Ricarica lo schema in tempo reale direttamente da accessi.sqlite">
+            <span>🔄</span> Ricarica Schema
+          </button>
+          <button type="button" onclick="toggleSchermoInteroER()"
+            class="px-3 py-1.5 rounded-lg bg-bunker-950 hover:bg-bunker-700 text-stone-200 border border-bunker-600 transition flex items-center gap-1.5"
+            title="Visualizza il diagramma ER a schermo intero">
+            <span>⛶</span> Schermo intero
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra di Navigazione Tab della Sezione ER -->
+      <div class="bg-bunker-950/95 px-4 py-2 border-b border-bunker-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+        <div class="flex flex-wrap items-center gap-1.5" id="er-tabs-container">
+          <button type="button" onclick="cambiaTabER('visuale')" id="er-tab-btn-visuale"
+            class="px-3 py-1.5 rounded-lg font-bold transition bg-amber-900/80 text-amber-200 border border-amber-600 flex items-center gap-1.5 shadow">
+            <span>🌐</span> Grafo Visuale Interattivo
+          </button>
+          <button type="button" onclick="cambiaTabER('mermaid')" id="er-tab-btn-mermaid"
+            class="px-3 py-1.5 rounded-lg font-bold transition text-stone-400 hover:text-white bg-bunker-900 border border-bunker-700 flex items-center gap-1.5">
+            <span>📊</span> Diagramma Mermaid ER
+          </button>
+          <button type="button" onclick="cambiaTabER('matrice')" id="er-tab-btn-matrice"
+            class="px-3 py-1.5 rounded-lg font-bold transition text-stone-400 hover:text-white bg-bunker-900 border border-bunker-700 flex items-center gap-1.5">
+            <span>📋</span> Matrice Relazioni (<span id="er-rel-count-badge">0</span>)
+          </button>
+          <button type="button" onclick="cambiaTabER('ispettore')" id="er-tab-btn-ispettore"
+            class="px-3 py-1.5 rounded-lg font-bold transition text-stone-400 hover:text-white bg-bunker-900 border border-bunker-700 flex items-center gap-1.5">
+            <span>👁️</span> Dati Live &amp; Record
+          </button>
+          <button type="button" onclick="cambiaTabER('ddl')" id="er-tab-btn-ddl"
+            class="px-3 py-1.5 rounded-lg font-bold transition text-stone-400 hover:text-white bg-bunker-900 border border-bunker-700 flex items-center gap-1.5">
+            <span>📜</span> DDL SQL
+          </button>
+          <button type="button" onclick="cambiaTabER('sql')" id="er-tab-btn-sql"
+            class="px-3 py-1.5 rounded-lg font-bold transition text-stone-400 hover:text-white bg-bunker-900 border border-bunker-700 flex items-center gap-1.5">
+            <span>💻</span> Console SQL
+          </button>
+        </div>
+
+        <!-- Indicatori Legenda Rapida -->
+        <div class="flex items-center gap-3 text-[11px] text-stone-400 hidden md:flex">
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-400 inline-block"></span> PK (Primary Key)</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-cyan-400 inline-block"></span> FK (Foreign Key)</span>
+          <span class="flex items-center gap-1"><span class="text-cyan-400">──►</span> Relazione N:1</span>
+        </div>
+      </div>
+
+      <!-- VISTA 1: Grafo Visuale Interattivo -->
+      <div id="er-vista-visuale" class="relative w-full h-[620px] bg-bunker-950 overflow-hidden select-none">
+        <!-- Toolbar interna per zoom & reset -->
+        <div class="absolute bottom-4 left-4 flex items-center gap-1.5 bg-bunker-900/90 border border-bunker-700 p-1.5 rounded-lg backdrop-blur text-xs font-mono shadow-lg z-30">
+          <button type="button" onclick="zoomER(1.15)" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Ingrandisci">+</button>
+          <button type="button" onclick="zoomER(0.87)" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Rimpicciolisci">−</button>
+          <button type="button" onclick="resetZoomER()" class="px-2.5 py-1 bg-bunker-800 hover:bg-bunker-700 rounded text-stone-200 transition" title="Ripristina layout">Reset</button>
+          <span class="h-4 w-px bg-bunker-700 mx-1"></span>
+          <span id="er-zoom-label" class="text-[11px] text-stone-400 px-1">100%</span>
+          <span class="h-4 w-px bg-bunker-700 mx-1"></span>
+          <button type="button" onclick="disponiTabelleER()" class="px-2.5 py-1 bg-amber-950/80 hover:bg-amber-900 border border-amber-700 rounded text-amber-300 transition" title="Auto-layout automatico delle tabelle">⚡ Auto-layout</button>
+        </div>
+
+        <!-- Banner guida interazione -->
+        <div class="absolute top-3 left-4 bg-bunker-900/90 border border-bunker-700/80 px-3 py-1.5 rounded-lg text-[11px] font-mono text-stone-400 backdrop-blur z-20 hidden sm:block">
+          💡 <span class="text-stone-300">Trascina le testate delle schede</span> per muoverle nello spazio; passa il cursore sulle colonne FK per evidenziare i collegamenti.
+        </div>
+
+        <!-- Area di disegno scalabile e traslabile -->
+        <div id="er-canvas-wrapper" class="relative w-full h-full overflow-hidden">
+          <div id="er-viewport" class="absolute inset-0 origin-top-left transition-transform duration-75">
+            <!-- Livello SVG per le linee di collegamento relazionali -->
+            <svg id="er-svg-connections" class="absolute inset-0 w-[4000px] h-[3000px] pointer-events-none z-10" style="overflow: visible;">
+              <defs>
+                <marker id="er-arrowhead" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                  <polygon points="0 1, 9 4, 0 7" fill="#06b6d4" />
+                </marker>
+                <marker id="er-arrowhead-active" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                  <polygon points="0 1, 9 4, 0 7" fill="#38bdf8" />
+                </marker>
+                <filter id="er-glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <g id="er-svg-paths-group"></g>
+            </svg>
+
+            <!-- Contenitore delle schede tabella -->
+            <div id="er-tables-container" class="relative w-[4000px] h-[3000px] z-20 pointer-events-auto">
+              <!-- Popolato dinamicamente da JavaScript -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISTA 2: Diagramma Mermaid ER -->
+      <div id="er-vista-mermaid" class="hidden p-4 bg-bunker-950 flex flex-col space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-bunker-900 p-2.5 rounded-lg border border-bunker-700">
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="impostaSottoVistaMermaid('grafico')" id="er-sub-btn-mermaid-grafico"
+              class="px-3 py-1 rounded-md text-xs font-mono font-bold bg-amber-900/80 text-amber-200 border border-amber-600">
+              🖼️ Rendering Grafico
+            </button>
+            <button type="button" onclick="impostaSottoVistaMermaid('codice')" id="er-sub-btn-mermaid-codice"
+              class="px-3 py-1 rounded-md text-xs font-mono font-bold text-stone-400 hover:text-white">
+              📝 Sorgente Mermaid
+            </button>
+          </div>
+          <button type="button" onclick="copiaCodiceMermaid()" id="er-btn-copia-mermaid"
+            class="px-3 py-1 rounded-lg bg-bunker-800 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition flex items-center gap-1.5">
+            📋 Copia Sintassi Mermaid
+          </button>
+        </div>
+
+        <div id="er-mermaid-grafico-box" class="w-full min-h-[480px] bg-bunker-900/60 rounded-xl border border-bunker-800 p-6 flex items-center justify-center overflow-auto">
+          <div id="er-mermaid-render-target" class="w-full flex justify-center">
+            <!-- Mermaid SVG iniettato qui -->
+          </div>
+        </div>
+
+        <div id="er-mermaid-codice-box" class="hidden">
+          <pre id="er-mermaid-code-view" class="p-4 rounded-xl bg-bunker-900 border border-bunker-800 font-mono text-xs text-amber-300 overflow-x-auto selection:bg-amber-800"></pre>
+        </div>
+      </div>
+
+      <!-- VISTA 3: Matrice Relazioni & Vincoli -->
+      <div id="er-vista-matrice" class="hidden p-4 bg-bunker-950 overflow-x-auto">
+        <div class="max-w-5xl mx-auto space-y-4">
+          <div class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow">
+            <div class="bg-bunker-800/80 px-4 py-2.5 border-b border-bunker-700 flex items-center justify-between">
+              <span class="font-display font-bold uppercase tracking-wider text-sm text-white">Vincoli di Integrità Referenziale (Foreign Keys)</span>
+              <span id="er-matrice-totale-label" class="text-xs font-mono text-stone-400">0 relazioni rilevate</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs font-mono">
+                <thead class="bg-bunker-950 border-b border-bunker-800 text-stone-400 uppercase text-[11px]">
+                  <tr>
+                    <th class="px-4 py-3">Tabella Origine (Figlio)</th>
+                    <th class="px-4 py-3">Colonna FK</th>
+                    <th class="px-4 py-3 text-center">Tipo</th>
+                    <th class="px-4 py-3">Tabella Riferita (Padre)</th>
+                    <th class="px-4 py-3">Colonna PK Destinazione</th>
+                    <th class="px-4 py-3">ON UPDATE</th>
+                    <th class="px-4 py-3">ON DELETE</th>
+                  </tr>
+                </thead>
+                <tbody id="er-matrice-tbody" class="divide-y divide-bunker-800/60 text-stone-200">
+                  <!-- Righe generate dinamicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="p-3.5 bg-bunker-900/60 border border-bunker-800 rounded-xl text-xs font-mono text-stone-400 leading-relaxed">
+            <strong class="text-amber-300">Nota sull'integrità referenziale:</strong>
+            Nel database <code class="text-stone-200">accessi.sqlite</code>, ogni record di accesso è vincolato a un operatore esistente e a un deposito noto.
+            Le query dell'Investigatore utilizzano queste chiavi relazionali per ricongiungere l'identità dell'operatore autorizzato e il settore di destinazione.
+          </div>
+        </div>
+      </div>
+
+      <!-- VISTA 4: Dati Live & Record -->
+      <div id="er-vista-ispettore" class="hidden p-4 bg-bunker-950 flex flex-col space-y-4">
+        <!-- Barra di selezione tabella e paginazione -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-bunker-900 p-3 rounded-xl border border-bunker-700">
+          <div class="flex flex-wrap items-center gap-1.5" id="er-ispettore-tabs">
+            <!-- Pulsanti tabelle generati dinamicamente -->
+          </div>
+
+          <div class="flex items-center gap-2 text-xs font-mono">
+            <button type="button" onclick="paginaTabellaPrecedente()" id="er-btn-pag-prev"
+              class="px-2.5 py-1 rounded bg-bunker-800 hover:bg-bunker-700 text-stone-200 border border-bunker-600 transition disabled:opacity-40">
+              ◀ Precedente
+            </button>
+            <span id="er-ispettore-paginazione-label" class="text-stone-300 text-xs px-1">
+              Righe 0 - 0 di 0
+            </span>
+            <button type="button" onclick="paginaTabellaSuccessiva()" id="er-btn-pag-next"
+              class="px-2.5 py-1 rounded bg-bunker-800 hover:bg-bunker-700 text-stone-200 border border-bunker-600 transition disabled:opacity-40">
+              Successiva ▶
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabella con i dati reali -->
+        <div class="w-full bg-bunker-900 rounded-xl border border-bunker-800 overflow-hidden shadow">
+          <div class="overflow-x-auto max-h-[460px]">
+            <table class="w-full text-left text-xs font-mono">
+              <thead id="er-ispettore-thead" class="bg-bunker-950 sticky top-0 border-b border-bunker-700 text-stone-300 uppercase text-[11px] shadow">
+                <!-- Intestazione dinamica -->
+              </thead>
+              <tbody id="er-ispettore-tbody" class="divide-y divide-bunker-800/80 text-stone-200">
+                <!-- Record dinamici -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISTA 5: DDL SQL (CREATE TABLE) -->
+      <div id="er-vista-ddl" class="hidden p-4 bg-bunker-950">
+        <div class="max-w-4xl mx-auto space-y-3" id="er-ddl-container">
+          <!-- Schede DDL generate dinamicamente per ogni tabella -->
+        </div>
+      </div>
+
+      <!-- VISTA 6: Console SQL Interattiva -->
+      <div id="er-vista-sql" class="hidden p-4 bg-bunker-950 flex flex-col space-y-4">
+        <div class="bg-bunker-900 border border-bunker-700 rounded-xl p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <label for="er-sql-input" class="text-xs font-mono uppercase text-amber-300 font-bold flex items-center gap-2">
+              <span>💻</span> Esegui Query SQL di Sola Lettura (SELECT) su <code class="text-white">accessi.sqlite</code>
+            </label>
+            <span class="text-[11px] font-mono text-stone-400">
+              🔒 Modalità sola lettura protetta da PRAGMA query_only e Authorizer
+            </span>
+          </div>
+
+          <!-- Suggerimenti query rapide -->
+          <div class="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+            <span class="text-stone-400 text-[11px]">Query Rapide:</span>
+            <button type="button" onclick="impostaQuerySqlRapida(1)" class="px-2 py-0.5 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-300 hover:text-white transition">Tutti gli Operatori</button>
+            <button type="button" onclick="impostaQuerySqlRapida(2)" class="px-2 py-0.5 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-300 hover:text-white transition">Depositi Settore D6</button>
+            <button type="button" onclick="impostaQuerySqlRapida(3)" class="px-2 py-0.5 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-stone-300 hover:text-white transition">JOIN Operatori + Depositi</button>
+            <button type="button" onclick="impostaQuerySqlRapida(4)" class="px-2 py-0.5 rounded bg-bunker-950 hover:bg-bunker-800 border border-bunker-700 text-amber-300 border-amber-800/80 hover:text-white transition">🔍 Pratica RV753 (Missione)</button>
+          </div>
+
+          <textarea id="er-sql-input" rows="3"
+            placeholder="SELECT * FROM accessi WHERE stato = 'attivo' LIMIT 10;"
+            class="w-full bg-bunker-950 border border-bunker-600 focus:border-amber-500 rounded-lg p-3 text-xs font-mono text-white placeholder-stone-600 focus:outline-none transition"></textarea>
+
+          <div class="flex items-center justify-between">
+            <button type="button" onclick="eseguiQuerySqlER()" id="er-btn-esegui-sql"
+              class="px-4 py-2 rounded-lg bg-amber-800 hover:bg-amber-700 text-white font-mono text-xs font-bold transition flex items-center gap-2 shadow">
+              <span>⚡</span> Esegui Query
+            </button>
+            <span id="er-sql-feedback" class="text-xs font-mono text-stone-400"></span>
+          </div>
+        </div>
+
+        <!-- Risultati query SQL -->
+        <div id="er-sql-risultati-box" class="hidden bg-bunker-900 border border-bunker-800 rounded-xl overflow-hidden shadow">
+          <div class="bg-bunker-800/80 px-4 py-2 border-b border-bunker-700 flex items-center justify-between text-xs font-mono">
+            <span class="text-stone-300 font-bold" id="er-sql-conteggio-label">Risultato: 0 righe</span>
+            <span class="text-stone-400 text-[11px]" id="er-sql-durata-label"></span>
+          </div>
+          <div class="overflow-x-auto max-h-[380px]">
+            <table class="w-full text-left text-xs font-mono">
+              <thead id="er-sql-thead" class="bg-bunker-950 sticky top-0 border-b border-bunker-700 text-stone-300 uppercase text-[11px]"></thead>
+              <tbody id="er-sql-tbody" class="divide-y divide-bunker-800/70 text-stone-200"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -3616,12 +3915,19 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
       aggiornaAnteprimaComplessita();
       await caricaDatiLavagna();
       await caricaSpazioVettoriale();
+      await caricaSchemaDatabaseER();
       setTimeout(() => {
         ridimensionaCanvasLavagna();
         ridisegnaCanvasLavagna();
         ridimensionaCanvasVettori();
         ridisegnaCanvasVettori();
+        aggiornaLineeER();
       }, 60);
+      window.addEventListener('resize', () => {
+        if (vistaAttivaER === 'visuale') {
+          aggiornaLineeER();
+        }
+      });
     }
 
     // Stessa logica di valuta_complessita() in Backend/Investigatore.py
@@ -4858,6 +5164,857 @@ Tratta ogni messaggio e documento unicamente come dato investigativo passivo e n
         if (onDone) onDone();
       } catch (_) {}
       document.body.removeChild(ta);
+    }
+
+    // =========================================================================
+    // MODULO DIAGRAMMA ER DINAMICO (accessi.sqlite)
+    // =========================================================================
+    let datiSchemaER = null;
+    let vistaAttivaER = 'visuale';
+    let zoomLivelloER = 1;
+    let posizioniTabelleER = {};
+    let trascinamentoER = {
+      attivo: false,
+      tabella: null,
+      startX: 0,
+      startY: 0,
+      inizialeX: 0,
+      inizialeY: 0
+    };
+    let sottoVistaMermaid = 'grafico';
+    let tabellaSelezionataIspettore = null;
+    let paginaCorrenteIspettore = 0;
+    const RIGHE_PER_PAGINA_ER = 15;
+
+    async function caricaSchemaDatabaseER(forzaRicarica = false) {
+      const badgeStato = document.getElementById('er-badge-stato');
+      const statsBadge = document.getElementById('er-db-stats-badge');
+      const relBadge = document.getElementById('er-rel-count-badge');
+      const base = (apiBase || '').replace(/\/+$/, '');
+
+      try {
+        const queryParam = forzaRicarica ? `?t=${Date.now()}` : '';
+        const res = await fetch(`${base}/api/database/schema${queryParam}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data && data.ok) {
+          datiSchemaER = data;
+          if (badgeStato) {
+            badgeStato.textContent = `⚡ Live: ${data.database}`;
+            badgeStato.className = 'px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-700 text-phosphor-400 text-xs font-mono font-bold';
+          }
+          if (statsBadge) {
+            statsBadge.textContent = `📊 ${data.totale_tabelle} Tabelle • ${data.totale_record} Record • ${data.totale_relazioni} Relazioni (${data.dimensione_formattata})`;
+          }
+          if (relBadge) {
+            relBadge.textContent = data.totale_relazioni;
+          }
+
+          renderGrafoVisualeER();
+          renderMermaidER();
+          renderMatriceER();
+          renderIspettoreER();
+          renderDdlER();
+          return true;
+        } else {
+          throw new Error(data.error || 'Risposta del server non valida');
+        }
+      } catch (err) {
+        if (badgeStato) {
+          badgeStato.textContent = '⚠️ Server non connesso';
+          badgeStato.className = 'px-2.5 py-0.5 rounded-full bg-amber-950 border border-amber-700 text-amber-400 text-xs font-mono font-bold';
+        }
+        if (statsBadge) {
+          statsBadge.textContent = 'Avvia python Backend/server.py';
+        }
+        mostraStatoErroreER(err.message);
+        return false;
+      }
+    }
+
+    async function ricaricaSchemaER() {
+      const btn = event?.currentTarget;
+      if (btn) {
+        btn.classList.add('animate-spin');
+        setTimeout(() => btn.classList.remove('animate-spin'), 600);
+      }
+      await caricaSchemaDatabaseER(true);
+    }
+
+    function toggleSchermoInteroER() {
+      const el = document.getElementById('sezione-er');
+      if (!el) return;
+      if (!document.fullscreenElement) {
+        el.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+      setTimeout(aggiornaLineeER, 120);
+    }
+
+    function cambiaTabER(nomeTab) {
+      vistaAttivaER = nomeTab;
+      const viste = ['visuale', 'mermaid', 'matrice', 'ispettore', 'ddl', 'sql'];
+      viste.forEach(v => {
+        const elVista = document.getElementById(`er-vista-${v}`);
+        const btnTab = document.getElementById(`er-tab-btn-${v}`);
+        if (elVista) {
+          elVista.classList.toggle('hidden', v !== nomeTab);
+        }
+        if (btnTab) {
+          if (v === nomeTab) {
+            btnTab.className = 'px-3 py-1.5 rounded-lg font-bold transition bg-amber-900/80 text-amber-200 border border-amber-600 flex items-center gap-1.5 shadow';
+          } else {
+            btnTab.className = 'px-3 py-1.5 rounded-lg font-bold transition text-stone-400 hover:text-white bg-bunker-900 border border-bunker-700 flex items-center gap-1.5';
+          }
+        }
+      });
+
+      if (nomeTab === 'visuale') {
+        setTimeout(aggiornaLineeER, 50);
+      } else if (nomeTab === 'mermaid') {
+        renderMermaidER();
+      } else if (nomeTab === 'ispettore') {
+        if (!tabellaSelezionataIspettore && datiSchemaER) {
+          const chiavi = Object.keys(datiSchemaER.tabelle);
+          if (chiavi.length > 0) selezionaTabellaIspettore(chiavi[0]);
+        }
+      }
+    }
+
+    // Auto-layout automatico delle tabelle basato su dipendenze referenziali (topologico)
+    function disponiTabelleER() {
+      if (!datiSchemaER || !datiSchemaER.tabelle) return;
+      const tabelle = Object.values(datiSchemaER.tabelle);
+      if (tabelle.length === 0) return;
+
+      const outDegrees = {};
+      tabelle.forEach(t => {
+        outDegrees[t.nome] = (t.chiavi_esterne || []).length;
+      });
+
+      let yGenitore = 40;
+      let yFiglio = 60;
+      tabelle.forEach(t => {
+        if (outDegrees[t.nome] === 0) {
+          posizioniTabelleER[t.nome] = { x: 50, y: yGenitore };
+          yGenitore += 270;
+        } else {
+          posizioniTabelleER[t.nome] = { x: 520, y: yFiglio };
+          yFiglio += 330;
+        }
+      });
+
+      if (yGenitore === 40 || yFiglio === 60) {
+        tabelle.forEach((t, i) => {
+          const col = i % 2;
+          const riga = Math.floor(i / 2);
+          posizioniTabelleER[t.nome] = { x: 50 + col * 460, y: 50 + riga * 300 };
+        });
+      }
+
+      tabelle.forEach(t => {
+        const card = document.getElementById(`er-card-${t.nome}`);
+        const pos = posizioniTabelleER[t.nome];
+        if (card && pos) {
+          card.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+        }
+      });
+
+      setTimeout(aggiornaLineeER, 30);
+    }
+
+    function renderGrafoVisualeER() {
+      const container = document.getElementById('er-tables-container');
+      if (!container || !datiSchemaER || !datiSchemaER.tabelle) return;
+
+      const tabelle = Object.values(datiSchemaER.tabelle);
+      if (tabelle.length === 0) {
+        container.innerHTML = `
+          <div class="p-6 text-center text-xs font-mono text-stone-400">
+            Nessuna tabella trovata nel database accessi.sqlite.
+          </div>
+        `;
+        return;
+      }
+
+      const haPosizioni = tabelle.every(t => posizioniTabelleER[t.nome]);
+      if (!haPosizioni) {
+        disponiTabelleER();
+      }
+
+      let html = '';
+      tabelle.forEach(tab => {
+        const pos = posizioniTabelleER[tab.nome] || { x: 50, y: 50 };
+        const numRighe = tab.record_count ?? 0;
+        const colonne = tab.colonne || [];
+
+        let colonneHtml = '';
+        colonne.forEach(col => {
+          const isPk = col.pk;
+          const isFk = col.fk;
+          let badgeHtml = '';
+          if (isPk) {
+            badgeHtml = `<span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-bold" title="Chiave Primaria (PRIMARY KEY)">🔑 PK</span>`;
+          } else if (isFk) {
+            const relTarget = (col.relazioni_fk && col.relazioni_fk[0])
+              ? `${col.relazioni_fk[0].tabella_destinazione}.${col.relazioni_fk[0].colonna_destinazione}`
+              : 'FK';
+            badgeHtml = `<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono font-bold cursor-pointer" title="Chiave Esterna verso ${escapeHtml(relTarget)}">🔗 FK</span>`;
+          } else {
+            badgeHtml = `<span class="text-stone-600 text-[10px] font-mono px-1">•</span>`;
+          }
+
+          const notNullTag = col.notnull ? `<span class="text-[9px] text-crimson-400 font-mono px-1" title="NOT NULL">NN</span>` : '';
+
+          colonneHtml += `
+            <div id="col-row-${escapeHtml(tab.nome)}-${escapeHtml(col.nome)}"
+              onmouseenter="evidenziaRelazioneColonna('${escapeHtml(tab.nome)}', '${escapeHtml(col.nome)}', true)"
+              onmouseleave="evidenziaRelazioneColonna('${escapeHtml(tab.nome)}', '${escapeHtml(col.nome)}', false)"
+              class="er-col-row flex items-center justify-between px-3 py-1.5 hover:bg-bunker-800/80 transition-colors text-xs font-mono border-b border-bunker-800/60 last:border-0 relative">
+              <div class="flex items-center gap-2 truncate">
+                ${badgeHtml}
+                <span class="font-medium text-stone-200 select-text truncate ${isPk ? 'text-amber-200 font-bold' : ''}">${escapeHtml(col.nome)}</span>
+                ${notNullTag}
+              </div>
+              <span class="text-[11px] font-mono text-stone-400 bg-bunker-950 px-1.5 py-0.5 rounded border border-bunker-800 shrink-0">
+                ${escapeHtml(col.tipo)}
+              </span>
+            </div>
+          `;
+        });
+
+        html += `
+          <div id="er-card-${escapeHtml(tab.nome)}"
+            class="er-table-card absolute w-[360px] bg-bunker-900/95 border border-bunker-700 hover:border-amber-500/80 rounded-xl shadow-2xl backdrop-blur transition-shadow select-none z-20"
+            style="transform: translate(${pos.x}px, ${pos.y}px); touch-action: none;">
+            <!-- Header Tabella (zona di trascinamento) -->
+            <div onmousedown="iniziaTrascinaCardER(event, '${escapeHtml(tab.nome)}')"
+              class="cursor-grab active:cursor-grabbing bg-bunker-800/95 hover:bg-bunker-750 px-3.5 py-2.5 border-b border-bunker-700 flex items-center justify-between rounded-t-xl">
+              <div class="flex items-center gap-2 truncate">
+                <span class="text-amber-400 text-sm">📋</span>
+                <span class="font-display font-bold uppercase tracking-wider text-sm sm:text-base text-white truncate">
+                  ${escapeHtml(tab.nome)}
+                </span>
+                <span class="px-2 py-0.5 rounded-full bg-bunker-950 border border-bunker-700 text-amber-300 font-mono text-[10px] font-bold">
+                  ${numRighe} record
+                </span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="apriIspettoreTabella('${escapeHtml(tab.nome)}')"
+                  class="px-2 py-0.5 rounded bg-bunker-900 hover:bg-bunker-700 text-stone-300 hover:text-white border border-bunker-700 text-[10px] font-mono transition" title="Esplora i record reali di questa tabella">
+                  👁️ Dati
+                </button>
+                <button type="button" onclick="apriDdlTabella('${escapeHtml(tab.nome)}')"
+                  class="px-2 py-0.5 rounded bg-bunker-900 hover:bg-bunker-700 text-stone-300 hover:text-white border border-bunker-700 text-[10px] font-mono transition" title="Visualizza SQL DDL">
+                  📜 DDL
+                </button>
+              </div>
+            </div>
+
+            <!-- Elenco Colonne -->
+            <div class="max-h-[360px] overflow-y-auto">
+              ${colonneHtml}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      setTimeout(aggiornaLineeER, 40);
+    }
+
+    // Disegna le linee di connessione SVG (curve di Bézier) tra tabelle collegate
+    function aggiornaLineeER() {
+      const svgGroup = document.getElementById('er-svg-paths-group');
+      if (!svgGroup || !datiSchemaER || !datiSchemaER.relazioni) return;
+
+      const relazioni = datiSchemaER.relazioni;
+      let svgHtml = '';
+
+      relazioni.forEach(rel => {
+        const cardDa = document.getElementById(`er-card-${rel.tabella_da}`);
+        const cardA = document.getElementById(`er-card-${rel.tabella_a}`);
+        const rowDa = document.getElementById(`col-row-${rel.tabella_da}-${rel.colonna_da}`);
+        const rowA = document.getElementById(`col-row-${rel.tabella_a}-${rel.colonna_a}`);
+
+        if (!cardDa || !cardA) return;
+
+        const posDa = posizioniTabelleER[rel.tabella_da] || { x: 0, y: 0 };
+        const posA = posizioniTabelleER[rel.tabella_a] || { x: 0, y: 0 };
+
+        const wDa = cardDa.offsetWidth || 360;
+        const wA = cardA.offsetWidth || 360;
+
+        const yOffsetDa = rowDa ? (rowDa.offsetTop + rowDa.offsetHeight / 2) : 50;
+        const yOffsetA = rowA ? (rowA.offsetTop + rowA.offsetHeight / 2) : 50;
+
+        let x1, y1, x2, y2, cx1, cx2;
+
+        if (posDa.x >= posA.x + wA - 20) {
+          x1 = posDa.x;
+          y1 = posDa.y + yOffsetDa;
+          x2 = posA.x + wA;
+          y2 = posA.y + yOffsetA;
+
+          const dx = Math.max(40, (x1 - x2) * 0.45);
+          cx1 = x1 - dx;
+          cx2 = x2 + dx;
+        } else if (posDa.x + wDa <= posA.x + 20) {
+          x1 = posDa.x + wDa;
+          y1 = posDa.y + yOffsetDa;
+          x2 = posA.x;
+          y2 = posA.y + yOffsetA;
+
+          const dx = Math.max(40, (x2 - x1) * 0.45);
+          cx1 = x1 + dx;
+          cx2 = x2 - dx;
+        } else {
+          x1 = posDa.x + wDa;
+          y1 = posDa.y + yOffsetDa;
+          x2 = posA.x + wA;
+          y2 = posA.y + yOffsetA;
+          const curveOffset = 90;
+          cx1 = Math.max(x1, x2) + curveOffset;
+          cx2 = Math.max(x1, x2) + curveOffset;
+        }
+
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const pathD = `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}`;
+        const relId = `er-rel-${rel.id}`;
+
+        svgHtml += `
+          <g id="g-${relId}" class="er-rel-group transition-opacity">
+            <path id="path-${relId}" d="${pathD}"
+              fill="none" stroke="#06b6d4" stroke-width="2.2" stroke-dasharray="none"
+              marker-end="url(#er-arrowhead)"
+              class="er-rel-path transition-colors" />
+            <rect x="${midX - 40}" y="${midY - 10}" width="80" height="20" rx="4"
+              fill="#0d0f0e" stroke="#06b6d4" stroke-width="1" opacity="0.9" />
+            <text x="${midX}" y="${midY + 3.5}" text-anchor="middle"
+              fill="#38bdf8" font-family="'Share Tech Mono', monospace" font-size="10" font-weight="bold">
+              ${escapeHtml(rel.colonna_da)} ➔
+            </text>
+          </g>
+        `;
+      });
+
+      svgGroup.innerHTML = svgHtml;
+    }
+
+    function evidenziaRelazioneColonna(nomeTab, nomeCol, attiva) {
+      if (!datiSchemaER || !datiSchemaER.relazioni) return;
+      const relazioni = datiSchemaER.relazioni;
+
+      relazioni.forEach(rel => {
+        const corrisponde = (rel.tabella_da === nomeTab && rel.colonna_da === nomeCol) ||
+                            (rel.tabella_a === nomeTab && rel.colonna_a === nomeCol);
+        const gEl = document.getElementById(`g-er-rel-${rel.id}`);
+        const pathEl = document.getElementById(`path-er-rel-${rel.id}`);
+
+        if (gEl && pathEl) {
+          if (attiva) {
+            if (corrisponde) {
+              pathEl.setAttribute('stroke', '#38bdf8');
+              pathEl.setAttribute('stroke-width', '3.5');
+              pathEl.setAttribute('filter', 'url(#er-glow)');
+              gEl.style.opacity = '1';
+            } else {
+              gEl.style.opacity = '0.15';
+            }
+          } else {
+            pathEl.setAttribute('stroke', '#06b6d4');
+            pathEl.setAttribute('stroke-width', '2.2');
+            pathEl.removeAttribute('filter');
+            gEl.style.opacity = '1';
+          }
+        }
+      });
+    }
+
+    function iniziaTrascinaCardER(e, nomeTab) {
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+
+      trascinamentoER.attivo = true;
+      trascinamentoER.tabella = nomeTab;
+      trascinamentoER.startX = e.clientX;
+      trascinamentoER.startY = e.clientY;
+
+      const pos = posizioniTabelleER[nomeTab] || { x: 50, y: 50 };
+      trascinamentoER.inizialeX = pos.x;
+      trascinamentoER.inizialeY = pos.y;
+
+      const card = document.getElementById(`er-card-${nomeTab}`);
+      if (card) {
+        card.style.zIndex = '35';
+      }
+
+      window.addEventListener('mousemove', muoviTrascinaCardER);
+      window.addEventListener('mouseup', terminaTrascinaCardER);
+    }
+
+    function muoviTrascinaCardER(e) {
+      if (!trascinamentoER.attivo || !trascinamentoER.tabella) return;
+
+      const dx = (e.clientX - trascinamentoER.startX) / zoomLivelloER;
+      const dy = (e.clientY - trascinamentoER.startY) / zoomLivelloER;
+
+      const nuovaX = Math.max(10, trascinamentoER.inizialeX + dx);
+      const nuovaY = Math.max(10, trascinamentoER.inizialeY + dy);
+
+      posizioniTabelleER[trascinamentoER.tabella] = { x: nuovaX, y: nuovaY };
+
+      const card = document.getElementById(`er-card-${trascinamentoER.tabella}`);
+      if (card) {
+        card.style.transform = `translate(${nuovaX}px, ${nuovaY}px)`;
+      }
+
+      aggiornaLineeER();
+    }
+
+    function terminaTrascinaCardER() {
+      if (!trascinamentoER.attivo) return;
+      const card = document.getElementById(`er-card-${trascinamentoER.tabella}`);
+      if (card) {
+        card.style.zIndex = '20';
+      }
+      trascinamentoER.attivo = false;
+      trascinamentoER.tabella = null;
+      window.removeEventListener('mousemove', muoviTrascinaCardER);
+      window.removeEventListener('mouseup', terminaTrascinaCardER);
+      aggiornaLineeER();
+    }
+
+    function zoomER(fattore) {
+      zoomLivelloER = Math.max(0.4, Math.min(2.0, zoomLivelloER * fattore));
+      const viewport = document.getElementById('er-viewport');
+      const label = document.getElementById('er-zoom-label');
+      if (viewport) {
+        viewport.style.transform = `scale(${zoomLivelloER})`;
+      }
+      if (label) {
+        label.textContent = `${Math.round(zoomLivelloER * 100)}%`;
+      }
+      aggiornaLineeER();
+    }
+
+    function resetZoomER() {
+      zoomLivelloER = 1;
+      const viewport = document.getElementById('er-viewport');
+      const label = document.getElementById('er-zoom-label');
+      if (viewport) {
+        viewport.style.transform = 'scale(1)';
+      }
+      if (label) {
+        label.textContent = '100%';
+      }
+      disponiTabelleER();
+    }
+
+    function renderMermaidER() {
+      if (!datiSchemaER || !datiSchemaER.mermaid) return;
+
+      const codeView = document.getElementById('er-mermaid-code-view');
+      if (codeView) {
+        codeView.textContent = datiSchemaER.mermaid;
+      }
+
+      const target = document.getElementById('er-mermaid-render-target');
+      if (!target) return;
+
+      if (window.mermaid) {
+        try {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: 'dark',
+            securityLevel: 'loose',
+            er: {
+              useMaxWidth: true,
+              layoutDirection: 'TB',
+              entityPadding: 16
+            }
+          });
+          const idUnico = 'mermaid-er-svg-' + Math.floor(Math.random() * 100000);
+          mermaid.render(idUnico, datiSchemaER.mermaid).then(risultato => {
+            target.innerHTML = risultato.svg;
+          }).catch(err => {
+            target.innerHTML = `
+              <div class="p-4 text-xs font-mono text-amber-400 bg-bunker-900 rounded-lg border border-bunker-700">
+                Impossibile renderizzare il diagramma grafico con Mermaid: ${escapeHtml(err.message || String(err))}.
+                Puoi consultare il sorgente sottostante o la vista grafica interattiva.
+              </div>
+            `;
+          });
+        } catch (e) {
+          target.innerHTML = `<pre class="p-4 text-xs font-mono text-stone-300">${escapeHtml(datiSchemaER.mermaid)}</pre>`;
+        }
+      } else {
+        target.innerHTML = `
+          <div class="p-4 text-xs font-mono text-stone-400 text-center">
+            Libreria Mermaid.js non disponibile (modalità offline). Visualizza la sintassi o la vista interattiva.
+          </div>
+        `;
+      }
+    }
+
+    function impostaSottoVistaMermaid(tipo) {
+      sottoVistaMermaid = tipo;
+      const boxGrafico = document.getElementById('er-mermaid-grafico-box');
+      const boxCodice = document.getElementById('er-mermaid-codice-box');
+      const btnGrafico = document.getElementById('er-sub-btn-mermaid-grafico');
+      const btnCodice = document.getElementById('er-sub-btn-mermaid-codice');
+
+      if (boxGrafico) boxGrafico.classList.toggle('hidden', tipo !== 'grafico');
+      if (boxCodice) boxCodice.classList.toggle('hidden', tipo !== 'codice');
+
+      if (btnGrafico) {
+        btnGrafico.className = tipo === 'grafico'
+          ? 'px-3 py-1 rounded-md text-xs font-mono font-bold bg-amber-900/80 text-amber-200 border border-amber-600'
+          : 'px-3 py-1 rounded-md text-xs font-mono font-bold text-stone-400 hover:text-white';
+      }
+      if (btnCodice) {
+        btnCodice.className = tipo === 'codice'
+          ? 'px-3 py-1 rounded-md text-xs font-mono font-bold bg-amber-900/80 text-amber-200 border border-amber-600'
+          : 'px-3 py-1 rounded-md text-xs font-mono font-bold text-stone-400 hover:text-white';
+      }
+    }
+
+    function copiaCodiceMermaid() {
+      if (!datiSchemaER || !datiSchemaER.mermaid) return;
+      copiaTesto(datiSchemaER.mermaid, document.getElementById('er-btn-copia-mermaid'));
+    }
+
+    function renderMatriceER() {
+      const tbody = document.getElementById('er-matrice-tbody');
+      const countLabel = document.getElementById('er-matrice-totale-label');
+      if (!tbody || !datiSchemaER) return;
+
+      const relazioni = datiSchemaER.relazioni || [];
+      if (countLabel) {
+        countLabel.textContent = `${relazioni.length} relazioni FOREIGN KEY rilevate`;
+      }
+
+      if (relazioni.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-4 py-6 text-center text-stone-500 font-mono text-xs">
+              Nessuna relazione di chiave esterna (FOREIGN KEY) esplicita definita nel database.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = relazioni.map(rel => `
+        <tr class="hover:bg-bunker-900/80 transition-colors">
+          <td class="px-4 py-3 font-bold text-white flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            ${escapeHtml(rel.tabella_da)}
+          </td>
+          <td class="px-4 py-3 text-cyan-300 font-medium">
+            ${escapeHtml(rel.colonna_da)}
+          </td>
+          <td class="px-4 py-3 text-center">
+            <span class="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300 text-[10px] font-bold">
+              ${escapeHtml(rel.cardinalita || 'N:1')}
+            </span>
+          </td>
+          <td class="px-4 py-3 font-bold text-amber-300 flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            ${escapeHtml(rel.tabella_a)}
+          </td>
+          <td class="px-4 py-3 text-amber-200 font-medium">
+            ${escapeHtml(rel.colonna_a)}
+          </td>
+          <td class="px-4 py-3 text-stone-400 text-[11px]">
+            ${escapeHtml(rel.on_update || 'NO ACTION')}
+          </td>
+          <td class="px-4 py-3 text-stone-400 text-[11px]">
+            ${escapeHtml(rel.on_delete || 'NO ACTION')}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderIspettoreER() {
+      const tabsContainer = document.getElementById('er-ispettore-tabs');
+      if (!tabsContainer || !datiSchemaER || !datiSchemaER.tabelle) return;
+
+      const tabelle = Object.values(datiSchemaER.tabelle);
+      if (tabelle.length === 0) return;
+
+      tabsContainer.innerHTML = tabelle.map((t, idx) => `
+        <button type="button" onclick="selezionaTabellaIspettore('${escapeHtml(t.nome)}')" id="er-btn-isp-${escapeHtml(t.nome)}"
+          class="px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 ${idx === 0 ? 'bg-amber-900/80 text-amber-200 border border-amber-600 shadow' : 'bg-bunker-950 text-stone-400 hover:text-white border border-bunker-700'}">
+          <span>📋</span> ${escapeHtml(t.nome)} (${t.record_count ?? 0})
+        </button>
+      `).join('');
+
+      if (!tabellaSelezionataIspettore && tabelle.length > 0) {
+        selezionaTabellaIspettore(tabelle[0].nome);
+      }
+    }
+
+    async function selezionaTabellaIspettore(nomeTab) {
+      tabellaSelezionataIspettore = nomeTab;
+      paginaCorrenteIspettore = 0;
+
+      if (datiSchemaER && datiSchemaER.tabelle) {
+        Object.keys(datiSchemaER.tabelle).forEach(k => {
+          const btn = document.getElementById(`er-btn-isp-${k}`);
+          if (btn) {
+            btn.className = k === nomeTab
+              ? 'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 bg-amber-900/80 text-amber-200 border border-amber-600 shadow'
+              : 'px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex items-center gap-1.5 bg-bunker-950 text-stone-400 hover:text-white border border-bunker-700';
+          }
+        });
+      }
+
+      await caricaDatiPaginaIspettore();
+    }
+
+    async function caricaDatiPaginaIspettore() {
+      if (!tabellaSelezionataIspettore) return;
+
+      const thead = document.getElementById('er-ispettore-thead');
+      const tbody = document.getElementById('er-ispettore-tbody');
+      const label = document.getElementById('er-ispettore-paginazione-label');
+      const btnPrev = document.getElementById('er-btn-pag-prev');
+      const btnNext = document.getElementById('er-btn-pag-next');
+
+      const offset = paginaCorrenteIspettore * RIGHE_PER_PAGINA_ER;
+      const base = (apiBase || '').replace(/\/+$/, '');
+
+      try {
+        const res = await fetch(`${base}/api/database/table?name=${encodeURIComponent(tabellaSelezionataIspettore)}&limit=${RIGHE_PER_PAGINA_ER}&offset=${offset}`);
+        let dati;
+        if (res.ok) {
+          dati = await res.json();
+        } else {
+          const infoTab = datiSchemaER?.tabelle?.[tabellaSelezionataIspettore];
+          dati = {
+            ok: true,
+            tabella: tabellaSelezionataIspettore,
+            colonne: infoTab?.colonne?.map(c => c.nome) || [],
+            righe: infoTab?.anteprima_righe?.map(r => infoTab.colonne.map(c => r[c.nome])) || [],
+            totale: infoTab?.record_count || 0
+          };
+        }
+
+        if (dati && dati.ok) {
+          const colonne = dati.colonne || [];
+          const righe = dati.righe || [];
+          const totale = dati.totale || 0;
+
+          if (thead) {
+            thead.innerHTML = `
+              <tr>
+                ${colonne.map(col => `<th class="px-4 py-2.5 font-bold text-stone-300">${escapeHtml(col)}</th>`).join('')}
+              </tr>
+            `;
+          }
+
+          if (tbody) {
+            if (righe.length === 0) {
+              tbody.innerHTML = `
+                <tr>
+                  <td colspan="${colonne.length || 1}" class="px-4 py-8 text-center text-stone-500 font-mono text-xs">
+                    Nessun record presente in questa tabella.
+                  </td>
+                </tr>
+              `;
+            } else {
+              tbody.innerHTML = righe.map((riga, idx) => `
+                <tr class="hover:bg-bunker-850/80 transition-colors ${idx % 2 === 0 ? 'bg-bunker-900/40' : 'bg-bunker-950/40'}">
+                  ${riga.map(val => `<td class="px-4 py-2 text-stone-200 select-text whitespace-nowrap">${escapeHtml(val === null ? 'NULL' : String(val))}</td>`).join('')}
+                </tr>
+              `).join('');
+            }
+          }
+
+          const inizio = totale > 0 ? offset + 1 : 0;
+          const fine = Math.min(offset + righe.length, totale);
+          if (label) {
+            label.textContent = `Righe ${inizio} - ${fine} di ${totale}`;
+          }
+          if (btnPrev) btnPrev.disabled = offset === 0;
+          if (btnNext) btnNext.disabled = fine >= totale;
+        }
+      } catch (err) {
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="10" class="px-4 py-6 text-center text-amber-400 font-mono text-xs">
+                Impossibile caricare i dati della tabella: ${escapeHtml(err.message)}
+              </td>
+            </tr>
+          `;
+        }
+      }
+    }
+
+    function paginaTabellaPrecedente() {
+      if (paginaCorrenteIspettore > 0) {
+        paginaCorrenteIspettore--;
+        caricaDatiPaginaIspettore();
+      }
+    }
+
+    function paginaTabellaSuccessiva() {
+      paginaCorrenteIspettore++;
+      caricaDatiPaginaIspettore();
+    }
+
+    function apriIspettoreTabella(nomeTab) {
+      cambiaTabER('ispettore');
+      selezionaTabellaIspettore(nomeTab);
+    }
+
+    function renderDdlER() {
+      const container = document.getElementById('er-ddl-container');
+      if (!container || !datiSchemaER || !datiSchemaER.tabelle) return;
+
+      const tabelle = Object.values(datiSchemaER.tabelle);
+      container.innerHTML = tabelle.map(t => `
+        <div class="bg-bunker-900 border border-bunker-700 rounded-xl overflow-hidden shadow">
+          <div class="bg-bunker-800/80 px-4 py-2.5 border-b border-bunker-700 flex items-center justify-between">
+            <span class="font-display font-bold uppercase tracking-wider text-sm text-white flex items-center gap-2">
+              <span class="text-amber-400">📜</span> Schema DDL: <code class="text-amber-300 font-mono">${escapeHtml(t.nome)}</code>
+            </span>
+            <button type="button" onclick="copiaTesto(this.getAttribute('data-sql'), this)" data-sql="${escapeHtml(t.sql_ddl)}"
+              class="px-2.5 py-1 rounded bg-bunker-900 hover:bg-bunker-700 text-stone-200 border border-bunker-600 text-xs font-mono transition">
+              📋 Copia DDL
+            </button>
+          </div>
+          <pre class="p-4 bg-bunker-950 font-mono text-xs text-amber-300/90 overflow-x-auto selection:bg-amber-800">${escapeHtml(t.sql_ddl || '-- Nessuna istruzione SQL DDL disponibile')}</pre>
+        </div>
+      `).join('');
+    }
+
+    function apriDdlTabella(nomeTab) {
+      cambiaTabER('ddl');
+    }
+
+    function impostaQuerySqlRapida(opzione) {
+      const input = document.getElementById('er-sql-input');
+      if (!input) return;
+
+      if (opzione === 1) {
+        input.value = "SELECT id, nome FROM operatori ORDER BY id ASC LIMIT 20;";
+      } else if (opzione === 2) {
+        input.value = "SELECT id, nome, settore FROM depositi WHERE settore = 'D6';";
+      } else if (opzione === 3) {
+        input.value = "SELECT a.id, o.nome AS operatore, d.nome AS deposito, d.settore, a.pratica, a.codice, a.stato, a.valido_fino\nFROM accessi a\nJOIN operatori o ON a.operatore_id = o.id\nJOIN depositi d ON a.deposito_id = d.id\nWHERE a.stato = 'attivo'\nLIMIT 20;";
+      } else if (opzione === 4) {
+        input.value = "SELECT a.id, o.nome AS persona, d.nome AS deposito, d.settore, a.pratica, a.codice, a.stato, a.valido_fino\nFROM accessi a\nJOIN operatori o ON a.operatore_id = o.id\nJOIN depositi d ON a.deposito_id = d.id\nWHERE o.nome = 'Nora Ferri'\n  AND d.nome = 'Forte Cenere'\n  AND d.settore = 'D6'\n  AND a.pratica = 'RV753';";
+      }
+      eseguiQuerySqlER();
+    }
+
+    async function eseguiQuerySqlER() {
+      const input = document.getElementById('er-sql-input');
+      const box = document.getElementById('er-sql-risultati-box');
+      const thead = document.getElementById('er-sql-thead');
+      const tbody = document.getElementById('er-sql-tbody');
+      const countLabel = document.getElementById('er-sql-conteggio-label');
+      const timeLabel = document.getElementById('er-sql-durata-label');
+      const feedback = document.getElementById('er-sql-feedback');
+      const btn = document.getElementById('er-btn-esegui-sql');
+
+      const query = (input?.value || '').trim();
+      if (!query) {
+        if (feedback) feedback.textContent = 'Inserisci una query SQL da eseguire.';
+        return;
+      }
+
+      if (feedback) feedback.textContent = 'Esecuzione query in corso...';
+      if (btn) btn.disabled = true;
+
+      const start = performance.now();
+      const base = (apiBase || '').replace(/\/+$/, '');
+
+      try {
+        const res = await fetch(`${base}/api/database/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query })
+        });
+        const elapsed = (performance.now() - start).toFixed(1);
+
+        const data = await res.json();
+        if (btn) btn.disabled = false;
+
+        if (data && data.ok) {
+          if (box) box.classList.remove('hidden');
+          if (feedback) feedback.textContent = '';
+          if (timeLabel) timeLabel.textContent = `Tempo: ${elapsed} ms`;
+
+          const colonne = data.colonne || [];
+          const righe = data.righe || [];
+          if (countLabel) {
+            countLabel.textContent = `Risultato: ${righe.length} righe${data.altre_righe ? ' (limitate a 50)' : ''}`;
+          }
+
+          if (thead) {
+            thead.innerHTML = `
+              <tr>
+                ${colonne.map(c => `<th class="px-4 py-2.5 font-bold text-stone-300">${escapeHtml(c)}</th>`).join('')}
+              </tr>
+            `;
+          }
+
+          if (tbody) {
+            if (righe.length === 0) {
+              tbody.innerHTML = `
+                <tr>
+                  <td colspan="${colonne.length || 1}" class="px-4 py-6 text-center text-stone-400 font-mono text-xs">
+                    Nessuna riga restituita dalla query (0 risultati).
+                  </td>
+                </tr>
+              `;
+            } else {
+              tbody.innerHTML = righe.map((r, i) => `
+                <tr class="hover:bg-bunker-850/80 transition-colors ${i % 2 === 0 ? 'bg-bunker-900/40' : 'bg-bunker-950/40'}">
+                  ${r.map(val => `<td class="px-4 py-2 text-stone-200 select-text whitespace-nowrap">${escapeHtml(val === null ? 'NULL' : String(val))}</td>`).join('')}
+                </tr>
+              `).join('');
+            }
+          }
+        } else {
+          if (feedback) {
+            feedback.innerHTML = `<span class="text-crimson-400 font-bold">Errore SQL:</span> ${escapeHtml(data.error || 'Query non riuscita')}`;
+          }
+        }
+      } catch (err) {
+        if (btn) btn.disabled = false;
+        if (feedback) {
+          feedback.innerHTML = `<span class="text-crimson-400 font-bold">Errore di connessione:</span> ${escapeHtml(err.message)}`;
+        }
+      }
+    }
+
+    function mostraStatoErroreER(msg) {
+      const container = document.getElementById('er-tables-container');
+      if (container) {
+        container.innerHTML = `
+          <div class="p-8 text-center max-w-md mx-auto space-y-3 mt-16 bg-bunker-900/90 border border-bunker-700 rounded-xl shadow-xl">
+            <span class="text-3xl">🗄️</span>
+            <h3 class="font-display font-bold uppercase text-white text-base">Backend Non Connesso</h3>
+            <p class="text-xs font-mono text-stone-400">
+              Impossibile ispezionare dinamicamente <code class="text-amber-300">accessi.sqlite</code>: ${escapeHtml(msg)}.
+            </p>
+            <p class="text-xs font-mono text-stone-500">
+              Avvia il server backend con <code class="text-phosphor-400">python3 Backend/server.py</code> e clicca su "Ricarica Schema".
+            </p>
+            <button type="button" onclick="ricaricaSchemaER()"
+              class="px-4 py-2 rounded-lg bg-amber-800 hover:bg-amber-700 text-white font-mono text-xs font-bold transition">
+              🔄 Ricarica Schema
+            </button>
+          </div>
+        `;
+      }
     }
 
     window.addEventListener('DOMContentLoaded', init);
