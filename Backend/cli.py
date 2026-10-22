@@ -32,7 +32,6 @@ try:
         leggi_tabella_csv,
         cerca_in_csv,
         interroga_archivio_recuperato_sql,
-        risolvi_missione_varco,
         cerca_personale,
         elenca_personaggi_e_operatori,
         leggi_dossier_excel,
@@ -58,7 +57,6 @@ except ImportError:
         leggi_tabella_csv,
         cerca_in_csv,
         interroga_archivio_recuperato_sql,
-        risolvi_missione_varco,
         cerca_personale,
         elenca_personaggi_e_operatori,
         leggi_dossier_excel,
@@ -328,38 +326,12 @@ def avvia_cli() -> int:
                             for row in esito.get("righe", []):
                                 print(" | ".join(f"{str(v):<20}" for v in row))
                         print()
-            elif subcmd in ("varco", "risolvi", "missione"):
-                esito = risolvi_missione_varco()
-                if not esito.get("ok"):
-                    print(f"\nErrore: {esito.get('errore')}")
-                else:
-                    print("\n================================================================================")
-                    print("RAPPORTINO MISSIONE — ARCHIVIO EREBO VARCO V-59 (04/11/2026 ORE 12:00)")
-                    print("================================================================================")
-                    dest = esito["destinazione"]
-                    print(f"Destinazione: {dest['archivio_nome']} (ID {dest['archivio_id']}) -> Varco {dest['varco_codice']} (ID {dest['varco_id']})")
-                    sq = esito["squadra_autorizzata"]
-                    print(f"Squadra Autorizzata: {sq['nome_squadra']} (ID {sq['squadra_id']}) [Ruoli: {', '.join(sq['ruoli_confermati'])}]")
-                    ops = esito["operatori_autorizzati"]
-                    san = ops["sanitario"]
-                    sic = ops["sicurezza"]
-                    print(f"Operatore SANITARIO: {san['nome']} (Matricola: {san['matricola']}, ID: {san['id']})")
-                    print(f"Operatore SICUREZZA: {sic['nome']} (Matricola: {sic['matricola']}, ID: {sic['id']})")
-                    print("\nTerminali Operativi Convalidati:")
-                    for t in esito["terminali_operativi_convalidati"]:
-                        print(f"  - Terminale {t['terminale_id']} ({t['canale']}): Chiave {t['chiave_valida']} (Finestra: {t['finestra_aperta']})")
-                    print("\nCandidati ed Elementi Esclusi:")
-                    for esc in esito["candidati_ed_elementi_esclusi"]:
-                        print(f"  - {esc['candidato']}: {esc['motivo']}")
-                    print("\nInformazione Mancante da Chiedere:")
-                    print(f"  {esito['informazione_mancante_da_chiedere']}\n")
             else:
                 print("Sottocomandi disponibili per /csv:")
                 print("  /csv elenca                 : Elenca tutte le 14 tabelle CSV decodificate")
                 print("  /csv leggi <tabella> [lim]  : Legge i record di una tabella CSV (es. /csv leggi r03 10)")
                 print("  /csv cerca <termine>        : Cerca un nome o codice su tutte le tabelle CSV")
                 print("  /csv sql <query>            : Esegue query SQL SELECT su archivio_recuperato.sqlite")
-                print("  /csv varco                  : Risoluzione e verifica vincoli per Archivio Erebo V-59")
             continue
 
         # Invia la richiesta al router ibrido

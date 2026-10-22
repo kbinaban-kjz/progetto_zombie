@@ -140,7 +140,7 @@ Risposta:
 [OK] Ancora corretta: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per...
 
 DOMANDA: Dove è scoppiato il primo focolaio e a che ora?
-File recuperati dal RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt, G2-01.txt, DOSSIER_SBLOCCATO.xlsx, G2-04.txt, G2-06.txt, G1-02.txt, G2-02.txt, documento_0057.html, DOSSIER_SBLOCCATO_02_Sospensione.txt, G2-05.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt
+File recuperati dal RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt, G2-01.txt, DOSSIER_SBLOCCATO.xlsx, G1-02.txt, G2-02.txt, documento_0057.html, G2-04.txt, G2-06.txt, DOSSIER_SBLOCCATO_02_Sospensione.txt, G2-05.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt
 Risposta:
   Ore 01:12. Primo allarme registrato nel laboratorio San Mauro. [G2-01]
 [OK] Ancora corretta: Dove è scoppiato il primo focolaio e a che ora?...

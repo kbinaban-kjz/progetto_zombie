@@ -38,7 +38,6 @@ try:
         ACCESSI_DB_PATH,
         DATA_MISSIONE_G4,
         risolvi_accessi_db,
-        DATA_MISSIONE_VARCO,
         TABELLE_CSV_DIR,
         ARCHIVIO_RECUPERATO_DB_PATH,
         risolvi_tabelle_csv_dir,
@@ -63,7 +62,6 @@ except ImportError:
         ACCESSI_DB_PATH,
         DATA_MISSIONE_G4,
         risolvi_accessi_db,
-        DATA_MISSIONE_VARCO,
         TABELLE_CSV_DIR,
         ARCHIVIO_RECUPERATO_DB_PATH,
         risolvi_tabelle_csv_dir,
@@ -1170,7 +1168,7 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
     def limit():
         nonlocal ticks
         ticks += 1
-        return 1 if ticks > 1000 else 0
+        return 1 if ticks > 100000 else 0
 
     con.set_progress_handler(limit, 1000)
     try:
@@ -1213,37 +1211,54 @@ def interroga_accessi_sql(query: str) -> dict[str, Any]:
 
 
 def _genera_sql_fallback(domanda: str) -> str:
-    """Costruisce una query SQL deterministica se nessun LLM è disponibile."""
+    """Costruisce una query SQL dinamica se nessun LLM è disponibile."""
     d_low = domanda.lower()
     if any(k in d_low for k in ("cancella", "elimina", "svuota", "rimuovi", "delete", "drop", "truncate", "update")):
         return "DELETE FROM accessi WHERE stato = 'revocato'"
 
     condizioni = []
-    # Persona
-    if "nora" in d_low or "ferri" in d_low:
-        condizioni.append("o.nome = 'Nora Ferri'")
-    # Deposito
-    if "forte cenere" in d_low or "forte" in d_low or "cenere" in d_low or "lume" in d_low:
-        condizioni.append("d.nome = 'Forte Cenere'")
-    elif "darsena" in d_low:
-        condizioni.append("d.nome = 'Darsena Vuota'")
+
+    # Risoluzione dinamica di operatori e depositi dal database
+    path_acc = risolvi_accessi_db()
+    if path_acc.is_file():
+        try:
+            con_temp = sqlite3.connect(path_acc.as_uri() + "?mode=ro", uri=True)
+            cur_temp = con_temp.cursor()
+            cur_temp.execute("SELECT DISTINCT nome FROM operatori")
+            for (op_nome,) in cur_temp.fetchall():
+                parti = [p.lower() for p in op_nome.split() if len(p) >= 3]
+                if op_nome.lower() in d_low or (parti and all(p in d_low for p in parti)):
+                    condizioni.append(f"o.nome = '{op_nome}'")
+                    break
+
+            cur_temp.execute("SELECT DISTINCT nome, settore FROM depositi")
+            for dep_nome, dep_sett in cur_temp.fetchall():
+                if dep_nome.lower() in d_low:
+                    condizioni.append(f"d.nome = '{dep_nome}'")
+                    break
+            con_temp.close()
+        except Exception:
+            pass
+
     # Settore
     import re
     m_sett = re.search(r"\b([a-z]\d)\b", d_low)
     if m_sett:
         condizioni.append(f"d.settore = '{m_sett.group(1).upper()}'")
+
     # Pratica
     m_prat = re.search(r"\b([a-z]{2}\d{3,4})\b", d_low)
     if m_prat:
         condizioni.append(f"a.pratica = '{m_prat.group(1).upper()}'")
-    elif "rv753" in d_low:
-        condizioni.append("a.pratica = 'RV753'")
 
-    # Filtro validità data missione (12 ottobre 2031 ore 06:00)
+    # Data di validità (da indizio o data missione G4)
+    m_data = re.search(r"\b(20\d{2}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)\b", domanda)
+    data_rif = m_data.group(1) if m_data else DATA_MISSIONE_G4
+
     condizioni.append("a.stato = 'attivo'")
-    condizioni.append("a.valido_fino >= '2031-10-12 06:00'")
+    condizioni.append(f"a.valido_fino >= '{data_rif}'")
 
-    where_clause = " AND ".join(condizioni) if condizioni else "a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'"
+    where_clause = " AND ".join(condizioni) if condizioni else f"a.stato = 'attivo' AND a.valido_fino >= '{data_rif}'"
     return (
         "SELECT a.id, o.nome AS persona, d.nome AS deposito, d.settore AS settore, "
         "a.pratica, a.codice, a.stato, a.valido_fino "
@@ -1295,31 +1310,47 @@ def agente_sql(domanda: str) -> str:
     if "errore" in esito:
         return f"QUERY\n{query_sql}\nRISULTATO\n{json.dumps(esito, ensure_ascii=False)}\nSPIEGAZIONE\nQuery non eseguita o respinta dalla sicurezza: {esito['errore']}. Nessuna modifica è stata apportata al database."
 
-    # Sintesi del risultato
+    # Sintesi dinamica del risultato
     righe = esito.get("righe", [])
     colonne = esito.get("colonne", [])
     if righe:
         prima = righe[0]
-        # Mappa i campi
         diz_riga = dict(zip(colonne, prima)) if colonne else {}
-        codice = diz_riga.get("codice", str(prima[-3] if len(prima) >= 3 else prima[0]))
-        persona = diz_riga.get("persona", "Nora Ferri")
-        deposito = diz_riga.get("deposito", "Forte Cenere")
-        settore = diz_riga.get("settore", "D6")
-        pratica = diz_riga.get("pratica", "RV753")
-        stato = diz_riga.get("stato", "attivo")
-        valido_fino = diz_riga.get("valido_fino", "2031-10-12 23:59")
+        codice = str(diz_riga.get("codice", prima[-3] if len(prima) >= 3 else prima[0]))
+        persona = diz_riga.get("persona") or diz_riga.get("operatore")
+        deposito = diz_riga.get("deposito")
+        settore = diz_riga.get("settore")
+        pratica = diz_riga.get("pratica")
+        stato = diz_riga.get("stato", "")
+        valido_fino = diz_riga.get("valido_fino", "")
+
+        parti_desc: list[str] = []
+        if persona:
+            parti_desc.append(f"per {persona}")
+        if deposito:
+            parti_desc.append(f"presso il deposito {deposito}")
+        if settore:
+            parti_desc.append(f"(settore {settore})")
+        if pratica:
+            parti_desc.append(f"relativa alla pratica {pratica}")
+        contesto = (" " + " ".join(parti_desc)) if parti_desc else ""
+
+        dettagli_stato: list[str] = []
+        if stato:
+            dettagli_stato.append(f"stato: {stato}")
+        if valido_fino:
+            dettagli_stato.append(f"valido fino al: {valido_fino}")
+        str_stato = f" ({', '.join(dettagli_stato)})" if dettagli_stato else ""
+
         sintesi = (
-            f"Trovata autorizzazione valida nel registro accessi per {persona} presso il deposito {deposito} "
-            f"(settore {settore}) relativa alla pratica {pratica}. "
-            f"Il codice di autorizzazione è: {codice} (stato: {stato}, valido fino al: {valido_fino}). "
+            f"Trovata autorizzazione valida nel registro accessi{contesto}. "
+            f"Il codice di autorizzazione è: {codice}{str_stato}. "
             f"Lo zero iniziale è conservato."
         )
     else:
         sintesi = (
             "Nessuna riga trovata nel database: non esiste alcuna autorizzazione attiva e non scaduta "
-            "alla data della missione (12 ottobre 2031, ore 06:00) per i criteri indicati. "
-            "Nessun codice inventato."
+            "per i criteri indicati. Nessun codice inventato."
         )
 
     return f"QUERY\n{query_sql}\nRISULTATO\n{json.dumps(esito, ensure_ascii=False)}\nSPIEGAZIONE\n{sintesi}"
@@ -1335,73 +1366,73 @@ MAPPA_SIGNIFICATO_TABELLE: dict[str, dict[str, Any]] = {
         "nome_logico": "operatori",
         "descrizione": "Anagrafica del personale e operatori di missione",
         "campi": {"k0": "operatore_id (PK)", "v1": "nome_completo", "v2": "matricola (PX-xxxxxx)"},
-        "evidenza": "Nomi propri (es. Tina Rocchi, Ugo Valli) e codici matricola operatore.",
+        "evidenza": "Elenco nominativo del personale con nome completo e matricola PX-xxxxxx.",
     },
     "r11": {
         "nome_logico": "squadre",
         "descrizione": "Anagrafica delle squadre operative di emergenza",
         "campi": {"k0": "squadra_id (PK)", "v1": "nome_squadra (Unità 5-xxxx)"},
-        "evidenza": "Nomi di squadra con prefisso Unità 5- (es. Unità 5-Ardesia, Unità 5-Tufo).",
+        "evidenza": "Nomi identificativi delle squadre operative con prefisso Unità 5- o Nucleo 5-.",
     },
     "r02": {
         "nome_logico": "archivi",
         "descrizione": "Sedi archivi clinici / rifugi protetti",
         "campi": {"k0": "archivio_id (PK)", "v1": "nome_archivio", "v2": "codice_struttura"},
-        "evidenza": "Include la destinazione primaria Archivio Erebo (ID 7685883, codice AR-ERE-01).",
+        "evidenza": "Sedi archivi clinici e rifugi di emergenza con relativi codici identificativi di struttura.",
     },
     "r07": {
         "nome_logico": "varchi",
         "descrizione": "Varchi d'accesso fisici alle strutture cliniche",
         "campi": {"k0": "varco_id (PK)", "k1": "archivio_id (FK -> r02.k0)", "v1": "codice_varco"},
-        "evidenza": "Include il varco di destinazione V-59 (ID 1756534) associato all'Archivio Erebo.",
+        "evidenza": "Codici dei varchi fisici di transito collegati alle sedi archivio.",
     },
     "r09": {
         "nome_logico": "terminali",
         "descrizione": "Terminali di autenticazione e convalida presso i varchi",
         "campi": {"k0": "terminale_id (PK)", "k1": "varco_id (FK -> r07.k0)", "v1": "canale_comunicazione", "v2": "stato (OPERATIVO/FUORI_SERVIZIO)"},
-        "evidenza": "Terminali fisici del varco V-59 sui canali Iota, Gamma, Quarzo, Rame, Ferro.",
+        "evidenza": "Canali radio dei terminali di convalida (es. Iota, Gamma, Quarzo, Rame, Ferro) e stato operativo.",
     },
     "r06": {
         "nome_logico": "abilitazioni_ruolo",
         "descrizione": "Qualifiche operative certificate per operatore (SANITARIO / SICUREZZA)",
         "campi": {"k0": "abilitazione_id (PK)", "k1": "operatore_id (FK -> r03.k0)", "v1": "ruolo", "ts_a": "valido_da", "ts_b": "valido_a"},
-        "evidenza": "Certifica abilitazione come SANITARIO o SICUREZZA con intervallo temporale.",
+        "evidenza": "Abilitazioni operative per ruolo (SANITARIO o SICUREZZA) con intervallo di validità temporale.",
     },
     "m12": {
         "nome_logico": "membri_squadra",
         "descrizione": "Assegnazione degli operatori alle rispettive squadre",
         "campi": {"k0": "assegnazione_id (PK)", "k1": "operatore_id (FK -> r03.k0)", "k2": "squadra_id (FK -> r11.k0)", "ts_a": "inizio_assegnazione", "ts_b": "fine_assegnazione"},
-        "evidenza": "Associazione molti-a-molti tra operatori e squadre con validità temporale.",
+        "evidenza": "Assegnazione degli operatori alle rispettive squadre con periodo di validità temporale.",
     },
     "r08": {
         "nome_logico": "permessi_squadre_varco",
         "descrizione": "Autorizzazioni squadrarie per specifico varco e ruolo",
         "campi": {"k0": "permesso_id (PK)", "k1": "squadra_id (FK -> r11.k0)", "k2": "varco_id (FK -> r07.k0)", "v1": "ruolo", "ts_a": "valido_da", "ts_b": "valido_a", "v2": "stato (ATTIVO/BLOCCATO)"},
-        "evidenza": "Definisce quali ruoli ciascuna squadra può schierare su un dato varco.",
+        "evidenza": "Permessi operativi assegnati alle squadre per varco e ruolo con finestra temporale e stato (ATTIVO/BLOCCATO).",
     },
     "e04": {
         "nome_logico": "sospensioni_operatori",
         "descrizione": "Eventi disciplinari, sanitari o amministrativi di sospensione",
         "campi": {"k0": "evento_id (PK)", "k1": "operatore_id (FK -> r03.k0)", "ts_a": "inizio_sospensione", "ts_b": "fine_sospensione", "v1": "motivo"},
-        "evidenza": "Sospensioni attive che escludono operatori (es. Alma Donati, Berto Serra).",
+        "evidenza": "Eventi di sospensione o ritiro idoneità degli operatori con data inizio, fine e motivazione.",
     },
     "e10": {
         "nome_logico": "revoche_permessi",
         "descrizione": "Revoche anticipate e blocchi dei permessi di transito",
         "campi": {"k0": "evento_id (PK)", "k1": "permesso_id (FK -> r08.k0)", "ts_a": "istante_revoca", "v1": "motivo"},
-        "evidenza": "Revoche anticipate (es. Squadra Unità 5-Gesso revocata alle 11:00 del 04/11).",
+        "evidenza": "Eventi di revoca anticipata dei permessi di transito con orario di efficacia e motivazione.",
     },
     "m05": {
         "nome_logico": "finestre_operative_terminali",
         "descrizione": "Finestre temporali di apertura e funzionamento dei terminali",
         "campi": {"k0": "finestra_id (PK)", "k1": "terminale_id (FK -> r09.k0)", "ts_a": "inizio_finestra", "ts_b": "fine_finestra"},
-        "evidenza": "Finestre orarie di accensione operativa (es. 08:00-12:20 e 11:30-12:10 al 04/11).",
+        "evidenza": "Finestre temporali di apertura operativa e accensione dei terminali.",
     },
     "r13": {
         "nome_logico": "chiavi_terminali",
         "descrizione": "Codici chiave e passphrase validi per ciascun terminale",
         "campi": {"k0": "chiave_id (PK)", "k1": "terminale_id (FK -> r09.k0)", "v1": "codice_chiave", "ts_a": "inizio_validita", "ts_b": "fine_validita"},
-        "evidenza": "Chiavi crittografiche numeriche attive (es. 642103 per 4703994, 500295 per 8372085).",
+        "evidenza": "Codici crittografici di sicurezza assegnati ai terminali con periodo di validità.",
     },
     "r14": {
         "nome_logico": "repliche_storiche_permessi",
@@ -1621,7 +1652,7 @@ def interroga_archivio_recuperato_sql(query: str) -> dict[str, Any]:
     def limit():
         nonlocal ticks
         ticks += 1
-        return 1 if ticks > 1000 else 0
+        return 1 if ticks > 100000 else 0
 
     con.set_progress_handler(limit, 1000)
     try:
@@ -1639,251 +1670,6 @@ def interroga_archivio_recuperato_sql(query: str) -> dict[str, Any]:
         }
     except sqlite3.Error as e:
         return {"ok": False, "query": query, "errore": str(e)}
-    finally:
-        con.close()
-
-
-def risolvi_missione_varco() -> dict[str, Any]:
-    """
-    Risolve e verifica deterministicamente tutti i vincoli della missione per l'Archivio Erebo varco V-59
-    alla data e ora target: 4 novembre 2026, ore 12:00 (DATA_MISSIONE_VARCO).
-    Esegue cross-check relazionale su tutte le 14 tabelle recuperate.
-    """
-    data_target = DATA_MISSIONE_VARCO
-    path_db = risolvi_archivio_recuperato_db()
-    if not path_db.is_file():
-        return {"ok": False, "errore": f"Database {path_db} non trovato per la risoluzione della missione."}
-
-    con = sqlite3.connect(path_db.as_uri() + "?mode=ro", uri=True)
-    cur = con.cursor()
-    try:
-        # 1. Identificazione Archivio e Varco
-        cur.execute(
-            "SELECT v.k0, v.v1, a.k0, a.v1 FROM r07 v JOIN r02 a ON v.k1 = a.k0 WHERE v.v1 = 'V-59'"
-        )
-        row_varco = cur.fetchone()
-        if not row_varco:
-            return {"ok": False, "errore": "Varco V-59 non trovato in r07."}
-        varco_id, varco_codice, archivio_id, archivio_nome = row_varco
-
-        # 2. Verifica Squadre con permessi attivi su V-59 al target
-        cur.execute(
-            """
-            SELECT p.k0, p.k1, s.v1, p.v1, p.ts_a, p.ts_b, p.v2, r.ts_a, r.v1
-            FROM r08 p
-            JOIN r11 s ON p.k1 = s.k0
-            LEFT JOIN e10 r ON p.k0 = r.k1
-            WHERE p.k2 = ?
-            """,
-            (varco_id,),
-        )
-        permessi_raw = cur.fetchall()
-
-        squadre_attive: dict[int, dict[str, Any]] = {}
-        for p in permessi_raw:
-            pid, sq_id, sq_nome, ruolo, ts_a, ts_b, stato, rev_ts, rev_motivo = p
-            # Filtro stato BLOCCATO
-            if stato != "ATTIVO":
-                continue
-            # Filtro orario inizio
-            if ts_a > data_target:
-                continue
-            # Filtro scadenza
-            if ts_b and ts_b < data_target:
-                continue
-            # Filtro revoca
-            if rev_ts and rev_ts <= data_target:
-                continue
-
-            if sq_id not in squadre_attive:
-                squadre_attive[sq_id] = {"id": sq_id, "nome": sq_nome, "ruoli": set(), "permessi": []}
-            squadre_attive[sq_id]["ruoli"].add(ruolo)
-            squadre_attive[sq_id]["permessi"].append({
-                "permesso_id": pid,
-                "ruolo": ruolo,
-                "valido_da": ts_a,
-                "valido_a": ts_b,
-                "revoca_successiva": f"Revocato alle {rev_ts} per {rev_motivo}" if rev_ts else None,
-            })
-
-        # Squadre con entrambi i ruoli (SANITARIO e SICUREZZA)
-        squadre_idonee = {sid: d for sid, d in squadre_attive.items() if {"SANITARIO", "SICUREZZA"}.issubset(d["ruoli"])}
-
-        # 3. Analisi membri e abilitazioni per ciascuna squadra idonea
-        squadra_selezionata = None
-        operatore_sanitario = None
-        operatore_sicurezza = None
-
-        for sq_id, sq_info in squadre_idonee.items():
-            cur.execute(
-                """
-                SELECT m.k1, o.v1, o.v2, m.ts_a, m.ts_b
-                FROM m12 m
-                JOIN r03 o ON m.k1 = o.k0
-                WHERE m.k2 = ? AND m.ts_a <= ? AND (m.ts_b IS NULL OR m.ts_b >= ?)
-                """,
-                (sq_id, data_target, data_target),
-            )
-            membri = cur.fetchall()
-            candidati_san = []
-            candidati_sic = []
-
-            for op_id, op_nome, op_mat, ma, mb in membri:
-                # Controlla sospensioni attive in e04
-                cur.execute(
-                    """
-                    SELECT k0, ts_a, ts_b, v1 FROM e04
-                    WHERE k1 = ? AND ts_a <= ? AND (ts_b IS NULL OR ts_b >= ?)
-                    """,
-                    (op_id, data_target, data_target),
-                )
-                sospensioni = cur.fetchall()
-                if sospensioni:
-                    continue  # Escluso per sospensione
-
-                # Controlla abilitazioni in r06
-                cur.execute(
-                    """
-                    SELECT v1 FROM r06
-                    WHERE k1 = ? AND ts_a <= ? AND (ts_b IS NULL OR ts_b >= ?)
-                    """,
-                    (op_id, data_target, data_target),
-                )
-                abils = {r[0] for r in cur.fetchall()}
-                op_dict = {"id": op_id, "nome": op_nome, "matricola": op_mat, "abilitazioni": list(abils)}
-                if "SANITARIO" in abils:
-                    candidati_san.append(op_dict)
-                if "SICUREZZA" in abils:
-                    candidati_sic.append(op_dict)
-
-            # Regola della missione: 2 persone distinte della stessa squadra, una per ruolo
-            for san in candidati_san:
-                for sic in candidati_sic:
-                    if san["id"] != sic["id"]:
-                        squadra_selezionata = sq_info
-                        operatore_sanitario = san
-                        operatore_sicurezza = sic
-                        break
-                if squadra_selezionata:
-                    break
-            if squadra_selezionata:
-                break
-
-        # 4. Terminali al varco V-59
-        cur.execute(
-            "SELECT k0, v1, v2 FROM r09 WHERE k1 = ?",
-            (varco_id,),
-        )
-        terminali_raw = cur.fetchall()
-        terminali_validi = []
-        for tid, canale, stato in terminali_raw:
-            if stato != "OPERATIVO":
-                continue
-            # Verifica finestra aperta in m05
-            cur.execute(
-                "SELECT k0, ts_a, ts_b FROM m05 WHERE k1 = ? AND ts_a <= ? AND ts_b >= ?",
-                (tid, data_target, data_target),
-            )
-            finestre = cur.fetchall()
-            if not finestre:
-                continue
-            # Verifica chiave attiva in r13
-            cur.execute(
-                "SELECT v1, ts_a, ts_b FROM r13 WHERE k1 = ? AND ts_a <= ? AND ts_b >= ?",
-                (tid, data_target, data_target),
-            )
-            chiavi = cur.fetchall()
-            if not chiavi:
-                continue
-
-            terminali_validi.append({
-                "terminale_id": tid,
-                "canale": canale,
-                "stato": stato,
-                "chiave_valida": chiavi[0][0],
-                "validita_chiave": f"{chiavi[0][1]} -> {chiavi[0][2]}",
-                "finestra_aperta": f"{finestre[0][1]} -> {finestre[0][2]}",
-            })
-
-        # 5. Candidati ed elementi esclusi documentati
-        esclusioni = [
-            {
-                "candidato": "Hilda Marini (PX-615738)",
-                "squadra": "Unità 5-Tufo (1719260)",
-                "motivo": "Possiede entrambe le abilitazioni (SANITARIO e SICUREZZA), ma il regolamento vieta espressamente a una singola persona di ricoprire entrambi i ruoli nella stessa missione (sono obbligatori due operatori distinti)."
-            },
-            {
-                "candidato": "Alma Donati (PX-742882)",
-                "squadra": "Unità 5-Basalto (7538287)",
-                "motivo": "Abilitata come SANITARIO, ma gravata da sospensione attiva a tempo indeterminato in e04 dal 04/11 ore 11:50 per 'ritiro idoneità'."
-            },
-            {
-                "candidato": "Berto Serra (PX-306307)",
-                "squadra": "Unità 5-Calce (1474219)",
-                "motivo": "Abilitato come SICUREZZA, ma gravato da sospensione attiva in e04 fino alle ore 13:00 del 04/11 per 'verifica credenziali'."
-            },
-            {
-                "candidato": "Squadra Unità 5-Gesso (752946)",
-                "squadra": "Unità 5-Gesso",
-                "motivo": "Il permesso SANITARIO su V-59 (ID 7183803) è stato revocato anticipatamente in e10 alle ore 11:00 del 04/11 con causale 'revoca direzione'."
-            },
-            {
-                "candidato": "Squadra Unità 5-Arenaria (4724931)",
-                "squadra": "Unità 5-Arenaria",
-                "motivo": "Il permesso SANITARIO su V-59 (ID 471366) risulta marcato in stato BLOCCATO in r08."
-            },
-            {
-                "candidato": "Squadra Unità 5-Marmo (9215925)",
-                "squadra": "Unità 5-Marmo",
-                "motivo": "Il permesso SANITARIO su V-59 (ID 753195) ha finestra oraria scaduta alle ore 11:59 del 04/11 (un minuto prima dell'arrivo previsto)."
-            },
-            {
-                "candidato": "Terminale 5880280 (Canale Quarzo)",
-                "squadra": "N/A",
-                "motivo": "Marcato in stato FUORI_SERVIZIO nella tabella r09."
-            },
-            {
-                "candidato": "Terminale 5491816 (Canale Rame)",
-                "squadra": "N/A",
-                "motivo": "Nessuna finestra operativa m05 aperta il 04/11 alle ore 12:00 (aperto solo il 03/11)."
-            },
-            {
-                "candidato": "Terminale 7650550 (Canale Ferro)",
-                "squadra": "N/A",
-                "motivo": "Nessuna chiave di sicurezza valida in r13 per la data del 04/11 alle ore 12:00 (chiavi scadute il 03/11)."
-            },
-        ]
-
-        # 6. Informazione mancante
-        info_mancante = (
-            "Occorre richiedere al Comando Centrale / Docente quale sia il canale di ricezione compatibile "
-            "installato a bordo del mezzo di trasporto operativo (Canale Iota oppure Canale Gamma). Entrambi i "
-            "terminali (4703994 e 8372085) sono pienamente operativi e convalidati alle ore 12:00 del 4 novembre 2026, "
-            "ciascuno con la propria chiave di sicurezza specifica (642103 per Canale Iota, 500295 per Canale Gamma)."
-        )
-
-        return {
-            "ok": True,
-            "data_target_missione": data_target,
-            "destinazione": {
-                "archivio_id": archivio_id,
-                "archivio_nome": archivio_nome,
-                "varco_id": varco_id,
-                "varco_codice": varco_codice,
-            },
-            "squadra_autorizzata": {
-                "squadra_id": squadra_selezionata["id"] if squadra_selezionata else None,
-                "nome_squadra": squadra_selezionata["nome"] if squadra_selezionata else None,
-                "ruoli_confermati": ["SANITARIO", "SICUREZZA"],
-            },
-            "operatori_autorizzati": {
-                "sanitario": operatore_sanitario,
-                "sicurezza": operatore_sicurezza,
-            },
-            "terminali_operativi_convalidati": terminali_validi,
-            "candidati_ed_elementi_esclusi": esclusioni,
-            "informazione_mancante_da_chiedere": info_mancante,
-        }
     finally:
         con.close()
 
@@ -1993,11 +1779,6 @@ def cerca_personale(termine: str) -> dict[str, Any]:
                     )
                     sospensioni = [{"motivo": r[0], "da": r[1], "a": r[2]} for r in cur.fetchall()]
 
-                    sospeso_missione = any(
-                        (s["da"] <= DATA_MISSIONE_VARCO and (not s["a"] or s["a"] >= DATA_MISSIONE_VARCO))
-                        for s in sospensioni
-                    )
-
                     operatori_rec.append(
                         {
                             "id": op_id,
@@ -2005,8 +1786,7 @@ def cerca_personale(termine: str) -> dict[str, Any]:
                             "matricola": op_mat,
                             "squadre": list(dict.fromkeys([s["squadra"] for s in squadre])),
                             "abilitazioni": list(dict.fromkeys(abilitazioni)),
-                            "sospensioni": list(dict.fromkeys([s["motivo"] for s in sospensioni])),
-                            "attivo_alla_missione": not sospeso_missione,
+                            "sospensioni": sospensioni,
                         }
                     )
             con_rec.close()
@@ -2107,15 +1887,18 @@ def cerca_personale(termine: str) -> dict[str, Any]:
         for op in operatori_rec:
             sq_str = ", ".join(op["squadre"]) if op["squadre"] else "Nessuna squadra assegnata"
             ab_str = ", ".join(op["abilitazioni"]) if op["abilitazioni"] else "Nessuna abilitazione specifica"
-            sosp_str = (
-                f"Sospensioni: {', '.join(op['sospensioni'])}"
-                if op["sospensioni"]
-                else "Nessuna sospensione (ATTIVO)"
-            )
+            if op["sospensioni"]:
+                desc_sosp = []
+                for s in op["sospensioni"]:
+                    fine_s = f" fino a {s['a']}" if s.get("a") else " (a tempo indeterminato)"
+                    desc_sosp.append(f"{s['motivo']} (dal {s['da']}{fine_s})")
+                sosp_str = f"SOSPESO: {'; '.join(desc_sosp)}"
+            else:
+                sosp_str = "ATTIVO (nessuna sospensione registrata)"
+
             linee_riassunto.append(
                 f"- {op['nome']} (Matricola: {op['matricola']}, ID: {op['id']}): "
-                f"Squadra: {sq_str} | Ruolo/Abilitazione: {ab_str} | "
-                f"Stato per la missione ({DATA_MISSIONE_VARCO}): {'IDONEO' if op['attivo_alla_missione'] else 'SOSPESO'} ({sosp_str})"
+                f"Squadra: {sq_str} | Ruolo/Abilitazione: {ab_str} | {sosp_str}"
             )
 
     if operatori_acc:
@@ -2158,7 +1941,7 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
     Interroga dinamicamente senza alcun hardcoding:
     - I personaggi e tecnici citati nei dossier primari (dati/): es. Nora Ferri, Livia Serra, Luca Serra.
     - Gli operatori con permessi speciali registrati in accessi.sqlite (es. operatori con accessi attivi a depositi sensibili).
-    - La squadra autorizzata e gli operatori chiave di archivio_recuperato.sqlite per la missione Varco V-59 (es. Tina Rocchi, Ugo Valli).
+    - Il censimento del personale in archivio_recuperato.sqlite (tabella r03).
 
     ARGOMENTI
     - fonte: "tutte" (default), "archivio_recuperato", "accessi", oppure "dossier".
@@ -2171,7 +1954,6 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
         "ok": True,
         "fonte_richiesta": fonte_norm,
         "figure_dossier": [],
-        "squadra_missione_varco": {},
         "totale_operatori_archivio": 0,
         "operatori_accessi_nominativi": [],
         "riassunto": "",
@@ -2274,21 +2056,8 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
                 "dettagli": dati["menzioni"],
             })
 
-    # 2. Squadra autorizzata e conteggio operatori archivio_recuperato.sqlite
+    # 2. Conteggio operatori archivio_recuperato.sqlite
     if fonte_norm in ("tutte", "archivio_recuperato", "archivio", "recuperato"):
-        try:
-            esito_varco = risolvi_missione_varco()
-            if esito_varco.get("ok"):
-                risultati["squadra_missione_varco"] = {
-                    "squadra": esito_varco.get("squadra_autorizzata", {}).get("nome_squadra"),
-                    "operatore_sanitario": esito_varco.get("operatori_autorizzati", {}).get("sanitario"),
-                    "operatore_sicurezza": esito_varco.get("operatori_autorizzati", {}).get("sicurezza"),
-                    "varco": "V-59 (Archivio Erebo)",
-                    "data_orario": DATA_MISSIONE_VARCO,
-                }
-        except Exception:
-            pass
-
         path_rec = risolvi_archivio_recuperato_db()
         if path_rec.is_file():
             try:
@@ -2325,21 +2094,14 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
 
     # Riassunto
     linee: list[str] = ["CENSIMENTO DINAMICO DEL PERSONALE E DEI PERSONAGGI:"]
-    if risultati["squadra_missione_varco"]:
-        v = risultati["squadra_missione_varco"]
-        san = v.get("operatore_sanitario") or {}
-        sic = v.get("operatore_sicurezza") or {}
-        linee.append(f"1. Squadra autorizzata Varco {v.get('varco')} al {v.get('data_orario')}: {v.get('squadra')}")
-        linee.append(f"   - Operatore Sanitario: {san.get('nome')} (Matricola {san.get('matricola')})")
-        linee.append(f"   - Operatore Sicurezza: {sic.get('nome')} (Matricola {sic.get('matricola')})")
     if risultati["totale_operatori_archivio"]:
-        linee.append(f"2. Archivio recuperato (tabella r03): totale di {risultati['totale_operatori_archivio']} operatori registrati.")
+        linee.append(f"1. Archivio recuperato (tabella r03): totale di {risultati['totale_operatori_archivio']} operatori registrati.")
     if risultati["operatori_accessi_nominativi"]:
-        linee.append("3. Database accessi (accessi.sqlite):")
+        linee.append("2. Database accessi (accessi.sqlite):")
         for op in risultati["operatori_accessi_nominativi"]:
             linee.append(f"   - {op['nome']} (ID: {op['id']}, {op['numero_accessi_registrati']} permessi di deposito registrati)")
     if risultati["figure_dossier"]:
-        linee.append("4. Figure e tecnici citati nei dossier primari:")
+        linee.append("3. Figure e tecnici citati nei dossier primari:")
         for fig in risultati["figure_dossier"]:
             linee.append(f"   - {fig['nome']} (Dossier: {', '.join(fig['file_citazioni'])}): {fig['dettagli'][0] if fig['dettagli'] else ''}")
 
@@ -2359,8 +2121,7 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
          Unità 5-Basalto, Unità 5-Calce, Unità 5-Gesso, Unità 5-Granito, Unità 5-Marmo, Unità 5-Ossidiana, Unità 5-Porfido,
          Unità 5-Porfido bis, Unità 5-Scisto, Unità 5-Selce, Unità 5-Tufo).
       2. I 60 Nuclei operativi (Nucleo 5-110 ... Nucleo 5-169).
-      3. La squadra autorizzata per l'Operazione Varco V-59 (Unità 5-Ardesia).
-      4. Le squadre operative menzionate nei dossier narrativi (Unità investigativa dell'utente in G1-01, Squadra cavi in LX5).
+      3. Le squadre operative menzionate nei dossier narrativi (Unità investigativa dell'utente in G1-01, Squadra cavi in LX5).
 
     ARGOMENTI
     - filtro: "tutte" (default), "unita_5" (solo le Unità 5), "nuclei" (solo i nuclei).
@@ -2371,7 +2132,6 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
     - totale_squadre: conteggio totale delle squadre censite
     - unita_5: lista dei nomi e ID delle 14 Unità 5
     - nuclei_5: lista dei nomi e ID dei 60 Nuclei operativi
-    - squadra_missione_varco: squadra autorizzata al Varco V-59
     - squadre_narrative: squadre operative menzionate nei documenti di campo
     - riassunto: testo esplicativo, strutturato e completo
     """
@@ -2421,15 +2181,6 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
         else:
             altre_squadre.append(voce)
 
-    # Identificazione squadra autorizzata missione Varco V-59
-    squadra_varco_nome = "Unità 5-Ardesia"
-    try:
-        esito_v = risolvi_missione_varco()
-        if esito_v.get("ok"):
-            squadra_varco_nome = esito_v.get("squadra_autorizzata", {}).get("nome_squadra") or squadra_varco_nome
-    except Exception:
-        pass
-
     squadre_narrative = [
         {"nome": "Unità investigativa", "fonte": "G1-01", "ruolo": "Squadra dell'utente incaricata dell'indagine nella zona in quarantena"},
         {"nome": "Squadra cavi", "fonte": "LX5 (es. LX5_6648, LX5_7083)", "ruolo": "Unità tecnica per il collaudo di linea e riparazioni dei ripetitori"},
@@ -2439,8 +2190,7 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
     linee: list[str] = ["CENSIMENTO COMPLETO DELLE SQUADRE E DELLE UNITÀ 5:"]
     linee.append(f"\n1. Le {len(unita_5)} Unità 5 operative (Archivio recuperato, tabella r11):")
     for u in unita_5:
-        tag_varco = " [SQUADRA AUTORIZZATA PER IL VARCO V-59 (Archivio Erebo)]" if u["nome"] == squadra_varco_nome else ""
-        linee.append(f"   - {u['nome']} (ID: {u['id']}){tag_varco}")
+        linee.append(f"   - {u['nome']} (ID: {u['id']})")
 
     linee.append(f"\n2. I {len(nuclei_5)} Nuclei operativi (tabella r11):")
     nomi_nuclei_anteprima = [n["nome"] for n in nuclei_5[:10]]
@@ -2457,7 +2207,6 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
         "totale_unita_5": len(unita_5),
         "nuclei_5": nuclei_5,
         "totale_nuclei_5": len(nuclei_5),
-        "squadra_missione_varco": squadra_varco_nome,
         "squadre_narrative": squadre_narrative,
         "riassunto": "\n".join(linee),
     }
@@ -2623,7 +2372,6 @@ STRUMENTI_REGISTRATI: dict[str, Any] = {
     "leggi_tabella_csv": leggi_tabella_csv,
     "cerca_in_csv": cerca_in_csv,
     "interroga_archivio_recuperato_sql": interroga_archivio_recuperato_sql,
-    "risolvi_missione_varco": risolvi_missione_varco,
 }
 
 TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
@@ -3015,18 +2763,6 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 },
                 "required": ["query"],
             },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "risolvi_missione_varco",
-            "description": (
-                "Risolve e verifica deterministicamente tutti i vincoli di accesso per Archivio Erebo varco V-59 "
-                "al 4 novembre 2026 ore 12:00: identifica la squadra autorizzata, i 2 operatori (sanitario e sicurezza), "
-                "i terminali operativi con relative chiavi, i candidati esclusi con motivazioni e l'informazione mancante."
-            ),
-            "parameters": {"type": "object", "properties": {}},
         },
     },
     {

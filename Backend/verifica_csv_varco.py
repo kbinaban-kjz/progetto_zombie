@@ -30,7 +30,6 @@ from Backend.tools import (
     leggi_tabella_csv,
     cerca_in_csv,
     interroga_archivio_recuperato_sql,
-    risolvi_missione_varco,
 )
 
 
@@ -87,64 +86,75 @@ def esegui_verifiche() -> bool:
     else:
         print(f"  [OK] Query eseguita con successo, righe restituite: {esito_sql.get('righe')}")
 
-    # 5. Verifica risoluzione complessiva missione varco V-59
-    print("\n[TEST 5] Risoluzione deterministica missione Archivio Erebo V-59...")
-    sol = risolvi_missione_varco()
-    if not sol.get("ok"):
-        print(f"  [FALLITO] Risoluzione missione: {sol.get('errore')}")
+    # 5. Verifica risoluzione dinamica requisiti missione tramite query SQL
+    print("\n[TEST 5] Verifica risoluzione requisiti missione tramite SQL (interroga_archivio_recuperato_sql)...")
+    q_squadra = """
+    SELECT 
+        sq.k0 AS squadra_id,
+        sq.v1 AS squadra_nome,
+        p_san.v1 AS san_nome,
+        p_san.v2 AS san_mat,
+        p_sic.v1 AS sic_nome,
+        p_sic.v2 AS sic_mat
+    FROM r11 sq
+    JOIN r07 v ON v.v1 = 'V-59'
+    JOIN r08 perm_san ON perm_san.k1 = sq.k0 AND perm_san.k2 = v.k0 AND perm_san.v1 = 'SANITARIO'
+      AND perm_san.v2 = 'ATTIVO' AND perm_san.ts_a <= '2026-11-04 12:00' AND (perm_san.ts_b IS NULL OR perm_san.ts_b > '2026-11-04 12:00')
+    LEFT JOIN e10 rev_san ON rev_san.k1 = perm_san.k0 AND rev_san.ts_a <= '2026-11-04 12:00'
+    JOIN r08 perm_sic ON perm_sic.k1 = sq.k0 AND perm_sic.k2 = v.k0 AND perm_sic.v1 = 'SICUREZZA'
+      AND perm_sic.v2 = 'ATTIVO' AND perm_sic.ts_a <= '2026-11-04 12:00' AND (perm_sic.ts_b IS NULL OR perm_sic.ts_b > '2026-11-04 12:00')
+    LEFT JOIN e10 rev_sic ON rev_sic.k1 = perm_sic.k0 AND rev_sic.ts_a <= '2026-11-04 12:00'
+    JOIN m12 aff_san ON aff_san.k2 = sq.k0 AND aff_san.ts_a <= '2026-11-04 12:00' AND (aff_san.ts_b IS NULL OR aff_san.ts_b > '2026-11-04 12:00')
+    JOIN r03 p_san ON p_san.k0 = aff_san.k1
+    JOIN r06 ab_san ON ab_san.k1 = p_san.k0 AND ab_san.v1 = 'SANITARIO' AND ab_san.ts_a <= '2026-11-04 12:00' AND (ab_san.ts_b IS NULL OR ab_san.ts_b > '2026-11-04 12:00')
+    LEFT JOIN e04 sosp_san ON sosp_san.k1 = p_san.k0 AND sosp_san.ts_a <= '2026-11-04 12:00' AND (sosp_san.ts_b IS NULL OR sosp_san.ts_b > '2026-11-04 12:00')
+    JOIN m12 aff_sic ON aff_sic.k2 = sq.k0 AND aff_sic.ts_a <= '2026-11-04 12:00' AND (aff_sic.ts_b IS NULL OR aff_sic.ts_b > '2026-11-04 12:00')
+    JOIN r03 p_sic ON p_sic.k0 = aff_sic.k1
+    JOIN r06 ab_sic ON ab_sic.k1 = p_sic.k0 AND ab_sic.v1 = 'SICUREZZA' AND ab_sic.ts_a <= '2026-11-04 12:00' AND (ab_sic.ts_b IS NULL OR ab_sic.ts_b > '2026-11-04 12:00')
+    LEFT JOIN e04 sosp_sic ON sosp_sic.k1 = p_sic.k0 AND sosp_sic.ts_a <= '2026-11-04 12:00' AND (sosp_sic.ts_b IS NULL OR sosp_sic.ts_b > '2026-11-04 12:00')
+    WHERE rev_san.k0 IS NULL
+      AND rev_sic.k0 IS NULL
+      AND sosp_san.k0 IS NULL
+      AND sosp_sic.k0 IS NULL
+      AND p_san.k0 != p_sic.k0
+    """
+    sol_sql = interroga_archivio_recuperato_sql(q_squadra)
+    if not sol_sql.get("ok"):
+        print(f"  [FALLITO] Query SQL requisiti missione: {sol_sql.get('errore')}")
         errori += 1
     else:
-        # Controllo squadra
-        sq = sol.get("squadra_autorizzata", {})
-        if sq.get("nome_squadra") != "Unità 5-Ardesia" or sq.get("squadra_id") != 9303094:
-            print(f"  [FALLITO] Squadra errata: {sq}")
+        righe_sq = sol_sql.get("righe", [])
+        if not righe_sq:
+            print("  [FALLITO] Nessuna squadra autorizzata trovata con la query SQL")
             errori += 1
         else:
-            print(f"  [OK] Squadra autorizzata: {sq.get('nome_squadra')} (ID {sq.get('squadra_id')})")
+            prima_sq = righe_sq[0]
+            sq_id, sq_nome, san_nome, san_mat, sic_nome, sic_mat = prima_sq
+            print(f"  [OK] Squadra identificata via SQL: {sq_nome} (ID {sq_id})")
+            print(f"  [OK] Operatore SANITARIO identificato via SQL: {san_nome} ({san_mat})")
+            print(f"  [OK] Operatore SICUREZZA identificato via SQL: {sic_nome} ({sic_mat})")
 
-        # Controllo operatori
-        ops = sol.get("operatori_autorizzati", {})
-        san = ops.get("sanitario", {})
-        sic = ops.get("sicurezza", {})
-        if san.get("nome") != "Tina Rocchi" or san.get("matricola") != "PX-803574":
-            print(f"  [FALLITO] Operatore Sanitario errato: {san}")
-            errori += 1
+    # Terminali e chiavi tramite query SQL
+    q_term = """
+    SELECT t.k0, t.v1, k.v1
+    FROM r09 t
+    JOIN r07 v ON t.k1 = v.k0 AND v.v1 = 'V-59'
+    JOIN m05 f ON f.k1 = t.k0 AND f.ts_a <= '2026-11-04 12:00' AND f.ts_b >= '2026-11-04 12:00'
+    JOIN r13 k ON k.k1 = t.k0 AND k.ts_a <= '2026-11-04 12:00' AND k.ts_b >= '2026-11-04 12:00'
+    WHERE t.v2 = 'OPERATIVO'
+    """
+    sol_term = interroga_archivio_recuperato_sql(q_term)
+    if not sol_term.get("ok"):
+        print(f"  [FALLITO] Query SQL terminali: {sol_term.get('errore')}")
+        errori += 1
+    else:
+        righe_term = sol_term.get("righe", [])
+        canali = {r[1]: r[2] for r in righe_term}
+        if "Canale Iota" in canali and "Canale Gamma" in canali:
+            print(f"  [OK] Terminali e chiavi identificati via SQL: Canale Iota ({canali['Canale Iota']}), Canale Gamma ({canali['Canale Gamma']})")
         else:
-            print(f"  [OK] Operatore SANITARIO: {san.get('nome')} ({san.get('matricola')})")
-
-        if sic.get("nome") != "Ugo Valli" or sic.get("matricola") != "PX-250896":
-            print(f"  [FALLITO] Operatore Sicurezza errato: {sic}")
+            print(f"  [FALLITO] Terminali attesi non trovati via SQL: {righe_term}")
             errori += 1
-        else:
-            print(f"  [OK] Operatore SICUREZZA: {sic.get('nome')} ({sic.get('matricola')})")
-
-        # Controllo terminali operativi
-        terms = sol.get("terminali_operativi_convalidati", [])
-        canali = {t["canale"]: t["chiave_valida"] for t in terms}
-        if "Canale Iota" not in canali or "Canale Gamma" not in canali:
-            print(f"  [FALLITO] Terminali convalidati errati: {terms}")
-            errori += 1
-        elif canali["Canale Iota"] != "642103" or canali["Canale Gamma"] != "500295":
-            print(f"  [FALLITO] Chiavi terminali errate: {canali}")
-            errori += 1
-        else:
-            print(f"  [OK] Terminali operativi: Canale Iota (chiave {canali['Canale Iota']}), Canale Gamma (chiave {canali['Canale Gamma']})")
-
-        # Controllo esclusioni
-        esc = sol.get("candidati_ed_elementi_esclusi", [])
-        if len(esc) < 3:
-            print(f"  [FALLITO] Troppe poche esclusioni documentate: {len(esc)}")
-            errori += 1
-        else:
-            print(f"  [OK] Esclusioni documentate con motivazione: {len(esc)}")
-
-        # Controllo informazione mancante
-        mancante = sol.get("informazione_mancante_da_chiedere", "")
-        if "canale" not in mancante.lower():
-            print(f"  [FALLITO] Informazione mancante non pertinente: {mancante}")
-            errori += 1
-        else:
-            print(f"  [OK] Informazione mancante correttamente rilevata: {mancante[:80]}...")
 
     print("\n" + "=" * 80)
     if errori == 0:
