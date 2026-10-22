@@ -148,6 +148,11 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             self.path = "/Frontend" + path
             return super().do_GET()
 
+        # Compatibilità percorsi assets: risiede in Frontend/assets/
+        if path.startswith("/assets"):
+            self.path = "/Frontend" + path
+            return super().do_GET()
+
         # Compatibilità percorsi Spazio Latente RAG 3D: risiede in Frontend/rag3d/
         if path.startswith("/rag3d"):
             self.path = "/Frontend" + path

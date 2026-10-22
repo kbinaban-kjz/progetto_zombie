@@ -44,7 +44,7 @@ Righe restituite: [[83, 'Nora Ferri', 'Forte Cenere', 'D6', 'RV753', '057284', '
 
 --- Prova 1: Richiesta con indizi corretti ---
 QUERY
-SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND depositi.settore = 'D6' AND accessi.pratica = 'RV753' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
+SELECT a.codice FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri' AND d.nome = 'Forte Cenere' AND d.settore = 'D6' AND a.pratica = 'RV753' AND a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'
 RISULTATO
 {"colonne": ["codice"], "righe": [["057284"]], "altre_righe": false}
 SPIEGAZIONE
@@ -85,7 +85,7 @@ Trovata autorizzazione valida nel registro accessi per Nora Ferri presso il depo
 == G. RISPONDITORE INVESTIGATORE (ROUTER + CHAT) ==
 Risposta Investigatore:
 QUERY
-SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND depositi.settore = 'D6' AND accessi.pratica = 'RV753' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
+SELECT a.codice FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri' AND d.nome = 'Forte Cenere' AND d.settore = 'D6' AND a.pratica = 'RV753' AND a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'
 RISULTATO
 {"colonne": ["codice"], "righe": [["057284"]], "altre_righe": false}
 SPIEGAZIONE

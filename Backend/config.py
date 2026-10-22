@@ -87,6 +87,25 @@ def risolvi_accessi_db() -> Path:
 
 ACCESSI_DB_PATH = risolvi_accessi_db()
 
+# Configurazione Database Archivio Recuperato (Giorno 4 Checkpoint 2 — Archivio Erebo: archivio_recuperato.sqlite)
+DATA_MISSIONE_EREBO = "2026-11-04 12:00"
+
+def risolvi_archivio_recuperato_db() -> Path:
+    """Restituisce il percorso valido del database archivio_recuperato.sqlite controllando le posizioni note."""
+    percorsi_candidati = [
+        Path(valore_env("ARCHIVIO_RECUPERATO_DB_PATH", "")),
+        ROOT_DIR / "archivio_recuperato.sqlite",
+        BACKEND_DIR / "archivio_recuperato.sqlite",
+        ROOT_DIR / "New Information 2" / "archivio_recuperato.sqlite",
+        Path("archivio_recuperato.sqlite"),
+    ]
+    for p in percorsi_candidati:
+        if p and p.is_file():
+            return p.resolve()
+    return (ROOT_DIR / "archivio_recuperato.sqlite").resolve()
+
+ARCHIVIO_RECUPERATO_DB_PATH = risolvi_archivio_recuperato_db()
+
 # Modello Locale (Investigatore.py)
 MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"
 

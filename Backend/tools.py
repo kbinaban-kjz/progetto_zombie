@@ -30,7 +30,14 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from Backend.config import ACCESSI_DB_PATH, DATA_MISSIONE_G4, risolvi_accessi_db
+    from Backend.config import (
+        ACCESSI_DB_PATH,
+        DATA_MISSIONE_G4,
+        risolvi_accessi_db,
+        ARCHIVIO_RECUPERATO_DB_PATH,
+        DATA_MISSIONE_EREBO,
+        risolvi_archivio_recuperato_db,
+    )
     from Backend import collegamenti as modulo_collegamenti
     from Backend.evidenze import risposta_imprevisti
     from Backend.database import cerca_in_cronologia, leggi_cronologia
@@ -44,7 +51,14 @@ try:
         scegli_fonti_dettagliato,
     )
 except ImportError:
-    from config import ACCESSI_DB_PATH, DATA_MISSIONE_G4, risolvi_accessi_db
+    from config import (
+        ACCESSI_DB_PATH,
+        DATA_MISSIONE_G4,
+        risolvi_accessi_db,
+        ARCHIVIO_RECUPERATO_DB_PATH,
+        DATA_MISSIONE_EREBO,
+        risolvi_archivio_recuperato_db,
+    )
     import collegamenti as modulo_collegamenti
     from evidenze import risposta_imprevisti
     from database import cerca_in_cronologia, leggi_cronologia
@@ -1095,7 +1109,25 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
     if not isinstance(query, str) or not query.strip():
         return {"errore": "Scrivi una query SQL."}
 
-    path = risolvi_accessi_db() if database is None else Path(database).resolve()
+    tabelle_recuperate = {
+        "e04", "e10", "m05", "m12", "r02", "r03", "r06", "r07",
+        "r08", "r09", "r11", "r13", "r14", "r15"
+    }
+
+    if database is None:
+        import re
+        q_tokens = set(re.findall(r"\b[a-z0-9_]+\b", query.lower()))
+        if q_tokens & tabelle_recuperate or any(k in query.lower() for k in ("erebo", "v-59", "v_59", "recuperat")):
+            path = risolvi_archivio_recuperato_db()
+        else:
+            path = risolvi_accessi_db()
+    elif isinstance(database, str) and database.lower().strip() in ("archivio_recuperato", "archivio_recuperato.sqlite", "erebo"):
+        path = risolvi_archivio_recuperato_db()
+    elif isinstance(database, str) and database.lower().strip() in ("accessi", "accessi.sqlite"):
+        path = risolvi_accessi_db()
+    else:
+        path = Path(database).resolve()
+
     if not path.is_file():
         return {"errore": "Carica il database della tua squadra."}
 
@@ -1105,7 +1137,7 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
         return {"errore": f"Impossibile connettersi al database in sola lettura: {exc}"}
 
     con.execute("PRAGMA query_only=ON")
-    tables = {"operatori", "depositi", "accessi"}
+    tables = {"operatori", "depositi", "accessi"} | tabelle_recuperate
 
     def authorize(action, arg1, arg2, db, trigger):
         if action == sqlite3.SQLITE_SELECT:
@@ -1115,7 +1147,7 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
         if action == sqlite3.SQLITE_FUNCTION:
             return (
                 sqlite3.SQLITE_OK
-                if (arg2 or "").lower() in {"count", "min", "max", "lower", "upper", "length", "coalesce", "sum", "avg"}
+                if (arg2 or "").lower() in {"count", "min", "max", "lower", "upper", "length", "coalesce", "sum", "avg", "like", "substr"}
                 else sqlite3.SQLITE_DENY
             )
         return sqlite3.SQLITE_DENY

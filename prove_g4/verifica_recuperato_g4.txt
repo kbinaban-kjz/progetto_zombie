@@ -1,0 +1,58 @@
+================================================================================
+VERIFICA AUTOMATICA — GIORNO 4 PARTE 2: ARCHIVIO EREBO & VARCO V-59
+================================================================================
+
+== 1. DATABASE ARCHIVIO_RECUPERATO.SQLITE (SOLA LETTURA) ==
+[OK] File database presente (archivio_recuperato.sqlite)
+[OK] Tutte le 14 tabelle obfuscate presenti (14/14)
+
+== 2. VERIFICA MATEMATICA DELLE FOREIGN KEYS (ZERO DANGLING REFERENCES) ==
+[OK] r07.k1 -> r02.k0 (Varchi -> Archivi) (Violazioni: 0)
+[OK] m12.k1 -> r03.k0 (Membri -> Persone) (Violazioni: 0)
+[OK] m12.k2 -> r11.k0 (Membri -> Squadre) (Violazioni: 0)
+[OK] r06.k1 -> r03.k0 (Abilitazioni -> Persone) (Violazioni: 0)
+[OK] e04.k1 -> r03.k0 (Sospensioni -> Persone) (Violazioni: 0)
+[OK] r08.k1 -> r11.k0 (Permessi -> Squadre) (Violazioni: 0)
+[OK] r08.k2 -> r07.k0 (Permessi -> Varchi) (Violazioni: 0)
+[OK] e10.k1 -> r08.k0 (Revoche -> Permessi) (Violazioni: 0)
+[OK] r09.k1 -> r07.k0 (Terminali -> Varchi) (Violazioni: 0)
+[OK] m05.k1 -> r09.k0 (Finestre -> Terminali) (Violazioni: 0)
+[OK] r13.k1 -> r09.k0 (Chiavi -> Terminali) (Violazioni: 0)
+
+== 3. RISOLUZIONE ARCHIVIO EREBO E VARCO V-59 ==
+[OK] Archivio Erebo identificato: id=7685883, codice=AC-574
+[OK] Varco V-59 collegato ad Erebo: id=1756534
+
+== 4. IDENTIFICAZIONE COMPLETA SQUADRA ED OPERATORI AUTORIZZATI ==
+[OK] Esattamente 1 configurazione di squadra autorizzata trovata (1)
+[OK] Squadra autorizzata: 'Unità 5-Ardesia' (ID: 9303094)
+[OK] Sanitario autorizzato: Tina Rocchi (Matricola: PX-803574, ID: 3691193)
+[OK] Sicurezza autorizzato: Ugo Valli (Matricola: PX-250896, ID: 8928812)
+[OK] Regola 1 verificata: identificativi operatori distinti
+
+== 5. PROVE DI ESCLUSIONE CANDIDATI (ALMENO 3 RICHIESTI DALLA MISSIONE) ==
+[OK] Esclusione 1 (Unità 5-Gesso): Permesso SANITARIO revocato da e10 alle ore 2026-11-04 11:00 (revoca direzione)
+[OK] Esclusione 2 (Unità 5-Marmo): Permesso SANITARIO scaduto alle 2026-11-04 11:59 (prima delle 12:00)
+[OK] Esclusione 3 (Unità 5-Basalto): Sanitaria Alma Donati sospesa dalle 2026-11-04 11:50 (ritiro idoneità)
+[OK] Esclusione 4 (Unità 5-Calce): Addetto Sicurezza Berto Serra sospeso (2026-11-04 11:00 - 2026-11-04 13:00, motivo: verifica credenziali)
+[OK] Esclusione 5 (Unità 5-Tufo): Solo 1 membro attivo (Hilda Marini), violazione Regola 1 (persone distinte)
+[OK] Esclusione 6 (Terminale 5880280): Stato 'FUORI_SERVIZIO' non idoneo
+
+== 6. TERMINALI OPERATIVI, FINESTRE E CODICI CHIAVE ==
+[OK] Esattamente 2 terminali operativi con finestre e chiavi attive (2)
+   - Terminale 4703994 [Canale Iota]: Chiave='642103', Finestre=['2026-11-04 08:00 -> 2026-11-04 12:20', '2026-11-04 11:30 -> 2026-11-04 12:10']
+   - Terminale 8372085 [Canale Gamma]: Chiave='500295', Finestre=['2026-11-04 08:00 -> 2026-11-04 12:20', '2026-11-04 11:30 -> 2026-11-04 12:10']
+[OK] Terminale 4703994 associato a Canale Iota e chiave '642103'
+[OK] Terminale 8372085 associato a Canale Gamma e chiave '500295'
+
+== 7. TEST ESECUZIONE TOOL interroga_database() ==
+[OK] Query lecita tramite interroga_database() ha successo
+[OK] Query con operatore LIKE consentita dall'Authorizer
+[OK] Operazione DROP TABLE bloccata con errore di sicurezza
+
+== 8. NON-REGRESSIONE GIORNO 4 PARTE 1 (ACCESSI.SQLITE) ==
+[OK] Codice autorizzazione Nora Ferri (057284) preservato con zero iniziale
+
+================================================================================
+ESITO SUITE: 33/33 controlli superati con successo (100.0%).
+================================================================================
