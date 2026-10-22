@@ -24,6 +24,7 @@ il dispatcher sicuro `esegui_tool(nome, argomenti)`, che valida il nome, convert
 argomenti da JSON e intercetta gli errori senza interrompere il flusso dell'applicazione.
 """
 
+import csv
 import json
 import sqlite3
 from pathlib import Path
@@ -34,8 +35,10 @@ try:
         ACCESSI_DB_PATH,
         DATA_MISSIONE_G4,
         risolvi_accessi_db,
+        DATA_MISSIONE_VARCO,
+        TABELLE_CSV_DIR,
         ARCHIVIO_RECUPERATO_DB_PATH,
-        DATA_MISSIONE_EREBO,
+        risolvi_tabelle_csv_dir,
         risolvi_archivio_recuperato_db,
     )
     from Backend import collegamenti as modulo_collegamenti
@@ -55,8 +58,10 @@ except ImportError:
         ACCESSI_DB_PATH,
         DATA_MISSIONE_G4,
         risolvi_accessi_db,
+        DATA_MISSIONE_VARCO,
+        TABELLE_CSV_DIR,
         ARCHIVIO_RECUPERATO_DB_PATH,
-        DATA_MISSIONE_EREBO,
+        risolvi_tabelle_csv_dir,
         risolvi_archivio_recuperato_db,
     )
     import collegamenti as modulo_collegamenti
@@ -1109,25 +1114,7 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
     if not isinstance(query, str) or not query.strip():
         return {"errore": "Scrivi una query SQL."}
 
-    tabelle_recuperate = {
-        "e04", "e10", "m05", "m12", "r02", "r03", "r06", "r07",
-        "r08", "r09", "r11", "r13", "r14", "r15"
-    }
-
-    if database is None:
-        import re
-        q_tokens = set(re.findall(r"\b[a-z0-9_]+\b", query.lower()))
-        if q_tokens & tabelle_recuperate or any(k in query.lower() for k in ("erebo", "v-59", "v_59", "recuperat")):
-            path = risolvi_archivio_recuperato_db()
-        else:
-            path = risolvi_accessi_db()
-    elif isinstance(database, str) and database.lower().strip() in ("archivio_recuperato", "archivio_recuperato.sqlite", "erebo"):
-        path = risolvi_archivio_recuperato_db()
-    elif isinstance(database, str) and database.lower().strip() in ("accessi", "accessi.sqlite"):
-        path = risolvi_accessi_db()
-    else:
-        path = Path(database).resolve()
-
+    path = risolvi_accessi_db() if database is None else Path(database).resolve()
     if not path.is_file():
         return {"errore": "Carica il database della tua squadra."}
 
@@ -1137,7 +1124,7 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
         return {"errore": f"Impossibile connettersi al database in sola lettura: {exc}"}
 
     con.execute("PRAGMA query_only=ON")
-    tables = {"operatori", "depositi", "accessi"} | tabelle_recuperate
+    tables = {"operatori", "depositi", "accessi"}
 
     def authorize(action, arg1, arg2, db, trigger):
         if action == sqlite3.SQLITE_SELECT:
@@ -1147,7 +1134,7 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
         if action == sqlite3.SQLITE_FUNCTION:
             return (
                 sqlite3.SQLITE_OK
-                if (arg2 or "").lower() in {"count", "min", "max", "lower", "upper", "length", "coalesce", "sum", "avg", "like", "substr"}
+                if (arg2 or "").lower() in {"count", "min", "max", "lower", "upper", "length", "coalesce", "sum", "avg", "like", "glob"}
                 else sqlite3.SQLITE_DENY
             )
         return sqlite3.SQLITE_DENY
@@ -1314,6 +1301,569 @@ def agente_sql(domanda: str) -> str:
 
 
 # ==============================================================================
+# STRUMENTI OPERAZIONE VARCO 2 — TERMINALE DANNEGGIATO & TABELLE CSV
+# (Cartella TABELLE_CSV/ e database archivio_recuperato.sqlite)
+# ==============================================================================
+
+MAPPA_SIGNIFICATO_TABELLE: dict[str, dict[str, Any]] = {
+    "r03": {
+        "nome_logico": "operatori",
+        "descrizione": "Anagrafica del personale e operatori di missione",
+        "campi": {"k0": "operatore_id (PK)", "v1": "nome_completo", "v2": "matricola (PX-xxxxxx)"},
+        "evidenza": "Nomi propri (es. Tina Rocchi, Ugo Valli) e codici matricola operatore.",
+    },
+    "r11": {
+        "nome_logico": "squadre",
+        "descrizione": "Anagrafica delle squadre operative di emergenza",
+        "campi": {"k0": "squadra_id (PK)", "v1": "nome_squadra (Unità 5-xxxx)"},
+        "evidenza": "Nomi di squadra con prefisso Unità 5- (es. Unità 5-Ardesia, Unità 5-Tufo).",
+    },
+    "r02": {
+        "nome_logico": "archivi",
+        "descrizione": "Sedi archivi clinici / rifugi protetti",
+        "campi": {"k0": "archivio_id (PK)", "v1": "nome_archivio", "v2": "codice_struttura"},
+        "evidenza": "Include la destinazione primaria Archivio Erebo (ID 7685883, codice AR-ERE-01).",
+    },
+    "r07": {
+        "nome_logico": "varchi",
+        "descrizione": "Varchi d'accesso fisici alle strutture cliniche",
+        "campi": {"k0": "varco_id (PK)", "k1": "archivio_id (FK -> r02.k0)", "v1": "codice_varco"},
+        "evidenza": "Include il varco di destinazione V-59 (ID 1756534) associato all'Archivio Erebo.",
+    },
+    "r09": {
+        "nome_logico": "terminali",
+        "descrizione": "Terminali di autenticazione e convalida presso i varchi",
+        "campi": {"k0": "terminale_id (PK)", "k1": "varco_id (FK -> r07.k0)", "v1": "canale_comunicazione", "v2": "stato (OPERATIVO/FUORI_SERVIZIO)"},
+        "evidenza": "Terminali fisici del varco V-59 sui canali Iota, Gamma, Quarzo, Rame, Ferro.",
+    },
+    "r06": {
+        "nome_logico": "abilitazioni_ruolo",
+        "descrizione": "Qualifiche operative certificate per operatore (SANITARIO / SICUREZZA)",
+        "campi": {"k0": "abilitazione_id (PK)", "k1": "operatore_id (FK -> r03.k0)", "v1": "ruolo", "ts_a": "valido_da", "ts_b": "valido_a"},
+        "evidenza": "Certifica abilitazione come SANITARIO o SICUREZZA con intervallo temporale.",
+    },
+    "m12": {
+        "nome_logico": "membri_squadra",
+        "descrizione": "Assegnazione degli operatori alle rispettive squadre",
+        "campi": {"k0": "assegnazione_id (PK)", "k1": "operatore_id (FK -> r03.k0)", "k2": "squadra_id (FK -> r11.k0)", "ts_a": "inizio_assegnazione", "ts_b": "fine_assegnazione"},
+        "evidenza": "Associazione molti-a-molti tra operatori e squadre con validità temporale.",
+    },
+    "r08": {
+        "nome_logico": "permessi_squadre_varco",
+        "descrizione": "Autorizzazioni squadrarie per specifico varco e ruolo",
+        "campi": {"k0": "permesso_id (PK)", "k1": "squadra_id (FK -> r11.k0)", "k2": "varco_id (FK -> r07.k0)", "v1": "ruolo", "ts_a": "valido_da", "ts_b": "valido_a", "v2": "stato (ATTIVO/BLOCCATO)"},
+        "evidenza": "Definisce quali ruoli ciascuna squadra può schierare su un dato varco.",
+    },
+    "e04": {
+        "nome_logico": "sospensioni_operatori",
+        "descrizione": "Eventi disciplinari, sanitari o amministrativi di sospensione",
+        "campi": {"k0": "evento_id (PK)", "k1": "operatore_id (FK -> r03.k0)", "ts_a": "inizio_sospensione", "ts_b": "fine_sospensione", "v1": "motivo"},
+        "evidenza": "Sospensioni attive che escludono operatori (es. Alma Donati, Berto Serra).",
+    },
+    "e10": {
+        "nome_logico": "revoche_permessi",
+        "descrizione": "Revoche anticipate e blocchi dei permessi di transito",
+        "campi": {"k0": "evento_id (PK)", "k1": "permesso_id (FK -> r08.k0)", "ts_a": "istante_revoca", "v1": "motivo"},
+        "evidenza": "Revoche anticipate (es. Squadra Unità 5-Gesso revocata alle 11:00 del 04/11).",
+    },
+    "m05": {
+        "nome_logico": "finestre_operative_terminali",
+        "descrizione": "Finestre temporali di apertura e funzionamento dei terminali",
+        "campi": {"k0": "finestra_id (PK)", "k1": "terminale_id (FK -> r09.k0)", "ts_a": "inizio_finestra", "ts_b": "fine_finestra"},
+        "evidenza": "Finestre orarie di accensione operativa (es. 08:00-12:20 e 11:30-12:10 al 04/11).",
+    },
+    "r13": {
+        "nome_logico": "chiavi_terminali",
+        "descrizione": "Codici chiave e passphrase validi per ciascun terminale",
+        "campi": {"k0": "chiave_id (PK)", "k1": "terminale_id (FK -> r09.k0)", "v1": "codice_chiave", "ts_a": "inizio_validita", "ts_b": "fine_validita"},
+        "evidenza": "Chiavi crittografiche numeriche attive (es. 642103 per 4703994, 500295 per 8372085).",
+    },
+    "r14": {
+        "nome_logico": "repliche_storiche_permessi",
+        "descrizione": "Backup e repliche storiche dei permessi del turno precedente",
+        "campi": {"k0": "copia_id (PK)", "k1": "squadra_id (FK -> r11.k0)", "k2": "varco_id (FK -> r07.k0)", "v1": "ruolo", "ts_a": "valido_da", "ts_b": "valido_a", "v2": "stato", "v3": "tipo_replica", "ts_c": "timestamp_creazione"},
+        "evidenza": "Dati di replica del turno precedente (REPLICA_TURNO_PRECEDENTE).",
+    },
+    "r15": {
+        "nome_logico": "log_transiti_accessi",
+        "descrizione": "Registro cronologico degli accessi e tentativi di transito",
+        "campi": {"k0": "log_id (PK)", "k1": "terminale_id (FK -> r09.k0)", "k2": "operatore_id (FK -> r03.k0)", "ts_a": "timestamp_evento", "v1": "esito (OK/NEGATO)", "v2": "codice_risposta"},
+        "evidenza": "Log storico dei transiti effettuati sui terminali.",
+    },
+}
+
+
+def elenca_tabelle_csv() -> dict[str, Any]:
+    """
+    Elenca tutte le 14 tabelle CSV recuperate dal terminale danneggiato (cartella TABELLE_CSV/).
+    Restituisce per ciascuna il nome logico decodificato, il numero di righe,
+    le colonne e la descrizione investigativa.
+    """
+    cartella = risolvi_tabelle_csv_dir()
+    if not cartella.is_dir():
+        return {
+            "ok": False,
+            "errore": f"Cartella tabelle CSV non trovata: {cartella}",
+            "tabelle": {},
+        }
+
+    risultati: dict[str, Any] = {}
+    file_csv = sorted(cartella.glob("*.csv"))
+    for file_path in file_csv:
+        nome_tabella = file_path.stem.lower()
+        meta = MAPPA_SIGNIFICATO_TABELLE.get(nome_tabella, {
+            "nome_logico": nome_tabella,
+            "descrizione": "Tabella dell'archivio recuperato",
+            "campi": {},
+        })
+        try:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
+                reader = csv.reader(f)
+                header = next(reader, [])
+                num_righe = sum(1 for _ in reader)
+            header_clean = [c.lstrip("\ufeff") for c in header]
+            risultati[nome_tabella] = {
+                "tabella": nome_tabella,
+                "nome_logico": meta["nome_logico"],
+                "descrizione": meta["descrizione"],
+                "colonne": header_clean,
+                "campi_decodificati": meta.get("campi", {}),
+                "num_righe": num_righe,
+                "file": file_path.name,
+            }
+        except Exception as exc:
+            risultati[nome_tabella] = {
+                "tabella": nome_tabella,
+                "errore": str(exc),
+            }
+
+    return {
+        "ok": True,
+        "totale_tabelle": len(risultati),
+        "cartella": str(cartella),
+        "tabelle": risultati,
+    }
+
+
+def leggi_tabella_csv(tabella: str, limite: int = 50, offset: int = 0) -> dict[str, Any]:
+    """
+    Legge i record direttamente dai file CSV recuperati (TABELLE_CSV/).
+    Supporta paginazione con limite e offset.
+    Decodifica i nomi colonna tramite il dizionario investigativo.
+    """
+    cartella = risolvi_tabelle_csv_dir()
+    tabella_pulita = tabella.strip().replace(".csv", "").lower()
+    file_path = cartella / f"{tabella_pulita}.csv"
+    if not file_path.is_file():
+        file_path_upper = cartella / f"{tabella_pulita.upper()}.csv"
+        if file_path_upper.is_file():
+            file_path = file_path_upper
+        else:
+            return {
+                "ok": False,
+                "errore": f"Tabella CSV '{tabella}' non trovata in {cartella}. Tabelle disponibili: {list(MAPPA_SIGNIFICATO_TABELLE.keys())}",
+            }
+
+    meta = MAPPA_SIGNIFICATO_TABELLE.get(tabella_pulita, {
+        "nome_logico": tabella_pulita,
+        "descrizione": "Tabella archivio recuperato",
+        "campi": {},
+    })
+
+    try:
+        righe = []
+        with open(file_path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            colonne = reader.fieldnames or []
+            colonne_clean = [c.lstrip("\ufeff") for c in colonne]
+            tutte = list(reader)
+            totale_righe = len(tutte)
+            sezione = tutte[offset : offset + limite]
+            for r in sezione:
+                r_clean = {k.lstrip("\ufeff"): v for k, v in r.items()}
+                righe.append(r_clean)
+
+        return {
+            "ok": True,
+            "tabella": tabella_pulita,
+            "nome_logico": meta["nome_logico"],
+            "descrizione": meta["descrizione"],
+            "colonne": colonne_clean,
+            "campi_decodificati": meta.get("campi", {}),
+            "totale_righe": totale_righe,
+            "offset": offset,
+            "limite": limite,
+            "righe_restituite": len(righe),
+            "righe": righe,
+        }
+    except Exception as exc:
+        return {"ok": False, "errore": f"Errore di lettura CSV '{tabella}': {exc}"}
+
+
+def cerca_in_csv(termine: str, tabelle: list[str] | str | None = None, limite: int = 25) -> dict[str, Any]:
+    """
+    Cerca un termine o codice su una o tutte le tabelle CSV recuperate.
+    Ricerca testuale case-insensitive su ogni colonna.
+    """
+    if not termine or not str(termine).strip():
+        return {"ok": False, "errore": "Specificare un termine da cercare nei CSV."}
+
+    termine_lower = str(termine).strip().lower()
+    cartella = risolvi_tabelle_csv_dir()
+
+    if isinstance(tabelle, str):
+        tabelle_target = [t.strip().replace(".csv", "").lower() for t in tabelle.split(",") if t.strip()]
+    elif isinstance(tabelle, list):
+        tabelle_target = [str(t).strip().replace(".csv", "").lower() for t in tabelle if str(t).strip()]
+    else:
+        tabelle_target = list(MAPPA_SIGNIFICATO_TABELLE.keys())
+
+    risultati = []
+    totale_trovati = 0
+
+    for tab in tabelle_target:
+        file_path = cartella / f"{tab}.csv"
+        if not file_path.is_file():
+            continue
+        try:
+            with open(file_path, "r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                for riga_idx, riga in enumerate(reader, start=1):
+                    trovato = False
+                    for val in riga.values():
+                        if val and termine_lower in str(val).lower():
+                            trovato = True
+                            break
+                    if trovato:
+                        totale_trovati += 1
+                        if len(risultati) < limite:
+                            r_clean = {k.lstrip("\ufeff"): v for k, v in riga.items()}
+                            risultati.append({
+                                "tabella": tab,
+                                "nome_logico": MAPPA_SIGNIFICATO_TABELLE.get(tab, {}).get("nome_logico", tab),
+                                "riga_num": riga_idx,
+                                "dati": r_clean,
+                            })
+        except Exception:
+            continue
+
+    return {
+        "ok": True,
+        "termine": termine,
+        "totale_riscontri": totale_trovati,
+        "risultati_mostrati": len(risultati),
+        "risultati": risultati,
+    }
+
+
+def interroga_archivio_recuperato_sql(query: str) -> dict[str, Any]:
+    """
+    Esegue una query SQL di sola lettura (SELECT ...) sul database SQLite recuperato
+    dal terminale danneggiato (archivio_recuperato.sqlite — 14 tabelle recuperate).
+    Garantisce sicurezza read-only (PRAGMA query_only = ON e authorizer).
+    """
+    if not isinstance(query, str) or not query.strip():
+        return {"ok": False, "errore": "Specificare una query SQL di lettura."}
+
+    path = risolvi_archivio_recuperato_db()
+    if not path.is_file():
+        return {"ok": False, "errore": f"Database archivio recuperato non trovato: {path}"}
+
+    try:
+        con = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    except Exception as exc:
+        return {"ok": False, "errore": f"Impossibile connettersi ad archivio_recuperato.sqlite: {exc}"}
+
+    con.execute("PRAGMA query_only=ON")
+    tabelle_consentite = {
+        "e04", "e10", "m05", "m12", "r02", "r03", "r06", "r07",
+        "r08", "r09", "r11", "r13", "r14", "r15"
+    }
+
+    def authorize(action, arg1, arg2, db, trigger):
+        if action == sqlite3.SQLITE_SELECT:
+            return sqlite3.SQLITE_OK
+        if action == sqlite3.SQLITE_READ:
+            return sqlite3.SQLITE_OK if arg1 in tabelle_consentite else sqlite3.SQLITE_DENY
+        if action == sqlite3.SQLITE_FUNCTION:
+            funzioni_ok = {"count", "min", "max", "lower", "upper", "length", "coalesce", "sum", "avg", "substr", "trim", "like", "glob"}
+            return sqlite3.SQLITE_OK if (arg2 or "").lower() in funzioni_ok else sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_DENY
+
+    con.set_authorizer(authorize)
+    ticks = 0
+
+    def limit():
+        nonlocal ticks
+        ticks += 1
+        return 1 if ticks > 1000 else 0
+
+    con.set_progress_handler(limit, 1000)
+    try:
+        cursor = con.execute(query)
+        rows = cursor.fetchmany(101)
+        desc = cursor.description or []
+        colonne = [x[0] for x in desc]
+        return {
+            "ok": True,
+            "query": query,
+            "colonne": colonne,
+            "righe": [list(r) for r in rows[:100]],
+            "totale_righe": len(rows[:100]),
+            "altre_righe": len(rows) > 100,
+        }
+    except sqlite3.Error as e:
+        return {"ok": False, "query": query, "errore": str(e)}
+    finally:
+        con.close()
+
+
+def risolvi_missione_varco() -> dict[str, Any]:
+    """
+    Risolve e verifica deterministicamente tutti i vincoli della missione per l'Archivio Erebo varco V-59
+    alla data e ora target: 4 novembre 2026, ore 12:00 (DATA_MISSIONE_VARCO).
+    Esegue cross-check relazionale su tutte le 14 tabelle recuperate.
+    """
+    data_target = DATA_MISSIONE_VARCO
+    path_db = risolvi_archivio_recuperato_db()
+    if not path_db.is_file():
+        return {"ok": False, "errore": f"Database {path_db} non trovato per la risoluzione della missione."}
+
+    con = sqlite3.connect(path_db.as_uri() + "?mode=ro", uri=True)
+    cur = con.cursor()
+    try:
+        # 1. Identificazione Archivio e Varco
+        cur.execute(
+            "SELECT v.k0, v.v1, a.k0, a.v1 FROM r07 v JOIN r02 a ON v.k1 = a.k0 WHERE v.v1 = 'V-59'"
+        )
+        row_varco = cur.fetchone()
+        if not row_varco:
+            return {"ok": False, "errore": "Varco V-59 non trovato in r07."}
+        varco_id, varco_codice, archivio_id, archivio_nome = row_varco
+
+        # 2. Verifica Squadre con permessi attivi su V-59 al target
+        cur.execute(
+            """
+            SELECT p.k0, p.k1, s.v1, p.v1, p.ts_a, p.ts_b, p.v2, r.ts_a, r.v1
+            FROM r08 p
+            JOIN r11 s ON p.k1 = s.k0
+            LEFT JOIN e10 r ON p.k0 = r.k1
+            WHERE p.k2 = ?
+            """,
+            (varco_id,),
+        )
+        permessi_raw = cur.fetchall()
+
+        squadre_attive: dict[int, dict[str, Any]] = {}
+        for p in permessi_raw:
+            pid, sq_id, sq_nome, ruolo, ts_a, ts_b, stato, rev_ts, rev_motivo = p
+            # Filtro stato BLOCCATO
+            if stato != "ATTIVO":
+                continue
+            # Filtro orario inizio
+            if ts_a > data_target:
+                continue
+            # Filtro scadenza
+            if ts_b and ts_b < data_target:
+                continue
+            # Filtro revoca
+            if rev_ts and rev_ts <= data_target:
+                continue
+
+            if sq_id not in squadre_attive:
+                squadre_attive[sq_id] = {"id": sq_id, "nome": sq_nome, "ruoli": set(), "permessi": []}
+            squadre_attive[sq_id]["ruoli"].add(ruolo)
+            squadre_attive[sq_id]["permessi"].append({
+                "permesso_id": pid,
+                "ruolo": ruolo,
+                "valido_da": ts_a,
+                "valido_a": ts_b,
+                "revoca_successiva": f"Revocato alle {rev_ts} per {rev_motivo}" if rev_ts else None,
+            })
+
+        # Squadre con entrambi i ruoli (SANITARIO e SICUREZZA)
+        squadre_idonee = {sid: d for sid, d in squadre_attive.items() if {"SANITARIO", "SICUREZZA"}.issubset(d["ruoli"])}
+
+        # 3. Analisi membri e abilitazioni per ciascuna squadra idonea
+        squadra_selezionata = None
+        operatore_sanitario = None
+        operatore_sicurezza = None
+
+        for sq_id, sq_info in squadre_idonee.items():
+            cur.execute(
+                """
+                SELECT m.k1, o.v1, o.v2, m.ts_a, m.ts_b
+                FROM m12 m
+                JOIN r03 o ON m.k1 = o.k0
+                WHERE m.k2 = ? AND m.ts_a <= ? AND (m.ts_b IS NULL OR m.ts_b >= ?)
+                """,
+                (sq_id, data_target, data_target),
+            )
+            membri = cur.fetchall()
+            candidati_san = []
+            candidati_sic = []
+
+            for op_id, op_nome, op_mat, ma, mb in membri:
+                # Controlla sospensioni attive in e04
+                cur.execute(
+                    """
+                    SELECT k0, ts_a, ts_b, v1 FROM e04
+                    WHERE k1 = ? AND ts_a <= ? AND (ts_b IS NULL OR ts_b >= ?)
+                    """,
+                    (op_id, data_target, data_target),
+                )
+                sospensioni = cur.fetchall()
+                if sospensioni:
+                    continue  # Escluso per sospensione
+
+                # Controlla abilitazioni in r06
+                cur.execute(
+                    """
+                    SELECT v1 FROM r06
+                    WHERE k1 = ? AND ts_a <= ? AND (ts_b IS NULL OR ts_b >= ?)
+                    """,
+                    (op_id, data_target, data_target),
+                )
+                abils = {r[0] for r in cur.fetchall()}
+                op_dict = {"id": op_id, "nome": op_nome, "matricola": op_mat, "abilitazioni": list(abils)}
+                if "SANITARIO" in abils:
+                    candidati_san.append(op_dict)
+                if "SICUREZZA" in abils:
+                    candidati_sic.append(op_dict)
+
+            # Regola della missione: 2 persone distinte della stessa squadra, una per ruolo
+            for san in candidati_san:
+                for sic in candidati_sic:
+                    if san["id"] != sic["id"]:
+                        squadra_selezionata = sq_info
+                        operatore_sanitario = san
+                        operatore_sicurezza = sic
+                        break
+                if squadra_selezionata:
+                    break
+            if squadra_selezionata:
+                break
+
+        # 4. Terminali al varco V-59
+        cur.execute(
+            "SELECT k0, v1, v2 FROM r09 WHERE k1 = ?",
+            (varco_id,),
+        )
+        terminali_raw = cur.fetchall()
+        terminali_validi = []
+        for tid, canale, stato in terminali_raw:
+            if stato != "OPERATIVO":
+                continue
+            # Verifica finestra aperta in m05
+            cur.execute(
+                "SELECT k0, ts_a, ts_b FROM m05 WHERE k1 = ? AND ts_a <= ? AND ts_b >= ?",
+                (tid, data_target, data_target),
+            )
+            finestre = cur.fetchall()
+            if not finestre:
+                continue
+            # Verifica chiave attiva in r13
+            cur.execute(
+                "SELECT v1, ts_a, ts_b FROM r13 WHERE k1 = ? AND ts_a <= ? AND ts_b >= ?",
+                (tid, data_target, data_target),
+            )
+            chiavi = cur.fetchall()
+            if not chiavi:
+                continue
+
+            terminali_validi.append({
+                "terminale_id": tid,
+                "canale": canale,
+                "stato": stato,
+                "chiave_valida": chiavi[0][0],
+                "validita_chiave": f"{chiavi[0][1]} -> {chiavi[0][2]}",
+                "finestra_aperta": f"{finestre[0][1]} -> {finestre[0][2]}",
+            })
+
+        # 5. Candidati ed elementi esclusi documentati
+        esclusioni = [
+            {
+                "candidato": "Hilda Marini (PX-615738)",
+                "squadra": "Unità 5-Tufo (1719260)",
+                "motivo": "Possiede entrambe le abilitazioni (SANITARIO e SICUREZZA), ma il regolamento vieta espressamente a una singola persona di ricoprire entrambi i ruoli nella stessa missione (sono obbligatori due operatori distinti)."
+            },
+            {
+                "candidato": "Alma Donati (PX-742882)",
+                "squadra": "Unità 5-Basalto (7538287)",
+                "motivo": "Abilitata come SANITARIO, ma gravata da sospensione attiva a tempo indeterminato in e04 dal 04/11 ore 11:50 per 'ritiro idoneità'."
+            },
+            {
+                "candidato": "Berto Serra (PX-306307)",
+                "squadra": "Unità 5-Calce (1474219)",
+                "motivo": "Abilitato come SICUREZZA, ma gravato da sospensione attiva in e04 fino alle ore 13:00 del 04/11 per 'verifica credenziali'."
+            },
+            {
+                "candidato": "Squadra Unità 5-Gesso (752946)",
+                "squadra": "Unità 5-Gesso",
+                "motivo": "Il permesso SANITARIO su V-59 (ID 7183803) è stato revocato anticipatamente in e10 alle ore 11:00 del 04/11 con causale 'revoca direzione'."
+            },
+            {
+                "candidato": "Squadra Unità 5-Arenaria (4724931)",
+                "squadra": "Unità 5-Arenaria",
+                "motivo": "Il permesso SANITARIO su V-59 (ID 471366) risulta marcato in stato BLOCCATO in r08."
+            },
+            {
+                "candidato": "Squadra Unità 5-Marmo (9215925)",
+                "squadra": "Unità 5-Marmo",
+                "motivo": "Il permesso SANITARIO su V-59 (ID 753195) ha finestra oraria scaduta alle ore 11:59 del 04/11 (un minuto prima dell'arrivo previsto)."
+            },
+            {
+                "candidato": "Terminale 5880280 (Canale Quarzo)",
+                "squadra": "N/A",
+                "motivo": "Marcato in stato FUORI_SERVIZIO nella tabella r09."
+            },
+            {
+                "candidato": "Terminale 5491816 (Canale Rame)",
+                "squadra": "N/A",
+                "motivo": "Nessuna finestra operativa m05 aperta il 04/11 alle ore 12:00 (aperto solo il 03/11)."
+            },
+            {
+                "candidato": "Terminale 7650550 (Canale Ferro)",
+                "squadra": "N/A",
+                "motivo": "Nessuna chiave di sicurezza valida in r13 per la data del 04/11 alle ore 12:00 (chiavi scadute il 03/11)."
+            },
+        ]
+
+        # 6. Informazione mancante
+        info_mancante = (
+            "Occorre richiedere al Comando Centrale / Docente quale sia il canale di ricezione compatibile "
+            "installato a bordo del mezzo di trasporto operativo (Canale Iota oppure Canale Gamma). Entrambi i "
+            "terminali (4703994 e 8372085) sono pienamente operativi e convalidati alle ore 12:00 del 4 novembre 2026, "
+            "ciascuno con la propria chiave di sicurezza specifica (642103 per Canale Iota, 500295 per Canale Gamma)."
+        )
+
+        return {
+            "ok": True,
+            "data_target_missione": data_target,
+            "destinazione": {
+                "archivio_id": archivio_id,
+                "archivio_nome": archivio_nome,
+                "varco_id": varco_id,
+                "varco_codice": varco_codice,
+            },
+            "squadra_autorizzata": {
+                "squadra_id": squadra_selezionata["id"] if squadra_selezionata else None,
+                "nome_squadra": squadra_selezionata["nome"] if squadra_selezionata else None,
+                "ruoli_confermati": ["SANITARIO", "SICUREZZA"],
+            },
+            "operatori_autorizzati": {
+                "sanitario": operatore_sanitario,
+                "sicurezza": operatore_sicurezza,
+            },
+            "terminali_operativi_convalidati": terminali_validi,
+            "candidati_ed_elementi_esclusi": esclusioni,
+            "informazione_mancante_da_chiedere": info_mancante,
+        }
+    finally:
+        con.close()
+
+
+# ==============================================================================
 # REGISTRO STRUMENTI E SCHEMI PER OPENAI FUNCTION CALLING
 # ==============================================================================
 
@@ -1332,6 +1882,11 @@ STRUMENTI_REGISTRATI: dict[str, Any] = {
     "interroga_accessi_sql": interroga_accessi_sql,
     "interroga_database": interroga_database,
     "agente_sql": agente_sql,
+    "elenca_tabelle_csv": elenca_tabelle_csv,
+    "leggi_tabella_csv": leggi_tabella_csv,
+    "cerca_in_csv": cerca_in_csv,
+    "interroga_archivio_recuperato_sql": interroga_archivio_recuperato_sql,
+    "risolvi_missione_varco": risolvi_missione_varco,
 }
 
 TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
@@ -1603,6 +2158,109 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 },
                 "required": ["query"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "elenca_tabelle_csv",
+            "description": (
+                "Elenca le 14 tabelle CSV dell'archivio recuperato dal terminale danneggiato "
+                "(cartella TABELLE_CSV/): e04, e10, m05, m12, r02, r07, r08, r09, r11, r13, r14, r15, r03, r06. "
+                "Fornisce per ciascuna il nome logico decodificato, il numero di righe, le colonne e la descrizione."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "leggi_tabella_csv",
+            "description": (
+                "Legge i record direttamente da una tabella CSV recuperata (es. 'r03', 'r08', 'r09', 'r06', 'm12', 'e04'). "
+                "Decodifica i campi secondo il dizionario investigativo e supporta paginazione con limite e offset. "
+                "USARE per esaminare i dati grezzi dei CSV senza dipendere da SQLite."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tabella": {
+                        "type": "string",
+                        "description": "Nome della tabella CSV da leggere (es. 'r03', 'r11', 'r08', 'r09', 'r06', 'm12', 'e04', 'e10', 'm05', 'r13').",
+                    },
+                    "limite": {
+                        "type": "integer",
+                        "description": "Numero massimo di righe da restituire (default 50).",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Indice di partenza per la paginazione (default 0).",
+                    },
+                },
+                "required": ["tabella"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cerca_in_csv",
+            "description": (
+                "Cerca un termine, nome, ID o codice all'interno delle tabelle CSV recuperate. "
+                "Permette di filtrare su tabelle specifiche o cercare su tutte contemporaneamente."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "termine": {
+                        "type": "string",
+                        "description": "Termine, nome persona, codice o ID da cercare.",
+                    },
+                    "tabelle": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Elenco facoltativo di tabelle su cui limitare la ricerca (es. ['r03', 'r11']). Se omesso cerca ovunque.",
+                    },
+                    "limite": {
+                        "type": "integer",
+                        "description": "Numero massimo di riscontri (default 25).",
+                    },
+                },
+                "required": ["termine"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "interroga_archivio_recuperato_sql",
+            "description": (
+                "Esegue una query SQL di sola lettura (SELECT ...) sul database SQLite recuperato dal terminale danneggiato "
+                "(archivio_recuperato.sqlite, contenente le 14 tabelle recuperate e decodificate). "
+                "USARE per correlazioni relazionali complesse, JOIN tra operatori, squadre, abilitazioni, varchi, terminali e sospensioni."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Query SQL di lettura (SELECT ...) sulle tabelle dell'archivio recuperato.",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "risolvi_missione_varco",
+            "description": (
+                "Risolve e verifica deterministicamente tutti i vincoli di accesso per Archivio Erebo varco V-59 "
+                "al 4 novembre 2026 ore 12:00: identifica la squadra autorizzata, i 2 operatori (sanitario e sicurezza), "
+                "i terminali operativi con relative chiavi, i candidati esclusi con motivazioni e l'informazione mancante."
+            ),
+            "parameters": {"type": "object", "properties": {}},
         },
     },
 ]

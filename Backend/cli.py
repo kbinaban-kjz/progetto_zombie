@@ -28,6 +28,11 @@ try:
         cerca_fonti,
         interroga_database,
         agente_sql,
+        elenca_tabelle_csv,
+        leggi_tabella_csv,
+        cerca_in_csv,
+        interroga_archivio_recuperato_sql,
+        risolvi_missione_varco,
     )
 except ImportError:
     from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
@@ -46,6 +51,11 @@ except ImportError:
         cerca_fonti,
         interroga_database,
         agente_sql,
+        elenca_tabelle_csv,
+        leggi_tabella_csv,
+        cerca_in_csv,
+        interroga_archivio_recuperato_sql,
+        risolvi_missione_varco,
     )
 
 
@@ -61,6 +71,7 @@ def stampa_guida_comandi() -> None:
     print("  /rag <domanda>  : Recupera i pezzi e i file dall'archivio tramite RAG")
     print("  /catena <testo> : Analisi evidenze (copie vs misure dirette) e catena multi-documento")
     print("  /sql <domanda>  : Esegue l'agente SQL mostrando QUERY, RISULTATO e SPIEGAZIONE")
+    print("  /csv [sottocmd] : Accesso tabelle CSV e archivio recuperato (/csv elenca, /csv leggi, /csv cerca, /csv sql, /csv varco)")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
 
@@ -224,6 +235,100 @@ def avvia_cli() -> int:
                     print(f"  {json.dumps(esito, ensure_ascii=False, indent=2)}")
                 else:
                     print("\n" + agente_sql(param))
+            continue
+
+        if cmd_lower.startswith("/csv"):
+            parti = domanda.split(maxsplit=2)
+            subcmd = parti[1].lower() if len(parti) > 1 else "guida"
+            resto = parti[2].strip() if len(parti) > 2 else ""
+
+            if subcmd in ("elenca", "ls", "list"):
+                esito = elenca_tabelle_csv()
+                print("\n=== TABELLE CSV RECUPERATE (Terminale Danneggiato) ===")
+                print(f"Cartella: {esito.get('cartella')}")
+                print(f"{'TABELLA':<10} {'RIGHE':<8} {'NOME LOGICO':<25} {'DESCRIZIONE'}")
+                print("-" * 80)
+                for tab_k, tab_v in esito.get("tabelle", {}).items():
+                    print(f"{tab_k:<10} {tab_v.get('num_righe', 0):<8} {tab_v.get('nome_logico', ''):<25} {tab_v.get('descrizione', '')}")
+                print()
+            elif subcmd in ("leggi", "read", "cat", "view"):
+                if not resto:
+                    print("Uso: /csv leggi <tabella> [limite] (es. /csv leggi r03 10)")
+                else:
+                    parti_leggi = resto.split()
+                    tab_nome = parti_leggi[0]
+                    lim = int(parti_leggi[1]) if len(parti_leggi) > 1 and parti_leggi[1].isdigit() else 20
+                    esito = leggi_tabella_csv(tab_nome, limite=lim)
+                    if not esito.get("ok"):
+                        print(f"\nErrore: {esito.get('errore')}")
+                    else:
+                        print(f"\n=== Tabella CSV '{esito['tabella']}' ({esito['nome_logico']}) ===")
+                        print(f"Descrizione: {esito['descrizione']}")
+                        print(f"Campi decodificati: {esito.get('campi_decodificati')}")
+                        print(f"Mostrate {len(esito['righe'])} righe su {esito['totale_righe']}:\n")
+                        import json
+                        for r in esito["righe"]:
+                            print(" ", json.dumps(r, ensure_ascii=False))
+                        print()
+            elif subcmd in ("cerca", "search", "grep"):
+                if not resto:
+                    print("Uso: /csv cerca <termine> (es. /csv cerca 'Tina Rocchi' oppure /csv cerca 'V-59')")
+                else:
+                    esito = cerca_in_csv(resto)
+                    print(f"\n=== Ricerca CSV per '{resto}' (Trovati: {esito.get('totale_riscontri')}) ===")
+                    for h in esito.get("risultati", []):
+                        print(f"  [{h['tabella']}.csv (riga {h['riga_num']}) - {h['nome_logico']}]: {h['dati']}")
+                    print()
+            elif subcmd == "sql":
+                if not resto:
+                    print("Uso: /csv sql <SELECT ...> (es. /csv sql SELECT r03.v1, r03.v2, r06.v1 FROM r03 JOIN r06 ON r03.k0 = r06.k1)")
+                else:
+                    esito = interroga_archivio_recuperato_sql(resto)
+                    if not esito.get("ok"):
+                        print(f"\nErrore SQL: {esito.get('errore')}")
+                    else:
+                        print("\nQUERY ESEGUITA:")
+                        print(f"  {resto}")
+                        print(f"\nRISULTATI ({esito.get('totale_righe')} righe):")
+                        colonne = esito.get("colonne", [])
+                        if colonne:
+                            print(" | ".join(f"{c:<20}" for c in colonne))
+                            print("-" * (22 * len(colonne)))
+                            for row in esito.get("righe", []):
+                                print(" | ".join(f"{str(v):<20}" for v in row))
+                        print()
+            elif subcmd in ("varco", "risolvi", "missione"):
+                esito = risolvi_missione_varco()
+                if not esito.get("ok"):
+                    print(f"\nErrore: {esito.get('errore')}")
+                else:
+                    print("\n================================================================================")
+                    print("RAPPORTINO MISSIONE — ARCHIVIO EREBO VARCO V-59 (04/11/2026 ORE 12:00)")
+                    print("================================================================================")
+                    dest = esito["destinazione"]
+                    print(f"Destinazione: {dest['archivio_nome']} (ID {dest['archivio_id']}) -> Varco {dest['varco_codice']} (ID {dest['varco_id']})")
+                    sq = esito["squadra_autorizzata"]
+                    print(f"Squadra Autorizzata: {sq['nome_squadra']} (ID {sq['squadra_id']}) [Ruoli: {', '.join(sq['ruoli_confermati'])}]")
+                    ops = esito["operatori_autorizzati"]
+                    san = ops["sanitario"]
+                    sic = ops["sicurezza"]
+                    print(f"Operatore SANITARIO: {san['nome']} (Matricola: {san['matricola']}, ID: {san['id']})")
+                    print(f"Operatore SICUREZZA: {sic['nome']} (Matricola: {sic['matricola']}, ID: {sic['id']})")
+                    print("\nTerminali Operativi Convalidati:")
+                    for t in esito["terminali_operativi_convalidati"]:
+                        print(f"  - Terminale {t['terminale_id']} ({t['canale']}): Chiave {t['chiave_valida']} (Finestra: {t['finestra_aperta']})")
+                    print("\nCandidati ed Elementi Esclusi:")
+                    for esc in esito["candidati_ed_elementi_esclusi"]:
+                        print(f"  - {esc['candidato']}: {esc['motivo']}")
+                    print("\nInformazione Mancante da Chiedere:")
+                    print(f"  {esito['informazione_mancante_da_chiedere']}\n")
+            else:
+                print("Sottocomandi disponibili per /csv:")
+                print("  /csv elenca                 : Elenca tutte le 14 tabelle CSV decodificate")
+                print("  /csv leggi <tabella> [lim]  : Legge i record di una tabella CSV (es. /csv leggi r03 10)")
+                print("  /csv cerca <termine>        : Cerca un nome o codice su tutte le tabelle CSV")
+                print("  /csv sql <query>            : Esegue query SQL SELECT su archivio_recuperato.sqlite")
+                print("  /csv varco                  : Risoluzione e verifica vincoli per Archivio Erebo V-59")
             continue
 
         # Invia la richiesta al router ibrido

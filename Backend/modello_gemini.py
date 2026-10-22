@@ -46,6 +46,11 @@ try:
         cerca_cronologia,
         statistiche_missione,
         interroga_accessi_sql,
+        elenca_tabelle_csv,
+        leggi_tabella_csv,
+        cerca_in_csv,
+        interroga_archivio_recuperato_sql,
+        risolvi_missione_varco,
     )
     from Backend.prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 except ImportError:
@@ -76,6 +81,11 @@ except ImportError:
         cerca_cronologia,
         statistiche_missione,
         interroga_accessi_sql,
+        elenca_tabelle_csv,
+        leggi_tabella_csv,
+        cerca_in_csv,
+        interroga_archivio_recuperato_sql,
+        risolvi_missione_varco,
     )
     from prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 
@@ -298,6 +308,11 @@ def genera_risposta(
                 cerca_cronologia,
                 statistiche_missione,
                 interroga_accessi_sql,
+                elenca_tabelle_csv,
+                leggi_tabella_csv,
+                cerca_in_csv,
+                interroga_archivio_recuperato_sql,
+                risolvi_missione_varco,
             ]
 
         # Costruzione cronologia messaggi per SDK google-genai (ultimi 10 scambi)

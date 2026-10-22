@@ -73,11 +73,13 @@ DATA_MISSIONE_G4 = "2031-10-12 06:00"
 
 def risolvi_accessi_db() -> Path:
     """Restituisce il percorso valido del database accessi.sqlite controllando le posizioni note."""
+    env_p = valore_env("ACCESSI_DB_PATH")
     percorsi_candidati = [
-        Path(valore_env("ACCESSI_DB_PATH", "")),
+        Path(env_p) if env_p else None,
         ROOT_DIR / "accessi.sqlite",
         BACKEND_DIR / "accessi.sqlite",
         ROOT_DIR / "New information" / "accessi.sqlite",
+        ROOT_DIR / "New Information" / "accessi.sqlite",
         Path("accessi.sqlite"),
     ]
     for p in percorsi_candidati:
@@ -87,23 +89,42 @@ def risolvi_accessi_db() -> Path:
 
 ACCESSI_DB_PATH = risolvi_accessi_db()
 
-# Configurazione Database Archivio Recuperato (Giorno 4 Checkpoint 2 — Archivio Erebo: archivio_recuperato.sqlite)
-DATA_MISSIONE_EREBO = "2026-11-04 12:00"
+# Configurazione Archivio Recuperato e Tabelle CSV (Giorno 4 — Terminale Danneggiato / Archivio Erebo V-59)
+DATA_MISSIONE_VARCO = "2026-11-04 12:00"
+
+def risolvi_tabelle_csv_dir() -> Path:
+    """Restituisce il percorso valido della cartella TABELLE_CSV controllando le posizioni note."""
+    env_p = valore_env("TABELLE_CSV_DIR")
+    percorsi_candidati = [
+        Path(env_p) if env_p else None,
+        ROOT_DIR / "New Information 2" / "TABELLE_CSV",
+        ROOT_DIR / "New information 2" / "TABELLE_CSV",
+        ROOT_DIR / "TABELLE_CSV",
+        BACKEND_DIR / "TABELLE_CSV",
+        Path("TABELLE_CSV"),
+    ]
+    for p in percorsi_candidati:
+        if p and p.is_dir():
+            return p.resolve()
+    return (ROOT_DIR / "New Information 2" / "TABELLE_CSV").resolve()
 
 def risolvi_archivio_recuperato_db() -> Path:
     """Restituisce il percorso valido del database archivio_recuperato.sqlite controllando le posizioni note."""
+    env_p = valore_env("ARCHIVIO_RECUPERATO_DB_PATH")
     percorsi_candidati = [
-        Path(valore_env("ARCHIVIO_RECUPERATO_DB_PATH", "")),
+        Path(env_p) if env_p else None,
+        ROOT_DIR / "New Information 2" / "archivio_recuperato.sqlite",
+        ROOT_DIR / "New information 2" / "archivio_recuperato.sqlite",
         ROOT_DIR / "archivio_recuperato.sqlite",
         BACKEND_DIR / "archivio_recuperato.sqlite",
-        ROOT_DIR / "New Information 2" / "archivio_recuperato.sqlite",
         Path("archivio_recuperato.sqlite"),
     ]
     for p in percorsi_candidati:
         if p and p.is_file():
             return p.resolve()
-    return (ROOT_DIR / "archivio_recuperato.sqlite").resolve()
+    return (ROOT_DIR / "New Information 2" / "archivio_recuperato.sqlite").resolve()
 
+TABELLE_CSV_DIR = risolvi_tabelle_csv_dir()
 ARCHIVIO_RECUPERATO_DB_PATH = risolvi_archivio_recuperato_db()
 
 # Modello Locale (Investigatore.py)
