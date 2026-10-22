@@ -37,6 +37,7 @@ try:
         recupera_rag,
         cerca_fonti,
         leggi_fonte,
+        leggi_dossier_excel,
         collega_documenti,
         analizza_evidenze,
         elenca_fonti,
@@ -53,6 +54,7 @@ try:
         risolvi_missione_varco,
         cerca_personale,
         elenca_personaggi_e_operatori,
+        elenca_squadre,
     )
     from Backend.prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 except ImportError:
@@ -74,6 +76,7 @@ except ImportError:
         recupera_rag,
         cerca_fonti,
         leggi_fonte,
+        leggi_dossier_excel,
         collega_documenti,
         analizza_evidenze,
         elenca_fonti,
@@ -90,6 +93,7 @@ except ImportError:
         risolvi_missione_varco,
         cerca_personale,
         elenca_personaggi_e_operatori,
+        elenca_squadre,
     )
     from prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 
@@ -300,25 +304,27 @@ def genera_risposta(
         funzioni_tools: list[Any] = []
         if usa_tools:
             funzioni_tools = [
-                recupera_rag,
                 cerca_fonti,
-                leggi_fonte,
-                collega_documenti,
-                analizza_evidenze,
-                elenca_fonti,
-                verifica_sicurezza_fonti,
-                ottieni_nodi_mappa,
-                ottieni_dettaglio_nodo,
-                cerca_cronologia,
-                statistiche_missione,
-                interroga_accessi_sql,
-                elenca_tabelle_csv,
-                leggi_tabella_csv,
-                cerca_in_csv,
-                interroga_archivio_recuperato_sql,
-                risolvi_missione_varco,
                 cerca_personale,
                 elenca_personaggi_e_operatori,
+                elenca_squadre,
+                cerca_in_csv,
+                interroga_accessi_sql,
+                interroga_archivio_recuperato_sql,
+                risolvi_missione_varco,
+                leggi_tabella_csv,
+                elenca_tabelle_csv,
+                collega_documenti,
+                analizza_evidenze,
+                leggi_fonte,
+                leggi_dossier_excel,
+                elenca_fonti,
+                ottieni_dettaglio_nodo,
+                ottieni_nodi_mappa,
+                cerca_cronologia,
+                statistiche_missione,
+                verifica_sicurezza_fonti,
+                recupera_rag,
             ]
 
         # Costruzione cronologia messaggi per SDK google-genai (ultimi 10 scambi)

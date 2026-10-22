@@ -716,12 +716,25 @@ def risposta_locale_da_fonti(
                     f"indica: «{frase_estratta}», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio."
                 )
 
-    # 4a-G4-bis. Domande su personaggi, personale e operatori di missione:
-    # Utilizza i tool dinamici dedicati cerca_personale ed elenca_personaggi_e_operatori
+    # 4a-G4-bis. Domande su personaggi, personale, operatori e squadre di missione:
+    # Utilizza i tool dinamici dedicati cerca_personale, elenca_personaggi_e_operatori ed elenca_squadre
     if not attacco_utente and not _chiede_collegamenti(q):
-        # Se chiede una panoramica o elenco dei personaggi/operatori:
+        # Se chiede delle squadre o delle Unità 5:
         if re.search(
-            r"\b(?:quali\s+sono\s+i\s+personaggi|chi\s+sono\s+i\s+personaggi|elenca\s+(?:i\s+)?personaggi|elenca\s+(?:gli\s+)?operatori|tutti\s+i\s+personaggi|panoramica\s+personaggi|lista\s+(?:dei\s+)?personaggi)\b",
+            r"\b(?:quali\s+squadre|che\s+squadre|elenca\s+(?:le\s+)?squadre|tutte\s+le\s+squadre|squadre\s+ci\s+sono|squadre\s+operative|quale\s+unità\s+5|quali\s+unità\s+5|quali\s+unita\s+5|quale\s+unita\s+5|elenca\s+(?:le\s+)?unità\s+5|elenca\s+(?:le\s+)?unita\s+5|unita\s+5\s+ci\s+sono|unità\s+5\s+ci\s+sono)\b",
+            q,
+        ):
+            try:
+                from Backend.tools import elenca_squadre
+                res_sq = elenca_squadre()
+                if res_sq.get("ok"):
+                    return avviso + res_sq.get("riassunto", "")
+            except Exception:
+                pass
+
+        # Se chiede una panoramica o elenco dei personaggi/operatori/persone:
+        if re.search(
+            r"\b(?:elenca(?:mi)?\s+(?:tutt[ei]\s+)?(?:le\s+)?(?:persone|personaggi|operatori|figure)|quali\s+sono\s+(?:le\s+persone|i\s+personaggi|gli\s+operatori)|chi\s+sono\s+(?:le\s+persone|i\s+personaggi|gli\s+operatori)|tutt[ei]\s+(?:le\s+persone|i\s+personaggi|gli\s+operatori)|persone\s+presenti|personaggi\s+presenti|lista\s+(?:delle\s+persone|dei\s+personaggi|degli\s+operatori)|censimento\s+(?:del\s+personale|dei\s+personaggi|delle\s+persone)|panoramica\s+personaggi)\b",
             q,
         ):
             try:

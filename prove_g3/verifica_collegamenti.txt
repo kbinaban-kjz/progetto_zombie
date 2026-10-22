@@ -2,7 +2,7 @@ VERIFICA COLLEGAMENTI TRA DOCUMENTI
 Modalità: estrattore deterministico
 
 DOMANDA: Chi ha cercato di fermare il progetto?
-FILE RAG: documento_0057.html, G2-05.txt, documento_0523.txt, LX5_1151.txt, LX5_1889.txt, LX5_1951.txt, LX5_1994.txt, LX5_2155.txt, G1-02.txt, G2-02.txt, G2-03.txt, documento_0389.xml, G2-01.txt
+FILE RAG: documento_0057.html, DOSSIER_SBLOCCATO.xlsx, DOSSIER_SBLOCCATO_03_Direttiva.txt, DOSSIER_SBLOCCATO_02_Sospensione.txt, G2-05.txt, documento_0523.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt, LX5_1151.txt, documento_0389.xml, G1-02.txt, G2-02.txt, G2-03.txt, G2-01.txt
 RISPOSTA:
   Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. [ARCH-3097] (documento_0057.html)
 [OK] Nessuna voce Wikipedia nelle fonti recuperate
@@ -10,7 +10,7 @@ RISPOSTA:
 [OK] Fonte corretta [ARCH-3097]
 
 DOMANDA: Dove è scoppiato il primo focolaio e a che ora?
-FILE RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, G2-01.txt, G1-02.txt, G2-02.txt, documento_0057.html, G2-04.txt, G2-06.txt, G2-05.txt
+FILE RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt, G2-01.txt, DOSSIER_SBLOCCATO.xlsx, G2-04.txt, G2-06.txt, G1-02.txt, G2-02.txt, documento_0057.html, DOSSIER_SBLOCCATO_02_Sospensione.txt, G2-05.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt
 RISPOSTA:
   Ore 01:12. Primo allarme registrato nel laboratorio San Mauro. [G2-01]
 [OK] Risposta secca: San Mauro e 01:12
@@ -18,16 +18,22 @@ RISPOSTA:
 [OK] Nessun orario estraneo (06:25 / 06:40) nella risposta principale
 
 DOMANDA: Cosa è successo nei rifugi?
-FILE RAG: documento_0523.txt, G1-01.txt, G2-02.txt, LX5_3923.txt, LX5_1079.txt, LX5_1087.txt, LX5_1506.txt, LX5_1551.txt, G1-02.txt, G2-03.txt, documento_0057.html, G2-01.txt, G2-05.txt
+FILE RAG: DOSSIER_SBLOCCATO.xlsx, DOSSIER_SBLOCCATO_02_Sospensione.txt, documento_0523.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt, G1-01.txt, G2-02.txt, LX5_3923.txt, LX5_1079.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt, G2-01.txt, G2-05.txt, G1-02.txt, G2-03.txt, documento_0057.html
 RISPOSTA:
+  ### FOGLIO: 01_Risveglio ###: Decisione richiesta: Fermare il trattamento, sospendere i trasferimenti e impedire la distribuzione ai rifugi fino a una verifica indipendente. [DOSSIER EXCEL: DOSSIER_SBLOCCATO.xlsx]
+  Cartella LZ-574 • Richiesta di sospensione: Decisione richiesta: Fermare il trattamento, sospendere i trasferimenti e impedire la distribuzione ai rifugi fino a una verifica indipendente. [LZ-574-02]
   Circolare interna sui rifugi: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. [ARCH-1842] (documento_0523.txt)
-  Messaggio della centrale: La centrale ordina ai superstiti di raggiungere i rifugi. [G1-01]
-  Intervento manutenzione: Nora Ferri chiede di chiudere il collegamento tra il laboratorio San Mauro e la rete dei rifugi. [G2-02]
+  
+  Collegamenti tra documenti:
+  COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
+    • [DOSSIER-SBLOCCATO] (DOSSIER_SBLOCCATO.xlsx) <-> [LZ-574-02] (DOSSIER_SBLOCCATO_02_Sospensione.txt): fermare, lz-574, cartella
+    • [DOSSIER-SBLOCCATO] (DOSSIER_SBLOCCATO.xlsx) <-> [ARCH-1842] (documento_0523.txt): lazzaro
+  Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
 [OK] Risposta: i rifugi sono stati usati per estendere il contagio
 [OK] Fonte [ARCH-1842] e nessun Corno del Renon
 
 DOMANDA: Quali documenti collegano Nora Ferri al contenitore LUME?
-FILE RAG: G2-03.txt, G2-02.txt, G1-02.txt, documento_0057.html, documento_0389.xml, LX5_5496.txt, G2-07.txt, LX5_3426.txt, G2-01.txt, G2-04.txt, G2-06.txt, G2-05.txt, documento_0421.json
+FILE RAG: G2-03.txt, G2-02.txt, G1-02.txt, documento_0057.html, documento_0389.xml, LX5_5496.txt, G2-07.txt, DOSSIER_SBLOCCATO.xlsx, G2-01.txt, G2-04.txt, G2-06.txt, G2-05.txt, documento_0421.json
 RISPOSTA:
   Riassunto della centrale: La centrale attribuisce il primo focolaio a San Paolo e accusa Nora Ferri di sabotaggio. [G2-03]
   Intervento manutenzione: Nora Ferri chiede di chiudere il collegamento tra il laboratorio San Mauro e la rete dei rifugi. [G2-02]
@@ -38,23 +44,23 @@ RISPOSTA:
   Collegamenti tra documenti:
   PERCORSO TRA «nora ferri» E «lume»: [ARCH-3097] (documento_0057.html) -> [ARCH-5721] (documento_0389.xml) --RV753--
   COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
-    • [G2-03] (G2-03.txt) <-> [G2-02] (G2-02.txt): nora ferri, nora, ferri
-    • [G2-03] (G2-03.txt) <-> [G1-02] (G1-02.txt): nora ferri, nora, ferri
-    • [G2-03] (G2-03.txt) <-> [ARCH-3097] (documento_0057.html): nora ferri, nora, ferri
-    • [G2-02] (G2-02.txt) <-> [G1-02] (G1-02.txt): nora ferri, nora, ferri
+    • [G2-03] (G2-03.txt) <-> [G2-02] (G2-02.txt): nora ferri, ferri, nora
+    • [G2-03] (G2-03.txt) <-> [G1-02] (G1-02.txt): nora ferri, ferri, nora
+    • [G2-03] (G2-03.txt) <-> [ARCH-3097] (documento_0057.html): nora ferri, ferri, nora
+    • [G2-02] (G2-02.txt) <-> [G1-02] (G1-02.txt): nora ferri, ferri, nora
   Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
 [OK] Collega almeno tre documenti (Nora, RV753, LUME)
 [OK] Mostra il percorso ARCH-3097 -> ARCH-5721
 [OK] Percorso verificato sulle entità condivise (rv753)
 
 DOMANDA: Chi ha autorizzato il trasferimento del contenitore LUME?
-FILE RAG: documento_0389.xml, LX5_1221.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, LX5_1974.txt, LX5_1984.txt, documento_0421.json, documento_0057.html, LX5_1749.txt, LX5_2398.txt
+FILE RAG: documento_0389.xml, DOSSIER_SBLOCCATO_03_Direttiva.txt, DOSSIER_SBLOCCATO.xlsx, LX5_1221.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, documento_0057.html, documento_0421.json, DOSSIER_SBLOCCATO_01_Risveglio.txt, DOSSIER_SBLOCCATO_02_Sospensione.txt, LX5_2398.txt, LX5_1749.txt
 RISPOSTA:
   Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica: «Consultare la planimetria per il settore e il database degli accessi per l’autorizzazione ancora valida.», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio.
 [OK] Dichiara 'non documentato' citando ARCH-5721
 
 DOMANDA: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per proteggere il materiale?
-FILE RAG: documento_0057.html, documento_0421.json, documento_0523.txt, documento_0389.xml, documento_0023.txt, LX5_1213.txt, LX5_7461.txt, LX5_7639.txt, G1-02.txt, G2-02.txt, G2-03.txt
+FILE RAG: documento_0057.html, documento_0421.json, documento_0523.txt, documento_0389.xml, documento_0023.txt, DOSSIER_SBLOCCATO.xlsx, DOSSIER_SBLOCCATO_01_Risveglio.txt, LX5_1213.txt, G1-02.txt, G2-02.txt, G2-03.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt, DOSSIER_SBLOCCATO_02_Sospensione.txt, G2-04.txt
 RISPOSTA:
   Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. Per proteggere il materiale di recupero ha aperto la pratica RV753. [ARCH-3097] (documento_0057.html)
   Planimetria depositi: Il deposito Forte Cenere usa il settore D6 per il materiale di recupero. Al prossimo controllo serviranno nome della persona, deposito, settore e pratica. [ARCH-6408] (documento_0421.json)
@@ -68,7 +74,7 @@ RISPOSTA:
 [OK] Non attribuisce la manomissione a una persona (astensione con G2-07)
 
 DOMANDA: Dove si trova il contenitore LUME?
-FILE RAG: documento_0389.xml, documento_0421.json, LX5_1221.txt, documento_0023.txt, LX5_1844.txt, LX5_1979.txt, LX5_2535.txt, LX5_2671.txt, documento_0057.html, LX5_1749.txt, LX5_2398.txt
+FILE RAG: documento_0389.xml, documento_0421.json, LX5_1221.txt, documento_0023.txt, DOSSIER_SBLOCCATO.xlsx, DOSSIER_SBLOCCATO_02_Sospensione.txt, LX5_1844.txt, LX5_1979.txt, documento_0057.html, LX5_2398.txt, LX5_1749.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt
 RISPOSTA:
   Trasferimento del materiale di recupero: Il contenitore LUME è stato spostato nel deposito Forte Cenere. Pratica RV753. [ARCH-5721] (documento_0389.xml)
   Planimetria depositi: Il deposito Forte Cenere usa il settore D6 per il materiale di recupero. Il settore A1 è un vecchio magazzino vuoto. [ARCH-6408] (documento_0421.json)
@@ -81,7 +87,7 @@ RISPOSTA:
 [OK] Risponde Forte Cenere, settore D6 con [ARCH-5721] e [ARCH-6408]
 
 DOMANDA: Come si collega il guasto del Ripetitore Pietra al primo focolaio?
-FILE RAG: LX5_2549.txt, LX5_6396.txt, LX5_8823.txt, G2-03.txt, documento_0523.txt, LX5_9242.txt, LX5_1151.txt, LX5_1889.txt, G1-02.txt, G2-02.txt, documento_0057.html, G2-01.txt, G2-04.txt, G2-06.txt
+FILE RAG: LX5_2549.txt, LX5_6396.txt, LX5_8823.txt, G2-03.txt, documento_0523.txt, LX5_9242.txt, LX5_1151.txt, LX5_1889.txt, G2-01.txt, G2-04.txt, G2-06.txt, G1-02.txt, G2-02.txt, documento_0057.html
 RISPOSTA:
   Rapporto intervento — giorno operativo 02, ore 08:00: Il primo guasto della rete secondaria è avvenuto a Ripetitore Salice, alle 06:40. È un guasto radio, non un nuovo focolaio. [LX5-2549]
   Scheda manutenzione orologi — giorno operativo 02, ore 07:20: L’orologio locale di Ripetitore Pietra è indietro di 25 minuti. Il guasto dell’orologio era già presente prima delle 06:00. [LX5-6396]
@@ -91,8 +97,8 @@ RISPOSTA:
   
   Collegamenti tra documenti:
   COLLEGAMENTI TRA I DOCUMENTI RECUPERATI (entità presente in entrambi i testi):
-    • [LX5-6396] (LX5_6396.txt) <-> [LX5-8823] (LX5_8823.txt): ripetitore pietra, pietra
-    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): salice, ripetitore salice, 06:40
+    • [LX5-6396] (LX5_6396.txt) <-> [LX5-8823] (LX5_8823.txt): pietra, ripetitore pietra
+    • [LX5-2549] (LX5_2549.txt) <-> [LX5-8823] (LX5_8823.txt): 06:40, ripetitore salice, salice
   Regola: un collegamento è valido solo se l'entità indicata compare davvero in entrambi i documenti. Se il percorso manca, dichiara che il collegamento non è documentato: non inventarlo.
   Nessun collegamento diretto documentato tra le due entità citate: i documenti sopra sono i più pertinenti, ma non contengono un percorso verificabile.
 [OK] Dichiara che il collegamento diretto non è documentato

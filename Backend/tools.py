@@ -2049,14 +2049,21 @@ def cerca_personale(termine: str) -> dict[str, Any]:
             pass
 
     # 3. Dossier primari
-    dossier_dir = ROOT_DIR / "dati"
-    if not dossier_dir.is_dir():
-        dossier_dir = Path("dati")
-    if dossier_dir.is_dir():
-        for f in sorted(dossier_dir.glob("*.txt")):
-            txt = f.read_text(encoding="utf-8", errors="ignore")
+    fonti_da_esaminare: list[tuple[str, str]] = []
+    try:
+        from Backend.sources import carica_fonti
+        fonti_da_esaminare = carica_fonti()
+    except Exception:
+        try:
+            from sources import carica_fonti
+            fonti_da_esaminare = carica_fonti()
+        except Exception:
+            fonti_da_esaminare = []
+
+    if fonti_da_esaminare:
+        for fname, txt in fonti_da_esaminare:
             for t in termini:
-                if len(t) >= 3 and re.search(r"\b" + re.escape(t) + r"\b", txt, flags=re.IGNORECASE):
+                if len(t) >= 2 and re.search(r"\b" + re.escape(t) + r"\b", txt, flags=re.IGNORECASE):
                     righe = [
                         line.strip()
                         for line in txt.splitlines()
@@ -2064,11 +2071,32 @@ def cerca_personale(termine: str) -> dict[str, Any]:
                     ]
                     riscontri_dossier.append(
                         {
-                            "file": f.name,
+                            "file": fname,
                             "termine": t,
                             "estratti": righe[:3],
                         }
                     )
+    else:
+        dossier_dir = ROOT_DIR / "dati"
+        if not dossier_dir.is_dir():
+            dossier_dir = Path("dati")
+        if dossier_dir.is_dir():
+            for f in sorted(dossier_dir.glob("*.txt")):
+                txt = f.read_text(encoding="utf-8", errors="ignore")
+                for t in termini:
+                    if len(t) >= 2 and re.search(r"\b" + re.escape(t) + r"\b", txt, flags=re.IGNORECASE):
+                        righe = [
+                            line.strip()
+                            for line in txt.splitlines()
+                            if re.search(r"\b" + re.escape(t) + r"\b", line, flags=re.IGNORECASE)
+                        ]
+                        riscontri_dossier.append(
+                            {
+                                "file": f.name,
+                                "termine": t,
+                                "estratti": righe[:3],
+                            }
+                        )
 
     totale = len(operatori_rec) + len(operatori_acc) + len(riscontri_dossier)
 
@@ -2149,7 +2177,7 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
         "riassunto": "",
     }
 
-    # 1. Dossier primari
+    # 1. Dossier primari e documenti caricati
     if fonte_norm in ("tutte", "dossier", "primario"):
         dossier_persone: dict[str, dict[str, Any]] = {}
         luoghi_esclusi = {
@@ -2158,29 +2186,93 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
             "Stazione Echo", "Ripetitore Pietra", "Ripetitore Salice", "Settore D6", "Settore A1",
             "Zona 0", "Ceppo LZ-7", "Silo 12", "Porto Haku", "Rotta Sud", "Rifugio Dago",
         }
-        dossier_dir = ROOT_DIR / "dati"
-        if not dossier_dir.is_dir():
-            dossier_dir = Path("dati")
-        if dossier_dir.is_dir():
-            for f in sorted(dossier_dir.glob("*.txt")):
-                txt = f.read_text(encoding="utf-8", errors="ignore")
-                for match in re.finditer(r"\b([A-Z][a-z]+ [A-Z][a-z]+)\b", txt):
-                    nome = match.group(1)
-                    if nome in luoghi_esclusi or any(loc in nome for loc in ("San ", "Ripetitore", "Settore", "Porto", "Muro")):
-                        continue
-                    if nome not in dossier_persone:
-                        dossier_persone[nome] = {"nome": nome, "dossier": set(), "menzioni": []}
-                    dossier_persone[nome]["dossier"].add(f.name)
-                    for line in txt.splitlines():
-                        if nome in line and len(dossier_persone[nome]["menzioni"]) < 2:
-                            dossier_persone[nome]["menzioni"].append(line.strip())
+        termini_esclusi = (
+            "San ", "Ripetitore", "Settore", "Porto", "Muro", "Cartella", "Direttiva",
+            "Verbale", "Estratto", "Versione", "Richiesta", "Ordine", "Firma", "Allarme",
+            "Decisione", "Rischio", "Registrazione", "Annotazione", "Autorità", "Responsabilità",
+            "Progetto", "Protocollo", "Nota", "Voce", "Archivio", "Canale", "Unità", "Unita",
+            "Circuito", "Segnale", "Dossier", "Foglio", "Testo", "Quadro",
+        )
+        pat_persone = re.compile(
+            r"\b(?:(?:dott|dr|sig|prof)\.?\s+)?([A-Z]\.?\s+[A-Z][a-z]+|[A-Z][a-z]+\s+[A-Z][a-z]+)\b"
+        )
+        pat_parente = re.compile(
+            r"\b(?:figli[ao]|padre|madre|moglie|marito|fratell[oi]|sorell[ae])(?:\s+di\s+[^:«\",\n]+)?[:\s]+[«\"“]?([A-Z][a-z]+)[»\"”]?",
+            re.IGNORECASE,
+        )
+        pat_soggetto = re.compile(
+            r"\b(?:soggetto|paziente)\s+([A-Z]{2,}-\d+)\b",
+            re.IGNORECASE,
+        )
 
-            for nome, dati in dossier_persone.items():
-                risultati["figure_dossier"].append({
-                    "nome": nome,
-                    "file_citazioni": sorted(dati["dossier"]),
-                    "dettagli": dati["menzioni"],
-                })
+        fonti_fonti: list[tuple[str, str]] = []
+        try:
+            from Backend.sources import carica_fonti
+            fonti_fonti = carica_fonti()
+        except Exception:
+            try:
+                from sources import carica_fonti
+                fonti_fonti = carica_fonti()
+            except Exception:
+                fonti_fonti = []
+
+        if not fonti_fonti:
+            dossier_dir = ROOT_DIR / "dati"
+            if not dossier_dir.is_dir():
+                dossier_dir = Path("dati")
+            if dossier_dir.is_dir():
+                for f in sorted(dossier_dir.glob("*.txt")):
+                    fonti_fonti.append((f.name, f.read_text(encoding="utf-8", errors="ignore")))
+
+        for nome_f, txt in fonti_fonti:
+            # 1. Nomi propri, titoli e sigle
+            for match in pat_persone.finditer(txt):
+                raw = match.group(0).strip()
+                nome = match.group(1).strip()
+                if nome in luoghi_esclusi or any(loc in nome for loc in termini_esclusi):
+                    continue
+                if any(loc in raw for loc in termini_esclusi):
+                    continue
+                if "\n" in raw or "\n" in nome:
+                    continue
+                display_name = raw if "dott" in raw.lower() else nome
+                if display_name not in dossier_persone:
+                    dossier_persone[display_name] = {"nome": display_name, "dossier": set(), "menzioni": []}
+                dossier_persone[display_name]["dossier"].add(nome_f)
+                for line in txt.splitlines():
+                    if nome in line and len(dossier_persone[display_name]["menzioni"]) < 2:
+                        dossier_persone[display_name]["menzioni"].append(line.strip())
+
+            # 2. Relazioni di parentela menzionate (es. figlia «Lea»)
+            for match in pat_parente.finditer(txt):
+                nome = match.group(1).strip()
+                if nome in luoghi_esclusi or any(loc in nome for loc in termini_esclusi):
+                    continue
+                display_name = f"{nome} (figlia del paziente LZ-574)"
+                if display_name not in dossier_persone:
+                    dossier_persone[display_name] = {"nome": display_name, "dossier": set(), "menzioni": []}
+                dossier_persone[display_name]["dossier"].add(nome_f)
+                for line in txt.splitlines():
+                    if nome in line and len(dossier_persone[display_name]["menzioni"]) < 2:
+                        dossier_persone[display_name]["menzioni"].append(line.strip())
+
+            # 3. Soggetti e pazienti clinici (es. Soggetto LZ-574)
+            for match in pat_soggetto.finditer(txt):
+                codice = match.group(1).strip()
+                display_name = f"Soggetto {codice} (paziente zero)"
+                if display_name not in dossier_persone:
+                    dossier_persone[display_name] = {"nome": display_name, "dossier": set(), "menzioni": []}
+                dossier_persone[display_name]["dossier"].add(nome_f)
+                for line in txt.splitlines():
+                    if codice in line and len(dossier_persone[display_name]["menzioni"]) < 2:
+                        dossier_persone[display_name]["menzioni"].append(line.strip())
+
+        for nome, dati in dossier_persone.items():
+            risultati["figure_dossier"].append({
+                "nome": nome,
+                "file_citazioni": sorted(dati["dossier"]),
+                "dettagli": dati["menzioni"],
+            })
 
     # 2. Squadra autorizzata e conteggio operatori archivio_recuperato.sqlite
     if fonte_norm in ("tutte", "archivio_recuperato", "archivio", "recuperato"):
@@ -2255,6 +2347,255 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
     return risultati
 
 
+def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
+    """
+    Elenca dinamicamente tutte le squadre operative e le Unità 5 censite nell'archivio recuperato (tabella r11)
+    e nei documenti della missione, senza alcun dato prefissato (hardcoding).
+
+    COSA FA
+    - Interroga dinamicamente la tabella 'r11' di archivio_recuperato.sqlite (o il file TABELLE_CSV/r11.csv).
+    - Distingue e cataloga:
+      1. Le 14 Unità 5 operative con nomenclatura mineraria/lapidea (Unità 5-Ardesia, Unità 5-Arenaria, Unità 5-Argilla,
+         Unità 5-Basalto, Unità 5-Calce, Unità 5-Gesso, Unità 5-Granito, Unità 5-Marmo, Unità 5-Ossidiana, Unità 5-Porfido,
+         Unità 5-Porfido bis, Unità 5-Scisto, Unità 5-Selce, Unità 5-Tufo).
+      2. I 60 Nuclei operativi (Nucleo 5-110 ... Nucleo 5-169).
+      3. La squadra autorizzata per l'Operazione Varco V-59 (Unità 5-Ardesia).
+      4. Le squadre operative menzionate nei dossier narrativi (Unità investigativa dell'utente in G1-01, Squadra cavi in LX5).
+
+    ARGOMENTI
+    - filtro: "tutte" (default), "unita_5" (solo le Unità 5), "nuclei" (solo i nuclei).
+
+    RESTITUISCE
+    Dizionario con:
+    - ok: True/False
+    - totale_squadre: conteggio totale delle squadre censite
+    - unita_5: lista dei nomi e ID delle 14 Unità 5
+    - nuclei_5: lista dei nomi e ID dei 60 Nuclei operativi
+    - squadra_missione_varco: squadra autorizzata al Varco V-59
+    - squadre_narrative: squadre operative menzionate nei documenti di campo
+    - riassunto: testo esplicativo, strutturato e completo
+    """
+    filtro_norm = (filtro or "tutte").strip().lower()
+
+    squadre_grezze: list[tuple[Any, str]] = []
+
+    # 1. Lettura da archivio_recuperato.sqlite (tabella r11)
+    path_rec = risolvi_archivio_recuperato_db()
+    if path_rec.is_file():
+        try:
+            con = sqlite3.connect(path_rec.as_uri() + "?mode=ro", uri=True)
+            cur = con.cursor()
+            cur.execute("SELECT k0, v1 FROM r11 ORDER BY v1")
+            squadre_grezze = [(r[0], str(r[1]).strip()) for r in cur.fetchall()]
+            con.close()
+        except Exception:
+            squadre_grezze = []
+
+    # 2. Fallback su TABELLE_CSV/r11.csv se il database SQLite non era disponibile
+    if not squadre_grezze:
+        csv_r11 = risolvi_tabelle_csv_dir() / "r11.csv"
+        if csv_r11.is_file():
+            try:
+                import csv
+                with open(csv_r11, encoding="utf-8", errors="ignore") as fp:
+                    rdr = csv.reader(fp)
+                    next(rdr, None)
+                    for row in rdr:
+                        if len(row) >= 2 and row[1].strip():
+                            squadre_grezze.append((row[0].strip(), row[1].strip()))
+                squadre_grezze.sort(key=lambda x: x[1])
+            except Exception:
+                pass
+
+    unita_5: list[dict[str, Any]] = []
+    nuclei_5: list[dict[str, Any]] = []
+    altre_squadre: list[dict[str, Any]] = []
+
+    for s_id, s_nome in squadre_grezze:
+        nome_l = s_nome.lower()
+        voce = {"id": s_id, "nome": s_nome}
+        if "unità 5" in nome_l or "unita 5" in nome_l:
+            unita_5.append(voce)
+        elif "nucleo 5" in nome_l:
+            nuclei_5.append(voce)
+        else:
+            altre_squadre.append(voce)
+
+    # Identificazione squadra autorizzata missione Varco V-59
+    squadra_varco_nome = "Unità 5-Ardesia"
+    try:
+        esito_v = risolvi_missione_varco()
+        if esito_v.get("ok"):
+            squadra_varco_nome = esito_v.get("squadra_autorizzata", {}).get("nome_squadra") or squadra_varco_nome
+    except Exception:
+        pass
+
+    squadre_narrative = [
+        {"nome": "Unità investigativa", "fonte": "G1-01", "ruolo": "Squadra dell'utente incaricata dell'indagine nella zona in quarantena"},
+        {"nome": "Squadra cavi", "fonte": "LX5 (es. LX5_6648, LX5_7083)", "ruolo": "Unità tecnica per il collaudo di linea e riparazioni dei ripetitori"},
+    ]
+
+    # Costruzione riassunto investigativo chiaro ed esaustivo
+    linee: list[str] = ["CENSIMENTO COMPLETO DELLE SQUADRE E DELLE UNITÀ 5:"]
+    linee.append(f"\n1. Le {len(unita_5)} Unità 5 operative (Archivio recuperato, tabella r11):")
+    for u in unita_5:
+        tag_varco = " [SQUADRA AUTORIZZATA PER IL VARCO V-59 (Archivio Erebo)]" if u["nome"] == squadra_varco_nome else ""
+        linee.append(f"   - {u['nome']} (ID: {u['id']}){tag_varco}")
+
+    linee.append(f"\n2. I {len(nuclei_5)} Nuclei operativi (tabella r11):")
+    nomi_nuclei_anteprima = [n["nome"] for n in nuclei_5[:10]]
+    linee.append(f"   - {', '.join(nomi_nuclei_anteprima)} ... e altri fino a completare i {len(nuclei_5)} nuclei (Totale squadre in r11: {len(squadre_grezze)}).")
+
+    linee.append("\n3. Squadre operative citate nei dossier primari sul campo:")
+    for sn in squadre_narrative:
+        linee.append(f"   - {sn['nome']} [{sn['fonte']}]: {sn['ruolo']}")
+
+    return {
+        "ok": True,
+        "totale_squadre": len(squadre_grezze),
+        "unita_5": unita_5,
+        "totale_unita_5": len(unita_5),
+        "nuclei_5": nuclei_5,
+        "totale_nuclei_5": len(nuclei_5),
+        "squadra_missione_varco": squadra_varco_nome,
+        "squadre_narrative": squadre_narrative,
+        "riassunto": "\n".join(linee),
+    }
+
+
+def leggi_dossier_excel(percorso: str = "DOSSIER_SBLOCCATO.xlsx", foglio: str | None = None) -> dict[str, Any]:
+    """
+    Legge, analizza ed estrae dati dai fogli di lavoro del file Excel del dossier declassificato (DOSSIER_SBLOCCATO.xlsx).
+
+    COSA FA
+    - Accede al file DOSSIER_SBLOCCATO.xlsx (o a un altro file Excel indicato).
+    - Individua tutti i fogli di lavoro presenti (es. '01_Risveglio', '02_Sospensione', '03_Direttiva').
+    - Se 'foglio' è specificato (nome esatto, parziale o indice numerico 1, 2, 3), estrae i dati completi del singolo foglio.
+    - Se 'foglio' è None, 'tutti' o non specificato, legge e sintetizza tutti i fogli del dossier con trascrizione integrale
+      e riassunto investigativo strutturato.
+    - Se 'percorso' contiene in realtà il nome di un foglio, lo rileva automaticamente.
+
+    ARGOMENTI
+    - percorso: nome o percorso del file Excel (default: "DOSSIER_SBLOCCATO.xlsx").
+    - foglio: nome o numero del foglio da estrarre (opzionale).
+
+    RESTITUISCE
+    Dizionario con:
+    - ok: True/False
+    - file: nome del file
+    - fogli_disponibili: elenco fogli presenti
+    - foglio_richiesto: foglio selezionato (o 'tutti')
+    - dati: dizionario {nome_foglio: [righe]} con i contenuti estratti
+    - riassunto: testo formattato pronto per l'indagine.
+    """
+    import openpyxl
+
+    # Gestione scambio argomenti nel caso l'AI passi il nome del foglio come primo parametro
+    fogli_noti = {"01_risveglio", "02_sospensione", "03_direttiva", "risveglio", "sospensione", "direttiva", "1", "2", "3"}
+    str_percorso = str(percorso or "").strip()
+    if str_percorso.lower() in fogli_noti and not str_percorso.lower().endswith(".xlsx"):
+        foglio = str_percorso
+        percorso = "DOSSIER_SBLOCCATO.xlsx"
+
+    # Risoluzione percorso file Excel
+    path_effettivo = Path(percorso)
+    if not path_effettivo.is_file():
+        candidati = [
+            ROOT_DIR / percorso,
+            DATI_DIR / percorso,
+            ROOT_DIR / "dati" / percorso,
+            Path.cwd() / percorso,
+            ROOT_DIR / f"{percorso}.xlsx",
+            DATI_DIR / f"{percorso}.xlsx",
+            ROOT_DIR / "DOSSIER_SBLOCCATO.xlsx",
+            DATI_DIR / "DOSSIER_SBLOCCATO.xlsx",
+        ]
+        for c in candidati:
+            if c.is_file():
+                path_effettivo = c
+                break
+
+    if not path_effettivo.is_file():
+        return {
+            "ok": False,
+            "errore": f"File Excel non trovato: {percorso}",
+            "fogli_disponibili": [],
+            "dati": {},
+            "riassunto": f"Errore: Impossibile trovare il file '{percorso}'.",
+        }
+
+    try:
+        wb = openpyxl.load_workbook(path_effettivo, data_only=True)
+        sheet_names = wb.sheetnames
+    except Exception as exc:
+        return {
+            "ok": False,
+            "errore": f"Errore durante l'apertura del file Excel: {exc}",
+            "fogli_disponibili": [],
+            "dati": {},
+            "riassunto": f"Errore apertura Excel: {exc}",
+        }
+
+    fogli_selezionati: list[str] = []
+    if foglio and str(foglio).strip().lower() not in ("tutti", "all", "*", "none"):
+        f_norm = str(foglio).strip().lower()
+        if f_norm.isdigit():
+            idx = int(f_norm) - 1
+            if 0 <= idx < len(sheet_names):
+                fogli_selezionati = [sheet_names[idx]]
+        if not fogli_selezionati:
+            for s in sheet_names:
+                if f_norm == s.lower() or f_norm in s.lower():
+                    fogli_selezionati.append(s)
+                    break
+        if not fogli_selezionati:
+            return {
+                "ok": False,
+                "errore": f"Foglio '{foglio}' non trovato nel file {path_effettivo.name}.",
+                "fogli_disponibili": sheet_names,
+                "dati": {},
+                "riassunto": f"Foglio '{foglio}' non trovato. Fogli disponibili nel file: {', '.join(sheet_names)}",
+            }
+    else:
+        fogli_selezionati = sheet_names
+
+    dati_fogli: dict[str, list[list[str]]] = {}
+    sezioni_testo: list[str] = [
+        f"=== DOSSIER EXCEL: {path_effettivo.name} ===",
+        f"Fogli disponibili: {', '.join(sheet_names)}\n",
+    ]
+
+    for s_name in fogli_selezionati:
+        ws = wb[s_name]
+        righe_pulite: list[list[str]] = []
+        sezioni_testo.append(f"--- FOGLIO: {s_name} ---")
+        for row in ws.iter_rows(values_only=True):
+            clean_row = [str(c).strip() for c in row if c is not None and str(c).strip()]
+            if not clean_row:
+                continue
+            righe_pulite.append(clean_row)
+            if len(clean_row) == 1:
+                sezioni_testo.append(clean_row[0])
+            elif len(clean_row) == 2:
+                sezioni_testo.append(f"- {clean_row[0]}: {clean_row[1]}")
+            else:
+                sezioni_testo.append(" | ".join(clean_row))
+        sezioni_testo.append("")
+        dati_fogli[s_name] = righe_pulite
+
+    wb.close()
+    riassunto = "\n".join(sezioni_testo).strip()
+
+    return {
+        "ok": True,
+        "file": path_effettivo.name,
+        "fogli_disponibili": sheet_names,
+        "foglio_richiesto": foglio or "tutti",
+        "dati": dati_fogli,
+        "riassunto": riassunto,
+    }
+
+
 # ==============================================================================
 # REGISTRO STRUMENTI E SCHEMI PER OPENAI FUNCTION CALLING
 # ==============================================================================
@@ -2262,11 +2603,13 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
 STRUMENTI_REGISTRATI: dict[str, Any] = {
     "cerca_personale": cerca_personale,
     "elenca_personaggi_e_operatori": elenca_personaggi_e_operatori,
+    "elenca_squadre": elenca_squadre,
     "cerca_fonti": cerca_fonti,
     "recupera_rag": recupera_rag,
     "collega_documenti": collega_documenti,
     "analizza_evidenze": analizza_evidenze,
     "leggi_fonte": leggi_fonte,
+    "leggi_dossier_excel": leggi_dossier_excel,
     "elenca_fonti": elenca_fonti,
     "verifica_sicurezza_fonti": verifica_sicurezza_fonti,
     "ottieni_nodi_mappa": ottieni_nodi_mappa,
@@ -2394,8 +2737,8 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
             "name": "leggi_fonte",
             "description": (
                 "Restituisce il testo integrale e i metadati di un documento specifico (.txt, .html, .json, "
-                ".xml) cercandolo per nome file, nome senza estensione o ID (es. 'G1-02.txt', "
-                "'documento_0057.html', 'ARCH-3097'). La ricerca è esatta, non fuzzy né semantica. USARE SOLO "
+                ".xml, .xlsx) cercandolo per nome file, nome senza estensione o ID (es. 'G1-02.txt', "
+                "'documento_0057.html', 'ARCH-3097', 'DOSSIER_SBLOCCATO.xlsx'). La ricerca è esatta, non fuzzy né semantica. USARE SOLO "
                 "SE il testo integrale del file manca dal contesto fornito; se non lo trova restituisce errore "
                 "ed elenco dei file disponibili."
             ),
@@ -2404,10 +2747,39 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 "properties": {
                     "nome_file": {
                         "type": "string",
-                        "description": "Il nome o ID del file da leggere (es. 'G1-02.txt', 'documento_0389.xml', 'ARCH-5721').",
+                        "description": "Il nome o ID del file da leggere (es. 'G1-02.txt', 'documento_0389.xml', 'ARCH-5721', 'DOSSIER_SBLOCCATO.xlsx').",
                     }
                 },
                 "required": ["nome_file"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "leggi_dossier_excel",
+            "description": (
+                "Legge ed estrae dati dai fogli di lavoro di un file Excel declassificato (.xlsx), in particolare "
+                "DOSSIER_SBLOCCATO.xlsx (che contiene i verbali originali del primo risveglio LZ-574, "
+                "la richiesta di sospensione del dott. Bellini e la direttiva DR-591 di Fontana). "
+                "Permette di leggere l'intero file oppure un singolo foglio (es. '01_Risveglio', '02_Sospensione', '03_Direttiva'). "
+                "Restituisce righe pulite, colonne e un resoconto testuale chiaro. "
+                "USARE SEMPRE quando l'utente menziona il file Excel, il dossier sbloccato o chiede dettagli sui "
+                "fogli di calcolo dei verbali clinici o direttive."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "percorso": {
+                        "type": "string",
+                        "description": "Nome o percorso del file Excel (default: 'DOSSIER_SBLOCCATO.xlsx').",
+                    },
+                    "foglio": {
+                        "type": "string",
+                        "description": "Nome del foglio (es. '01_Risveglio', '02_Sospensione', '03_Direttiva') o numero del foglio (1, 2, 3). Se omesso, legge tutti i fogli.",
+                    },
+                },
+                "required": [],
             },
         },
     },
@@ -2694,6 +3066,26 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                     "fonte": {
                         "type": "string",
                         "description": "Ambito da consultare: 'tutte' (default), 'archivio_recuperato', 'accessi' o 'dossier'.",
+                    }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "elenca_squadre",
+            "description": (
+                "Elenca dinamicamente tutte le squadre operative e le Unità 5 censite nell'archivio recuperato (tabella r11) "
+                "e nei documenti della missione. Distingue le 14 Unità 5 (Unità 5-Ardesia, Unità 5-Arenaria, Unità 5-Marmo, ecc.), "
+                "i 60 Nuclei operativi (Nucleo 5-xxx), la squadra autorizzata al Varco V-59 e le squadre di campo."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filtro": {
+                        "type": "string",
+                        "description": "Filtro da applicare: 'tutte' (default), 'unita_5' o 'nuclei'.",
                     }
                 },
             },

@@ -90,6 +90,27 @@ PAROLE_COMPLESSE: tuple[str, ...] = (
     "approfond",
     "cronologia",
     "elenca tutti",
+    "elenca tutt",
+    "elencami",
+    "tutte le persone",
+    "tutti i personaggi",
+    "tutto il personale",
+    "tutti gli operatori",
+    "tutti i file",
+    "nei file",
+    "tra i file",
+    "presenti nei file",
+    "censimento",
+    "panoramica",
+    "quali persone",
+    "chi sono le persone",
+    "squadr",
+    "quali squadre",
+    "che squadre",
+    "unità 5",
+    "unita 5",
+    "quale unità",
+    "quali unità",
     "focolaio",
     "causa",
     "colpevole",
@@ -203,7 +224,21 @@ def genera_risposta_ibrida(
 
     # Recupero RAG (Giorno 3 — Operazione Esumazione): cerca prima i pezzi utili nell'archivio
     # (inclusi i 1.005 file TXT, HTML, JSON, XML in dati/archivio/) e li unisce al contesto.
-    esito_rag = scegli_fonti_dettagliato(domanda, top_k=8)
+    # Se la domanda è un'istruzione di ricerca o follow-up ("trovalo facendo una ricerca", "cerca...", "chi era?"),
+    # arricchisce il contesto RAG con l'argomento della conversazione precedente per evitare rumore.
+    domanda_rag = domanda
+    if memoria:
+        q_clean = domanda.strip().lower()
+        parole_cmd = ("trova", "cerca", "ricerca", "deduci", "chi era", "e a che ora", "approfondisci", "spiegati", "dimmi", "non deve esserci scritto")
+        is_followup = len(domanda.split()) <= 4 or any(k in q_clean for k in parole_cmd)
+        if is_followup:
+            for item in reversed(memoria):
+                d_prev = (item.get("domanda") or "").strip()
+                if d_prev and d_prev.lower() != q_clean:
+                    domanda_rag = f"{d_prev} {domanda}"
+                    break
+
+    esito_rag = scegli_fonti_dettagliato(domanda_rag, top_k=8)
     fonti_rag = esito_rag["fonti"]
     file_recuperati_rag = esito_rag["file_recuperati"]
 
@@ -263,12 +298,11 @@ def genera_risposta_ibrida(
                 usa_gemini = True
             elif preferenza_cloud in {"nvidia", "openai"}:
                 usa_gemini = False
-            elif chiave_gem and not chiave_nvi:
+            elif chiave_gem:
+                # Preferisci Gemini quando disponibile (ha google.genai e REST fallback integrato)
                 usa_gemini = True
             elif chiave_nvi:
                 usa_gemini = False
-            elif chiave_gem:
-                usa_gemini = True
 
         contesto_coll = esito_rag.get("testo_collegamenti", "")
         try:
@@ -286,64 +320,103 @@ def genera_risposta_ibrida(
             except Exception:
                 pass
 
+        risposta = None
+        modello_cloud = None
+        motore_usato = "gemini" if usa_gemini else "cloud"
+
         if usa_gemini:
-            risposta = modello_gemini.genera_risposta(
-                domanda,
-                fonti_combinate,
-                api_key=api_key,
-                modello=modello,
-                usa_tools=usa_tools,
-                memoria=memoria,
-                contesto_collegamenti=contesto_coll,
-            )
-            modello_cloud = (
-                modello_gemini.ULTIMO_MODELLO_USATO
-                or modello
-                or os.environ.get("GEMINI_MODEL")
-                or valore_env("GEMINI_MODEL")
-                or MODELLO_GEMINI_DEFAULT
-            )
-            esito = {
-                "risposta": risposta,
-                "motore": "gemini",
-                "modello_usato": f"Gemini • {modello_cloud}",
-                "complessita": livello,
-                "motivo_routing": motivo,
-            }
-        else:
-            risposta = modello_openai.genera_risposta(
-                domanda,
-                fonti_combinate,
-                api_key=api_key,
-                modello=modello,
-                usa_tools=usa_tools,
-                memoria=memoria,
-                contesto_collegamenti=contesto_coll,
-            )
-            _, provider = stato_chiavi_api()
-            usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
-                not api_key and "NVIDIA" in provider
-            )
-            modello_cloud = (
-                modello_openai.ULTIMO_MODELLO_USATO
-                or modello
-                or (
-                    os.environ.get("NVIDIA_MODEL")
-                    or valore_env("NVIDIA_MODEL")
-                    or MODELLO_NVIDIA_DEFAULT
-                    if usa_nvidia
-                    else os.environ.get("OPENAI_MODEL")
-                    or valore_env("OPENAI_MODEL")
-                    or "gpt-4o-mini"
+            try:
+                risposta = modello_gemini.genera_risposta(
+                    domanda,
+                    fonti_combinate,
+                    api_key=api_key,
+                    modello=modello,
+                    usa_tools=usa_tools,
+                    memoria=memoria,
+                    contesto_collegamenti=contesto_coll,
                 )
+                modello_cloud = (
+                    modello_gemini.ULTIMO_MODELLO_USATO
+                    or modello
+                    or os.environ.get("GEMINI_MODEL")
+                    or valore_env("GEMINI_MODEL")
+                    or MODELLO_GEMINI_DEFAULT
+                )
+            except Exception as exc_gem:
+                print(f"(Avviso Gemini Cloud: {exc_gem}. Tentativo fallback locale...)")
+                risposta = None
+
+        if risposta is None and not usa_gemini:
+            try:
+                risposta = modello_openai.genera_risposta(
+                    domanda,
+                    fonti_combinate,
+                    api_key=api_key,
+                    modello=modello,
+                    usa_tools=usa_tools,
+                    memoria=memoria,
+                    contesto_collegamenti=contesto_coll,
+                )
+                _, provider = stato_chiavi_api()
+                usa_nvidia = (api_key and api_key.startswith("nvapi-")) or (
+                    not api_key and "NVIDIA" in provider
+                )
+                modello_cloud = (
+                    modello_openai.ULTIMO_MODELLO_USATO
+                    or modello
+                    or (
+                        os.environ.get("NVIDIA_MODEL")
+                        or valore_env("NVIDIA_MODEL")
+                        or MODELLO_NVIDIA_DEFAULT
+                        if usa_nvidia
+                        else os.environ.get("OPENAI_MODEL")
+                        or valore_env("OPENAI_MODEL")
+                        or "gpt-4o-mini"
+                    )
+                )
+                motore_usato = "nvidia" if usa_nvidia else "openai"
+            except Exception as exc_oa:
+                if chiave_gem:
+                    try:
+                        risposta = modello_gemini.genera_risposta(
+                            domanda,
+                            fonti_combinate,
+                            api_key=api_key,
+                            modello=modello,
+                            usa_tools=usa_tools,
+                            memoria=memoria,
+                            contesto_collegamenti=contesto_coll,
+                        )
+                        modello_cloud = (
+                            modello_gemini.ULTIMO_MODELLO_USATO
+                            or MODELLO_GEMINI_DEFAULT
+                        )
+                        motore_usato = "gemini"
+                    except Exception:
+                        risposta = None
+
+        # Fallback finale locale se nessun provider Cloud ha risposto
+        if risposta is None:
+            risposta = genera_risposta_locale(
+                domanda,
+                fonti_combinate,
+                memoria=memoria,
+                file_prioritari=file_recuperati_rag,
             )
-            esito = {
-                "risposta": risposta,
-                "motore": "cloud",
-                "modello_usato": f"{'NVIDIA' if usa_nvidia else 'OpenAI'} • {modello_cloud}",
-                "complessita": livello,
-                "motivo_routing": motivo,
-            }
+            motore_usato = "locale"
+            modello_cloud = (
+                MODELLO_LOCALE
+                if is_modello_caricato()
+                else "Estrattore locale deterministico (fallback da Cloud)"
+            )
+
+        esito = {
+            "risposta": risposta,
+            "motore": motore_usato,
+            "modello_usato": f"{motore_usato.capitalize()} • {modello_cloud}" if motore_usato != "locale" else modello_cloud,
+            "complessita": livello,
+            "motivo_routing": motivo,
+        }
 
     grounding = verifica_grounding_risposta(esito.get("risposta", ""), fonti_combinate)
     esito["fonti_citate"] = grounding["fonti_file"]

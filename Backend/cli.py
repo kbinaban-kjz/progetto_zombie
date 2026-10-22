@@ -35,6 +35,7 @@ try:
         risolvi_missione_varco,
         cerca_personale,
         elenca_personaggi_e_operatori,
+        leggi_dossier_excel,
     )
 except ImportError:
     from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
@@ -60,6 +61,7 @@ except ImportError:
         risolvi_missione_varco,
         cerca_personale,
         elenca_personaggi_e_operatori,
+        leggi_dossier_excel,
     )
 
 
@@ -77,6 +79,7 @@ def stampa_guida_comandi() -> None:
     print("  /sql <domanda>  : Esegue l'agente SQL mostrando QUERY, RISULTATO e SPIEGAZIONE")
     print("  /personale <n>  : Cerca operatori, tecnici e figure nei database e dossier (es. /personale Tina e Ugo)")
     print("  /personaggi     : Censimento dinamico completo del personale e delle figure operative")
+    print("  /dossier [foglio]: Legge il file Excel DOSSIER_SBLOCCATO.xlsx (es. /dossier, /dossier 01_Risveglio)")
     print("  /csv [sottocmd] : Accesso tabelle CSV e archivio recuperato (/csv elenca, /csv leggi, /csv cerca, /csv sql, /csv varco)")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
@@ -255,6 +258,13 @@ def avvia_cli() -> int:
 
         if cmd_lower.startswith("/personaggi"):
             esito = elenca_personaggi_e_operatori()
+            print("\n" + esito.get("riassunto", ""))
+            continue
+
+        if cmd_lower.startswith(("/dossier", "/excel")):
+            parti = domanda.split(maxsplit=1)
+            foglio_richiesto = parti[1].strip() if len(parti) > 1 else None
+            esito = leggi_dossier_excel(foglio=foglio_richiesto)
             print("\n" + esito.get("riassunto", ""))
             continue
 

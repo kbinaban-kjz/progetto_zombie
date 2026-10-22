@@ -19,7 +19,7 @@ NUOVI_DATI_DIR = ROOT_DIR / "new_dati"
 ARCHIVIO_DIR = DATI_DIR / "archivio" if (DATI_DIR / "archivio").is_dir() else ROOT_DIR / "archivio"
 # Pacchetto "imprevisti" del Giorno 3 (500 documenti LX5_*.txt): va unito all'archivio per il RAG
 IMPREVISTI_DIR = DATI_DIR / "dati_imprevisti_gg3"
-ESTENSIONI_SUPPORTATE =(".txt", ".html", ".json", ".xml")
+ESTENSIONI_SUPPORTATE = (".txt", ".html", ".json", ".xml", ".xlsx")
 MODELLO_EMBEDDING_RAG = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 # Assicura che la root e la cartella Backend siano nel PYTHONPATH

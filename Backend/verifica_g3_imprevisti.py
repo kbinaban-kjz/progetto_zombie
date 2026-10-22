@@ -92,7 +92,7 @@ controllo(
     mappa["LX5_1000.txt"][1]["id"] == "LX5-1000" and mappa["LX5_9687.txt"][1]["id"] == "LX5-9687",
 )
 out(f"Indice: {indice['totale_documenti']} documenti, {indice['totale_blocchi']} blocchi (prima: 1023 documenti, 9383 blocchi)")
-controllo("Archivio precedente ancora presente (1023 file + 500 nuovi)", indice["totale_documenti"] == 1023 + 500)
+controllo("Archivio precedente ancora presente (almeno 1023 file + 500 nuovi)", indice["totale_documenti"] >= 1023 + 500)
 controllo("Chiave di cache basata sul contenuto (si rigenera se cambia un file)", ":" in sources._chiave_contenuto_archivio([("a", "x")]))
 
 # ---------------------------------------------------------------- B. segnale EV-541

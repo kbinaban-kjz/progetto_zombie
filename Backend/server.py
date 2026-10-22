@@ -391,19 +391,22 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                     }
                 )
 
-            # Usa le fonti inviate dal client oppure quelle lette da disco
+            # Unisce le fonti inviate dal client con il dossier caricato da disco (per garantire accesso a tutti i file ed Excel)
+            fonti_disco = carica_fonti()
+            visti: set[str] = set()
+            fonti = []
             fonti_payload = payload.get("fonti")
             if isinstance(fonti_payload, list) and fonti_payload:
-                visti: set[str] = set()
-                fonti = []
                 for f in fonti_payload:
                     nome_f = str(f.get("nome", ""))
                     contenuto_f = str(f.get("contenuto", ""))
                     if nome_f and contenuto_f and nome_f not in visti:
                         visti.add(nome_f)
                         fonti.append((nome_f, contenuto_f))
-            else:
-                fonti = carica_fonti()
+            for nome_f, cont_f in fonti_disco:
+                if nome_f not in visti:
+                    visti.add(nome_f)
+                    fonti.append((nome_f, cont_f))
 
             api_key = (payload.get("api_key") or "").strip() or None
             modello = (payload.get("modello") or "").strip() or None

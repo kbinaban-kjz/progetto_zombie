@@ -188,13 +188,41 @@ def normalizza_testo_documento(nome: str, testo: str) -> str:
     return testo
 
 
+def leggi_documento_excel(path: str | Path) -> str:
+    """
+    Legge un documento Excel (.xlsx) formattando ciascun foglio come sezione di dossier.
+    Estrae titoli, verbali, orari, firme cliniche e direttive.
+    """
+    try:
+        import openpyxl
+        percorso = Path(path)
+        wb = openpyxl.load_workbook(percorso, data_only=True)
+        sezioni: list[str] = [f"DOSSIER EXCEL: {percorso.name}\n"]
+        for sname in wb.sheetnames:
+            sheet = wb[sname]
+            righe: list[str] = [f"### FOGLIO: {sname} ###"]
+            for row in sheet.iter_rows(values_only=True):
+                vals = [str(v).strip() for v in row if v is not None and str(v).strip()]
+                if vals:
+                    if len(vals) == 1:
+                        righe.append(vals[0])
+                    else:
+                        righe.append(f"{vals[0]}: {vals[1]}" if len(vals) == 2 else " | ".join(vals))
+            sezioni.append("\n".join(righe))
+        return "\n\n".join(sezioni)
+    except Exception as exc:
+        return f"Errore lettura Excel {path}: {exc}"
+
+
 def read_document(path: str | Path) -> str:
     """
-    Legge un documento da disco nei formati .txt, .html, .json, .xml.
+    Legge un documento da disco nei formati .txt, .html, .json, .xml, .xlsx.
     Compatibile con la funzione read_document(path) di RAG_base.ipynb,
-    con gestione migliorata di paragrafi HTML, entità e codifiche.
+    con gestione migliorata di paragrafi HTML, entità, codifiche e fogli Excel.
     """
     percorso = Path(path)
+    if percorso.suffix.lower() == ".xlsx":
+        return leggi_documento_excel(percorso)
     testo = percorso.read_text(encoding="utf-8", errors="replace")
     return normalizza_testo_documento(percorso.name, testo)
 
@@ -256,7 +284,7 @@ def carica_archivio_completo() -> list[tuple[str, str]]:
     percorsi_unici: dict[str, Path] = {}
     for cartella in cartelle:
         for p in sorted(cartella.iterdir()):
-            if p.is_file() and p.suffix.lower() in ESTENSIONI_SUPPORTATE:
+            if p.is_file() and p.suffix.lower() in ESTENSIONI_SUPPORTATE and not p.name.startswith(("~", ".")):
                 if p.name not in percorsi_unici:
                     percorsi_unici[p.name] = p
 
@@ -299,7 +327,7 @@ def carica_fonti(includi_wikipedia: bool = False) -> list[tuple[str, str]]:
     percorsi_base: dict[str, Path] = {}
     for cartella in cartelle_base:
         for p in sorted(cartella.iterdir()):
-            if p.is_file() and p.suffix.lower() in ESTENSIONI_SUPPORTATE:
+            if p.is_file() and p.suffix.lower() in ESTENSIONI_SUPPORTATE and not p.name.startswith(("~", ".")):
                 if p.name not in percorsi_base:
                     percorsi_base[p.name] = p
 
@@ -309,7 +337,7 @@ def carica_fonti(includi_wikipedia: bool = False) -> list[tuple[str, str]]:
     for cartella_arch in (ARCHIVIO_DIR, DATI_DIR / "archivio", ROOT_DIR / "archivio"):
         if cartella_arch.is_dir():
             for p in sorted(cartella_arch.iterdir()):
-                if not p.is_file() or p.suffix.lower() not in ESTENSIONI_SUPPORTATE:
+                if not p.is_file() or p.suffix.lower() not in ESTENSIONI_SUPPORTATE or p.name.startswith(("~", ".")):
                     continue
                 if p.name in percorsi_base or p.name in percorsi_archivio_lazzaro:
                     continue
