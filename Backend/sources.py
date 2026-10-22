@@ -225,18 +225,21 @@ def risolvi_cartella_dati() -> Path:
     return cartelle[0] if cartelle else DATI_DIR
 
 
-def _is_documento_dossier_lazzaro(nome: str, testo: str) -> bool:
+def is_documento_primario(nome: str, testo: str) -> bool:
     """
-    Determina se un file dell'archivio fa parte del dossier investigativo LAZZARO
-    (es. ARCH-xxxx / Dossier fittizio della simulazione LAZZARO) anziché del rumore enciclopedico Wikipedia.
+    Determina se un file fa parte del corpus primario dei documenti del caso
+    anziché delle voci enciclopediche esterne di rumore (es. Wikipedia).
+    Qualsiasi file operativo o di indagine (.txt, .html, .json, .xml) viene
+    considerato fonte primaria a meno che non provenga da un'enciclopedia esterna.
     """
     testo_lower = testo.lower()
-    if "wiki-" in testo_lower and "wikipedia.org" in testo_lower:
-        return False
-    if "arch-" in testo_lower or "simulazione lazzaro" in testo_lower:
-        return True
     nome_lower = nome.lower()
-    return nome_lower.startswith(("g1", "g2", "lx5"))
+    if "wikipedia.org" in testo_lower or nome_lower.startswith("wiki-") or "id: wiki-" in testo_lower:
+        return False
+    return True
+
+
+_is_documento_dossier_lazzaro = is_documento_primario
 
 
 def carica_archivio_completo() -> list[tuple[str, str]]:
@@ -311,9 +314,8 @@ def carica_fonti(includi_wikipedia: bool = False) -> list[tuple[str, str]]:
                 if p.name in percorsi_base or p.name in percorsi_archivio_lazzaro:
                     continue
                 try:
-                    # I file ARCH-* del laboratorio sono < 900 byte; controlliamo anche il contenuto
                     raw_text = p.read_text(encoding="utf-8", errors="replace")
-                    if _is_documento_dossier_lazzaro(p.name, raw_text):
+                    if is_documento_primario(p.name, raw_text):
                         percorsi_archivio_lazzaro[p.name] = p
                 except Exception:
                     continue
@@ -563,17 +565,62 @@ def _ottieni_embedder_rag() -> Any:
     return _embedder_rag
 
 
+def _stem_italiano(p: str) -> str:
+    """
+    Stemmer a regole per l'italiano (rimozione desinenze verbali, nominali e aggettivali).
+    Permette il matching morfologico generico (es. 'smentiscono'/'smentisce' -> 'sment',
+    'fermare'/'fermato' -> 'ferm', 'rifugi'/'rifugio' -> 'rifug', 'focolaio'/'focolai' -> 'focol')
+    senza dizionari o sinonimi hardcodati.
+    """
+    if len(p) <= 3:
+        return p
+    for suff in (
+        "izzazion", "izzazione", "izzazioni",
+        "trice", "trici", "menti", "mento", "mente",
+        "azion", "azione", "azioni", "atore", "atori",
+        "abili", "abile", "ibili", "ibile",
+        "arono", "erono", "irono", "avamo", "evamo", "ivamo",
+        "avano", "evano", "ivano", "assero", "essero",
+        "iscono", "endos", "andosi",
+        "ando", "endo", "ante", "anti",
+        "anza", "enze", "enza",
+        "ita", "ità",
+    ):
+        if p.endswith(suff) and len(p) - len(suff) >= 3:
+            p = p[: -len(suff)]
+            break
+    for suff in (
+        "isce", "isci", "isco", "sero", "vano",
+        "aro", "ero", "iro", "ato", "ata", "ati", "ate",
+        "ito", "ita", "iti", "ite", "uto", "uta", "uti", "ute",
+        "ivo", "iva", "ivi", "ive", "oso", "osa", "osi", "ose",
+        "ico", "ica", "ici", "iche", "are", "ere", "ire",
+        "aio", "aia", "aii", "aie",
+    ):
+        if p.endswith(suff) and len(p) - len(suff) >= 3:
+            p = p[: -len(suff)]
+            break
+    if len(p) >= 4 and p[-1] in "oaiue":
+        p = p[:-1]
+    return p
+
+
 def _tokenizza_rag(testo: str) -> list[str]:
-    """Estrae token alfanumerici e radici morfologiche per il matching ibrido BM25/TF-IDF."""
+    """Estrae token alfanumerici, radici morfologiche e prefissi per il matching ibrido BM25/TF-IDF."""
     parole = re.findall(r"[a-zàèéìòù0-9_-]+", testo.lower().replace("\u2019", "'"))
     tokens: list[str] = []
     for p in parole:
         if len(p) <= 1 or p in _STOPWORD_RAG:
             continue
         tokens.append(p)
-        # Aggiungi radice morfologica a 5 caratteri per l'italiano
-        if len(p) > 5 and not any(c.isdigit() for c in p):
-            tokens.append(p[:5])
+        if not any(c.isdigit() for c in p):
+            st = _stem_italiano(p)
+            if st != p and len(st) >= 3:
+                tokens.append(st)
+            if len(p) >= 4:
+                tokens.append(p[:4])
+            if len(p) >= 5:
+                tokens.append(p[:5])
     return tokens
 
 
@@ -680,7 +727,7 @@ def costruisci_indice_rag(forza_ricalcolo: bool = False) -> dict[str, Any]:
                     "chunk_index": idx_blocco,
                     "testo_blocco": frammento,
                     "tokens": tokens,
-                    "is_lazzaro": _is_documento_dossier_lazzaro(nome_file, testo),
+                    "is_primario": is_documento_primario(nome_file, testo),
                 }
             )
 
@@ -758,41 +805,8 @@ def scegli_fonti_dettagliato(
     q_lower = domanda.strip().lower().replace("\u2019", "'")
     q_tokens = _tokenizza_rag(q_lower)
 
-    # Espansione semantica mirata per sinonimi investigativi del dominio
-    sinonimi_dominio: dict[str, list[str]] = {
-        "rifugi": ["rifugi", "rifugio", "contagio", "circolare", "protezione", "lazzaro", "arch-1842"],
-        "rifugio": ["rifugi", "rifugio", "contagio", "circolare", "protezione", "lazzaro", "arch-1842"],
-        "fermare": ["fermare", "opposizione", "verbale", "nora", "ferri", "sabotatore", "rv753", "arch-3097"],
-        "fermato": ["fermare", "opposizione", "verbale", "nora", "ferri", "sabotatore", "rv753", "arch-3097"],
-        "opposto": ["fermare", "opposizione", "verbale", "nora", "ferri", "sabotatore", "rv753", "arch-3097"],
-        "opposizione": ["fermare", "opposizione", "verbale", "nora", "ferri", "rv753", "arch-3097"],
-        "materiale": ["materiale", "recupero", "contenitore", "lume", "rv753", "forte", "cenere", "settore", "d6", "planimetria"],
-        "recupero": ["materiale", "recupero", "contenitore", "lume", "rv753", "forte", "cenere", "settore", "d6", "planimetria"],
-        "deposito": ["deposito", "depositi", "forte", "cenere", "darsena", "vuota", "settore", "d6", "a1", "planimetria", "trasferimento"],
-        "settore": ["settore", "d6", "a1", "forte", "cenere", "darsena", "planimetria"],
-        "pratica": ["pratica", "rv753", "nora", "ferri", "lume", "forte", "cenere"],
-        "lume": ["lume", "contenitore", "rv753", "forte", "cenere", "d6", "arch-5721"],
-        "autorizzazione": ["autorizzazione", "database", "accessi", "valida", "rv753", "lume", "arch-5721"],
-        "accessi": ["autorizzazione", "database", "accessi", "valida", "rv753", "lume", "arch-5721"],
-        "archivio": ["arch-1842", "arch-3097", "arch-5721", "arch-6408", "arch-8254", "simulazione", "lazzaro"],
-        # Il "primo focolaio" è descritto nei registri come "primo allarme": senza questa
-        # equivalenza il riassunto della centrale (G2-03) scavalca il registro originale (G2-01).
-        "focolaio": ["focolaio", "allarme", "san", "mauro", "g2-01", "registri", "originali"],
-        "scoppiato": ["focolaio", "allarme", "san", "mauro", "g2-01", "registri", "originali"],
-        "scoppi": ["focolaio", "allarme", "san", "mauro", "g2-01", "registri", "originali"],
-        "prove": ["prova", "prove", "registri", "originali", "orari", "allarme", "g2-01", "g2-05", "g2-06"],
-        "prova": ["prova", "prove", "registri", "originali", "orari", "allarme", "g2-01", "g2-05", "g2-06"],
-        "smentiscono": ["smentisce", "contraddice", "registri", "originali", "orari", "allarme", "g2-01"],
-        "smentisce": ["smentiscono", "contraddice", "registri", "originali", "orari", "allarme", "g2-01"],
-        "versione": ["versione", "riassunto", "centrale", "registri", "originali", "prove"],
-    }
+    # Espansione morfologica della query (generica, basata su stemming e radici, senza dizionari hardcodati)
     tokens_espansi = list(q_tokens)
-    for t in q_tokens:
-        for chiave_sin, valori_sin in sinonimi_dominio.items():
-            if t.startswith(chiave_sin[:5]):
-                for vs in valori_sin:
-                    if vs not in tokens_espansi:
-                        tokens_espansi.append(vs)
 
     # Calcolo score denso se vettori SentenceTransformer sono presenti
     scores_dense = None
@@ -823,21 +837,21 @@ def scegli_fonti_dettagliato(
         re.search(r"\bwiki|wikipedia|encicloped|voce enciclopedica", q_lower)
     ) or any(c.startswith("WIKI-") for c in citazioni_esplicite)
 
-    ha_match_lazzaro_solido = False
+    ha_match_primario_solido = False
     if not chiede_wikipedia:
         for mb in meta_blocchi:
-            if mb["is_lazzaro"]:
+            if mb.get("is_primario", True):
                 comuni = [t for t in q_tokens if t in mb["tokens"]]
                 if comuni:
                     sc_quick = sum(idf.get(t, 2.0) for t in comuni)
                     if sc_quick >= 7.0:
-                        ha_match_lazzaro_solido = True
+                        ha_match_primario_solido = True
                         break
 
     def blocco_ammesso(mb: dict[str, Any]) -> bool:
-        if mb["is_lazzaro"]:
+        if mb.get("is_primario", True):
             return True
-        return chiede_wikipedia or not ha_match_lazzaro_solido
+        return chiede_wikipedia or not ha_match_primario_solido
 
     def calcola_punteggi(tokens_extra: Sequence[str], is_feedback: bool = False) -> list[tuple[float, int]]:
         """Punteggio lessicale + semantico sui blocchi ammessi (una sola implementazione)."""
@@ -865,8 +879,8 @@ def scegli_fonti_dettagliato(
                     peso_espansione = 0.25 if is_feedback else 0.65
                     score += idf.get(t, 1.5) * peso_espansione
 
-            # 3. Bonus se il documento appartiene al dossier operativo LAZZARO (non Wikipedia)
-            if mb["is_lazzaro"] and score > 0 and not chiede_wikipedia:
+            # 3. Bonus per i documenti del dossier primario (non voci enciclopediche esterne)
+            if mb.get("is_primario", True) and score > 0 and not chiede_wikipedia:
                 score *= 1.45
 
             # 4. Integrazione con score semantico SentenceTransformer (se disponibile).
@@ -954,63 +968,84 @@ def scegli_fonti_dettagliato(
                 }
             )
         if nome_f not in visti_file and len(file_scelti) < top_k:
-            # Evita di includere il documento ostile G2-04 a meno che non sia citato esplicitamente
-            testo_doc, _ = mappa_doc[nome_f]
-            if rileva_istruzioni_ostili(testo_doc) and "G2-04" not in citazioni_esplicite and "ostil" not in q_lower and "manomess" not in q_lower and "attacc" not in q_lower and "sospett" not in q_lower:
+            # Evita di includere documenti che simulano istruzioni ostili a meno che non siano citati esplicitamente
+            testo_doc, meta_doc = mappa_doc[nome_f]
+            id_norm_doc = str(meta_doc.get("id", "")).upper().replace("_", "-")
+            stem_norm_doc = Path(nome_f).stem.upper().replace("_", "-")
+            if (
+                rileva_istruzioni_ostili(testo_doc)
+                and id_norm_doc not in citazioni_esplicite
+                and stem_norm_doc not in citazioni_esplicite
+                and not any(k in q_lower for k in ("ostil", "manomess", "attacc", "sospett", "sicurezza", "iniezione", "injection"))
+            ):
                 continue
             visti_file.add(nome_f)
             file_scelti.append(nome_f)
             fonti_scelte.append((nome_f, testo_doc))
 
-    # Multi-Hop: se tra i file recuperati compaiono entità ponte dell'archivio (es. RV753, LUME, Forte Cenere),
-    # collega automaticamente i documenti correlati della catena investigativa!
+    # Multi-Hop dinamico e generico (nessun codice o ID hardcodato):
+    # 1. Analisi a salti tra entità-ponte e codici specifici presenti nei documenti recuperati
+    # 2. Percorso più breve calcolato con BFS tra le entità richieste nella domanda
     if includi_multi_hop and fonti_scelte:
-        testo_aggregato = " ".join(t for _, t in fonti_scelte).lower()
-        ponti = []
-        if "rv753" in testo_aggregato or "materiale di recupero" in testo_aggregato or "lume" in testo_aggregato or "forte cenere" in testo_aggregato or "darsena vuota" in testo_aggregato:
-            ponti.extend(["ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"])
-        if "rifugi" in testo_aggregato and ("contagio" in q_lower or "archivio" in q_lower or "successo nei rifugi" in q_lower):
-            ponti.append("ARCH-1842")
-        if "m562" in testo_aggregato or "k591" in testo_aggregato or "custodia schermata" in testo_aggregato or "ricambio" in testo_aggregato or ("nebbia" in q_lower and ("modulo" in q_lower or "custodia" in q_lower or "ricambio" in q_lower)):
-            ponti.extend(["LX5-2398", "LX5-1221", "LX5-1749"])
-        if "ev-541" in testo_aggregato or "ev-541" in q_lower or "segnale di evacuazione" in q_lower or "circuito cn" in q_lower:
-            ponti.extend(["LX5-2775", "LX5-8820"])
+        RE_CODICE_MH = re.compile(r"(?<![\w-])([A-Za-z]{1,5}[-_]?\d{2,6})(?![\w-])")
+        RE_NOME_MH = re.compile(r"\b[A-Z][a-zàèéìòù]+(?:\s+[A-Z][a-zàèéìòù]+)+\b")
+        STOP_MH = {"dossier fittizio", "materiale originale", "repubblica italiana", "stati uniti"}
 
-        for cod_ponte in ponti:
-            f_ponte = mappa_id.get(cod_ponte)
-            if f_ponte and f_ponte not in visti_file and f_ponte in mappa_doc:
-                testo_p, meta_p = mappa_doc[f_ponte]
-                visti_file.add(f_ponte)
-                file_scelti.append(f_ponte)
-                fonti_scelte.append((f_ponte, testo_p))
-                blocchi_scelti.append(
-                    {
-                        "file": f_ponte,
-                        "id": meta_p["id"],
-                        "titolo": meta_p["titolo"],
-                        "formato": meta_p["formato"],
-                        "fase": meta_p["fase"],
-                        "score": 9.99,
-                        "blocco": testo_p,
-                        "multi_hop": True,
-                    }
-                )
+        for _ in range(2):
+            nuovi_hop: list[tuple[str, str]] = []
+            for _, t_base in list(fonti_scelte)[:6]:
+                entita_da_esplorare: set[tuple[str, bool]] = set()
+                for m_c in RE_CODICE_MH.finditer(t_base):
+                    c_val = m_c.group(1).upper().replace("_", "-")
+                    if any(ch.isdigit() for ch in c_val) and not c_val.startswith(("WIKI", "DOC")):
+                        entita_da_esplorare.add((c_val, True))
+                for m_n in RE_NOME_MH.finditer(t_base):
+                    n_val = m_n.group(0).strip()
+                    if len(n_val) > 4 and n_val.lower() not in STOP_MH:
+                        entita_da_esplorare.add((n_val, False))
 
-    # Multi-Hop generico (non limitato alla catena RV753): se due entità citate nella domanda
-    # sono collegate da un percorso di documenti che condividono codici/nomi/orari, si aggiungono
-    # i documenti del percorso. È il meccanismo che collega, per esempio, Nora Ferri -> LUME.
-    analisi_collegamenti = {"collegamenti": [], "percorso": None, "testo": ""}
-    if includi_multi_hop and fonti_scelte:
-        analisi_collegamenti = modulo_collegamenti.analizza_collegamenti(domanda, fonti_scelte)
-        percorso = analisi_collegamenti.get("percorso")
-        if percorso:
-            for passo in percorso.get("passi", []):
+                for ent_v, is_c in entita_da_esplorare:
+                    pat_v = rf"(?<![\w-]){re.escape(ent_v)}(?![\w-])" if is_c else rf"\b{re.escape(ent_v)}\b"
+                    collegati_trovati = []
+                    for fn_cand, (t_cand, m_cand) in mappa_doc.items():
+                        if fn_cand not in visti_file and re.search(pat_v, t_cand, re.IGNORECASE):
+                            if not chiede_wikipedia and str(m_cand["id"]).upper().startswith("WIKI-"):
+                                continue
+                            collegati_trovati.append(fn_cand)
+                    # Collega i documenti dell'archivio se l'entità è specifica (non onnipresente)
+                    if 1 <= len(collegati_trovati) <= 6:
+                        for f_p in collegati_trovati:
+                            if f_p not in visti_file:
+                                visti_file.add(f_p)
+                                file_scelti.append(f_p)
+                                t_p, meta_p = mappa_doc[f_p]
+                                nuovi_hop.append((f_p, t_p))
+                                blocchi_scelti.append(
+                                    {
+                                        "file": f_p,
+                                        "id": meta_p["id"],
+                                        "titolo": meta_p["titolo"],
+                                        "formato": meta_p["formato"],
+                                        "fase": meta_p["fase"],
+                                        "score": 9.95,
+                                        "blocco": t_p,
+                                        "multi_hop": True,
+                                        "ponte": ent_v,
+                                    }
+                                )
+            if not nuovi_hop:
+                break
+            fonti_scelte.extend(nuovi_hop)
+
+        # Percorso globale BFS su tutte le fonti primarie tra entità citate nella domanda
+        fonti_primarie = [(k, v[0]) for k, v in mappa_doc.items() if not str(v[1]["id"]).upper().startswith("WIKI-")]
+        percorso_globale = modulo_collegamenti.percorso_collegamento(domanda, fonti_primarie)
+        if percorso_globale:
+            for passo in percorso_globale.get("passi", []):
                 f_ponte = passo.get("file")
                 if not f_ponte or f_ponte in visti_file or f_ponte not in mappa_doc:
                     continue
                 testo_p, meta_p = mappa_doc[f_ponte]
-                if not chiede_wikipedia and str(meta_p["id"]).upper().startswith("WIKI-"):
-                    continue
                 visti_file.add(f_ponte)
                 file_scelti.append(f_ponte)
                 fonti_scelte.append((f_ponte, testo_p))
@@ -1027,8 +1062,10 @@ def scegli_fonti_dettagliato(
                         "ponte": passo.get("ponte"),
                     }
                 )
-            # Ricalcola i collegamenti includendo anche i documenti appena aggiunti.
-            analisi_collegamenti = modulo_collegamenti.analizza_collegamenti(domanda, fonti_scelte)
+
+        analisi_collegamenti = modulo_collegamenti.analizza_collegamenti(domanda, fonti_scelte)
+    else:
+        analisi_collegamenti = {"collegamenti": [], "percorso": None, "testo": ""}
 
     # Fallback se la query non ha match specifici (es. saluti o domande generali sulla missione)
     if not fonti_scelte:
@@ -1194,8 +1231,8 @@ def cerca_in_fonti(
         testo_ricerca = f"{nome} {meta['id']} {meta['titolo']} {meta['corpo']}".lower()
         occorrenze = sum(testo_ricerca.count(p) for p in parole_chiave)
         if occorrenze > 0:
-            # Dai priorità ai documenti operativi Lazzaro rispetto alle voci Wikipedia generiche
-            bonus_lazzaro = 10 if _is_documento_dossier_lazzaro(nome, testo) else 0
+            # Dai priorità ai documenti operativi del dossier rispetto alle voci enciclopediche generiche
+            bonus_primario = 10 if is_documento_primario(nome, testo) else 0
             risultati.append(
                 {
                     "file": nome,
@@ -1204,7 +1241,7 @@ def cerca_in_fonti(
                     "formato": meta["formato"],
                     "fase": meta["fase"],
                     "estratto": meta["corpo"][:220] + ("..." if len(meta["corpo"]) > 220 else ""),
-                    "rilevanza": occorrenze + bonus_lazzaro,
+                    "rilevanza": occorrenze + bonus_primario,
                     "sospetto": bool(rileva_istruzioni_ostili(testo)),
                 }
             )

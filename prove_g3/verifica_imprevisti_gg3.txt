@@ -12,7 +12,7 @@ Indice: 1523 documenti, 10366 blocchi (prima: 1023 documenti, 9383 blocchi)
 == B. SEGNALE EV-541, GIORNO OPERATIVO 03 ==
 
 DOMANDA: Nel giorno operativo 03, quale ripetitore e quale circuito usare per il segnale EV-541? Quante conferme realmente indipendenti avete?
-File recuperati dal RAG: LX5_8820.txt, LX5_2775.txt, LX5_4279.txt, LX5_4739.txt, LX5_1105.txt, LX5_6484.txt, LX5_8386.txt, LX5_8429.txt
+File recuperati dal RAG: LX5_8820.txt, LX5_2775.txt, LX5_4279.txt, LX5_4739.txt, LX5_1731.txt, LX5_4956.txt, LX5_8250.txt, LX5_1105.txt
 Risposta:
   Analisi evidenze per il segnale EV-541 (giorno operativo 03):
   • Da usare: Ripetitore Pietra, circuito CN-58.
@@ -34,20 +34,20 @@ Risposta:
 == C. BRANI RECUPERATI E RICERCA RIPETUTA CON UNA DOMANDA DIVERSA ==
 
 BRANI RECUPERATI dal RAG per: Nel giorno operativo 03, quale ripetitore e quale circuito usare per il segnale EV-541? Quante conferme realmente indipendenti avete?
-  * LX5_8820.txt [LX5-8820] score=126.093: id: LX5-8820 title: Rettifica tecnica — giorno operativo 03, ore 08:30 text: Oggetto: bollettino B-517 e segnale EV-541. Il bollettino usa lo stato del giorno precedente. Oggi Ripetitore Salice è fuori servizio e non può trasmettere. Usare 
-  * LX5_2775.txt [LX5-2775] score=109.422: id: LX5-2775 title: Collaudo di linea — giorno operativo 03, ore 08:20 text: Segnale di prova: EV-541. Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione. Ripetitore Pietra: alimentazione presente; circuito CN-58; in
-  * LX5_4279.txt [LX5-4279] score=99.674: id: LX5-4279 title: Scheda di reparto — giorno operativo 03, ore 06:35 text: Intervento presso Ripetitore Pietra, circuito AUX-5-035. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
-  * LX5_4739.txt [LX5-4739] score=99.674: id: LX5-4739 title: Scheda di reparto — giorno operativo 03, ore 06:24 text: Intervento presso Ripetitore Pietra, circuito AUX-5-034. Il presidio sotterraneo ha sostituito un connettore del pannello locale. Il circuito serve la comunicazion
-  * LX5_1105.txt [LX5-1105] score=98.773: id: LX5-1105 title: Scheda di reparto — giorno operativo 03, ore 06:03 text: Intervento presso Ripetitore Pietra, circuito AUX-5-043. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
-  * LX5_6484.txt [LX5-6484] score=98.773: id: LX5-6484 title: Scheda di reparto — giorno operativo 03, ore 06:46 text: Intervento presso Ripetitore Pietra, circuito AUX-5-036. Il unità portatile ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione int
-  * LX5_8386.txt [LX5-8386] score=98.773: id: LX5-8386 title: Scheda di reparto — giorno operativo 03, ore 06:13 text: Intervento presso Ripetitore Pietra, circuito AUX-5-033. Il servizio trasporti ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
-  * LX5_8429.txt [LX5-8429] score=98.773: id: LX5-8429 title: Scheda di reparto — giorno operativo 03, ore 06:19 text: Intervento presso Ripetitore Pietra, circuito AUX-5-039. Il squadra cavi ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione intern
-  (+ 79 copie inoltrate dello stesso bollettino, non ripetute)
+  * LX5_8820.txt [LX5-8820] score=249.101: id: LX5-8820 title: Rettifica tecnica — giorno operativo 03, ore 08:30 text: Oggetto: bollettino B-517 e segnale EV-541. Il bollettino usa lo stato del giorno precedente. Oggi Ripetitore Salice è fuori servizio e non può trasmettere. Usare 
+  * LX5_2775.txt [LX5-2775] score=187.748: id: LX5-2775 title: Collaudo di linea — giorno operativo 03, ore 08:20 text: Segnale di prova: EV-541. Ripetitore Salice: alimentazione assente; invio fallito; nessuna ricezione. Ripetitore Pietra: alimentazione presente; circuito CN-58; in
+  * LX5_4279.txt [LX5-4279] score=179.159: id: LX5-4279 title: Scheda di reparto — giorno operativo 03, ore 06:35 text: Intervento presso Ripetitore Pietra, circuito AUX-5-035. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
+  * LX5_4739.txt [LX5-4739] score=179.159: id: LX5-4739 title: Scheda di reparto — giorno operativo 03, ore 06:24 text: Intervento presso Ripetitore Pietra, circuito AUX-5-034. Il presidio sotterraneo ha sostituito un connettore del pannello locale. Il circuito serve la comunicazion
+  * LX5_1731.txt [LX5-1731] score=177.994: id: LX5-1731 title: Scheda di reparto — giorno operativo 03, ore 07:48 text: Intervento presso Ripetitore Pietra, circuito AUX-5-058. Il presidio sotterraneo ha sostituito un connettore del pannello locale. Il circuito serve la comunicazion
+  * LX5_4956.txt [LX5-4956] score=177.994: id: LX5-4956 title: Scheda di reparto — giorno operativo 03, ore 08:06 text: Intervento presso Ripetitore Pietra, circuito AUX-5-076. Il unità portatile ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione int
+  * LX5_8250.txt [LX5-8250] score=177.994: id: LX5-8250 title: Scheda di reparto — giorno operativo 03, ore 08:33 text: Intervento presso Ripetitore Pietra, circuito AUX-5-073. Il servizio trasporti ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
+  * LX5_1105.txt [LX5-1105] score=176.372: id: LX5-1105 title: Scheda di reparto — giorno operativo 03, ore 06:03 text: Intervento presso Ripetitore Pietra, circuito AUX-5-043. Il magazzino di linea ha sostituito un connettore del pannello locale. Il circuito serve la comunicazione 
+  (+ 80 copie inoltrate dello stesso bollettino, non ripetute)
 [OK] Il RAG recupera collaudo e rettifica (misura diretta + correzione)
 [OK] Le copie non saturano i risultati (max 1 copia inoltrata tra i file recuperati)
 
 DOMANDA: Ripetitore Salice è attivo per EV-541 oggi? Chi lo conferma davvero?
-File recuperati dal RAG: LX5_5851.txt, LX5_8820.txt, LX5_2775.txt, LX5_8823.txt, LX5_2549.txt, LX5_1122.txt, LX5_1951.txt, LX5_1994.txt
+File recuperati dal RAG: LX5_5851.txt, LX5_8820.txt, LX5_2775.txt, LX5_8823.txt, LX5_2549.txt, LX5_1122.txt, LX5_1951.txt, LX5_1994.txt, LX5_1001.txt
 Risposta:
   Analisi evidenze per il segnale EV-541:
   • Da usare: Ripetitore Pietra, circuito CN-58.
@@ -59,7 +59,7 @@ Risposta:
 [OK] Domanda diversa, stessa conclusione: Salice non va usato, serve Pietra CN-58
 
 DOMANDA: Quale circuito CN trasmette il segnale di evacuazione nel giorno operativo 03?
-File recuperati dal RAG: LX5_4279.txt, LX5_4739.txt, LX5_1105.txt, LX5_6484.txt, LX5_8386.txt, LX5_8429.txt, LX5_9780.txt, LX5_1731.txt, LX5_2775.txt, LX5_8820.txt
+File recuperati dal RAG: LX5_8250.txt, LX5_8386.txt, LX5_3378.txt, LX5_4090.txt, LX5_6094.txt, LX5_9479.txt, LX5_4279.txt, LX5_4739.txt
 Risposta:
   Analisi evidenze per il segnale EV-541 (giorno operativo 03):
   • Da usare: Ripetitore Pietra, circuito CN-58.
@@ -73,7 +73,7 @@ Risposta:
 == D. CUSTODIA SCHERMATA DEL CORRIERE NEBBIA, GIORNO OPERATIVO 03 ==
 
 DOMANDA: Dove si trova il modulo nella custodia schermata consegnata dal corriere Nebbia nel giorno operativo 03? Ricostruite i passaggi fino ad armadio e settore.
-File recuperati dal RAG: LX5_2398.txt, LX5_2754.txt, LX5_1351.txt, LX5_1783.txt, LX5_8592.txt, LX5_3062.txt, LX5_7475.txt, LX5_8210.txt, LX5_1221.txt, LX5_1749.txt
+File recuperati dal RAG: LX5_1351.txt, LX5_1783.txt, LX5_2398.txt, LX5_2754.txt, LX5_8592.txt, LX5_3062.txt, LX5_7475.txt, LX5_8210.txt, LX5_1221.txt
 Risposta:
   Ricostruzione a più documenti (RAG a salti successivi):
   1. [LX5-2398] (LX5_2398.txt): Il corriere con nome operativo Nebbia ha consegnato una custodia schermata. La presa in carico è registrata nella pratica M562.
@@ -87,10 +87,10 @@ Risposta:
 
 PASSI DELLA CATENA (domande successive e brani usati):
   Salto 0: domanda -> Dove si trova il modulo nella custodia schermata consegnata dal corriere Nebbia nel giorno operativo 03? Ricostruite i passaggi fino ad armadio e settore.
-    RAG: LX5_2398.txt, LX5_2754.txt, LX5_1351.txt, LX5_1783.txt, LX5_8592.txt ...
+    RAG: LX5_1351.txt, LX5_1783.txt, LX5_2398.txt, LX5_2754.txt, LX5_8592.txt ...
     scelto: LX5_2398.txt | brano: Il corriere con nome operativo Nebbia ha consegnato una custodia schermata. La presa in carico è registrata nella pratica M562.
   Salto 1: domanda -> Cosa riporta la pratica M562? Contenuto e lotto del trasferimento.
-    RAG: LX5_1221.txt, documento_0389.xml, LX5_2398.txt, documento_0023.txt, LX5_1567.txt ...
+    RAG: LX5_1221.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt ...
     scelto: LX5_1221.txt | brano: Pratica M562: lotto K591; contenuto: modulo di ricambio per radio secondaria; trasferimento completato.
   Salto 2: domanda -> Dove è stato ricevuto il lotto K591? Collocazione fisica: settore e armadio.
     RAG: LX5_1749.txt, LX5_1221.txt, LX5_2660.txt, LX5_7687.txt, LX5_8548.txt ...
@@ -102,7 +102,7 @@ PASSI DELLA CATENA (domande successive e brani usati):
 [OK] Nessun passo usa Officina Cenotafio / settore Z9 / armadio 1 (lotto K519 del corriere Eco)
 
 DOMANDA: Recuperate un canale di evacuazione e localizzate un ricambio radio.
-File recuperati dal RAG: documento_0389.xml, documento_0421.json, LX5_1221.txt, documento_0057.html, LX5_1229.txt, LX5_1854.txt, LX5_2083.txt, LX5_2328.txt, documento_0023.txt, LX5_2398.txt, LX5_1749.txt
+File recuperati dal RAG: LX5_1221.txt, LX5_1229.txt, LX5_1854.txt, LX5_2083.txt, LX5_2328.txt, LX5_2444.txt, LX5_2794.txt, LX5_2929.txt, LX5_1749.txt, LX5_2398.txt
 Risposta:
   Analisi evidenze per il segnale EV-541:
   • Da usare: Ripetitore Pietra, circuito CN-58.
@@ -124,7 +124,7 @@ Risposta:
 == E. DOMANDA SENZA RISPOSTA ==
 
 DOMANDA: Qual è il nome civile del corriere Nebbia?
-File recuperati dal RAG: LX5_2398.txt, LX5_1351.txt, LX5_1395.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, LX5_1783.txt, LX5_1221.txt, LX5_1749.txt
+File recuperati dal RAG: LX5_2398.txt, LX5_1351.txt, LX5_1395.txt, LX5_1567.txt, LX5_1642.txt, LX5_1669.txt, LX5_1733.txt, LX5_1783.txt, LX5_1221.txt
 Risposta:
   Non documentato nelle fonti disponibili: [LX5-2398] (LX5_2398.txt) dichiara espressamente: «Il nome civile e la destinazione non sono riportati.»
 [OK] Dichiara 'non documentato' citando LX5-2398 e non inventa un nome
@@ -132,23 +132,23 @@ Risposta:
 == F. REGRESSIONE: DOMANDE GIÀ RIUSCITE PRIMA DELLA MODIFICA, RIPETUTE DOPO ==
 
 DOMANDA: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per proteggere il materiale?
-File recuperati dal RAG: documento_0057.html, documento_0421.json, documento_0389.xml, documento_0523.txt, documento_0023.txt, LX5_1213.txt, LX5_1614.txt, LX5_1756.txt, LX5_2398.txt, LX5_1221.txt, LX5_1749.txt
+File recuperati dal RAG: documento_0057.html, documento_0421.json, documento_0523.txt, documento_0389.xml, documento_0023.txt, LX5_1213.txt, LX5_7461.txt, LX5_7639.txt, G1-02.txt, G2-02.txt, G2-03.txt
 Risposta:
   Verbale di opposizione: Nora Ferri ha chiesto di fermare il progetto e avvertire i cittadini. Per proteggere il materiale di recupero ha aperto la pratica RV753. [ARCH-3097] (documento_0057.html)
-  Circolare interna sui rifugi: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. Le persone sono state attirate con messaggi di protezione. [ARCH-1842] (documento_0523.txt)
   Planimetria depositi: Il deposito Forte Cenere usa il settore D6 per il materiale di recupero. Al prossimo controllo serviranno nome della persona, deposito, settore e pratica. [ARCH-6408] (documento_0421.json)
+  Circolare interna sui rifugi: Il progetto LAZZARO ha usato i rifugi per estendere il contagio. Le persone sono state attirate con messaggi di protezione. [ARCH-1842] (documento_0523.txt)
 [OK] Ancora corretta: Quale persona si è opposta al progetto LAZZARO aprendo una pratica per...
 
 DOMANDA: Dove è scoppiato il primo focolaio e a che ora?
-File recuperati dal RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, G2-01.txt, G1-02.txt, G2-07.txt, G2-06.txt, G2-02.txt
+File recuperati dal RAG: G2-03.txt, documento_0523.txt, LX5_2549.txt, G2-01.txt, G1-02.txt, G2-02.txt, documento_0057.html, G2-04.txt, G2-06.txt, G2-05.txt
 Risposta:
   Ore 01:12. Primo allarme registrato nel laboratorio San Mauro. [G2-01]
 [OK] Ancora corretta: Dove è scoppiato il primo focolaio e a che ora?...
 
 DOMANDA: Qual è l'autorizzazione ancora valida nel database degli accessi per il contenitore LUME?
-File recuperati dal RAG: documento_0389.xml, documento_0421.json, documento_0523.txt, LX5_1264.txt, documento_0057.html, LX5_1221.txt, LX5_1151.txt, LX5_1889.txt, documento_0023.txt, LX5_2398.txt, LX5_1749.txt
+File recuperati dal RAG: documento_0389.xml, documento_0523.txt, LX5_1264.txt, LX5_1062.txt, LX5_1151.txt, LX5_1889.txt, LX5_1951.txt, LX5_1994.txt, documento_0421.json, documento_0057.html, G2-03.txt, G2-04.txt
 Risposta:
-  Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica di consultare la planimetria per il settore e il database degli accessi per l'autorizzazione ancora valida relativa alla pratica RV753 (contenitore LUME presso il deposito Forte Cenere), ma il database degli accessi e il nome di chi ha autorizzato non sono presenti tra i file dell'archivio.
+  Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica: «Consultare la planimetria per il settore e il database degli accessi per l’autorizzazione ancora valida.», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio.
 [OK] Ancora corretta: Qual è l'autorizzazione ancora valida nel database degli accessi per i...
 
 Risultato: 28/28 controlli superati

@@ -359,7 +359,8 @@ def formatta_collegamenti(
     righe: list[str] = []
     if percorso:
         catena = " -> ".join(
-            f"[{p['id']}] ({p['file']})" + (f" --{p['ponte']}--" if i else "")
+            f"[{p['id']}] ({p['file']})"
+            + (f" --{p['ponte'].upper() if any(c.isdigit() for c in p['ponte']) else p['ponte']}--" if i else "")
             for i, p in enumerate(percorso["passi"])
         )
         righe.append(

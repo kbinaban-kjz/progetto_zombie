@@ -5,6 +5,23 @@ Responsabilità:
 - Implementazione delle funzioni investigative (analisi fonti, mappa, nodi, database SQLite).
 - Esposizione degli schemi OpenAI Function Calling (TOOLS_OPENAI_SCHEMA) per i modelli cloud.
 - Dispatcher per l'esecuzione dinamica e sicura degli strumenti (esegui_tool).
+
+Strumenti esposti:
+- recupera_rag: recupero RAG ibrido (lessicale + semantico) sull'intero archivio sepolto.
+- cerca_fonti: ricerca letterale di parole chiave nei documenti del dossier e dell'archivio.
+- leggi_fonte: lettura del testo integrale di un documento specifico tramite nome file o ID.
+- collega_documenti: collegamenti tra documenti tramite entità condivise e percorso più breve.
+- analizza_evidenze: analisi deterministica di segnali di evacuazione e catene di consegna.
+- elenca_fonti: censimento dei documenti del dossier con metadati riassuntivi.
+- verifica_sicurezza_fonti: scansione anti-prompt-injection dei documenti del dossier.
+- ottieni_nodi_mappa: elenco filtrabile dei nodi della mappa tattica.
+- ottieni_dettaglio_nodo: scheda di intelligence di un singolo nodo della mappa.
+- cerca_cronologia: ricerca testuale nelle conversazioni salvate nel database SQLite.
+- statistiche_missione: metriche globali su fonti, archivio, indice RAG, mappa e database.
+
+Tutti i tool restituiscono un dizionario con il campo "ok" e vengono eseguiti tramite
+il dispatcher sicuro `esegui_tool(nome, argomenti)`, che valida il nome, converte gli
+argomenti da JSON e intercetta gli errori senza interrompere il flusso dell'applicazione.
 """
 
 import json
@@ -449,9 +466,44 @@ NODI_TEATRO = [
 
 def cerca_fonti(query: str, limite: int = 8) -> dict[str, Any]:
     """
-    Cerca termini o concetti chiave all'interno dei documenti del dossier e dell'archivio (TXT, HTML, JSON, XML).
-    Restituisce i brani più rilevanti e il file di provenienza.
-    USARE SOLO SE i documenti pertinenti non sono già presenti nel testo fornito nel blocco fonti.
+    Ricerca letterale di parole chiave nei documenti del dossier e dell'archivio.
+
+    COSA FA
+    Cerca i termini della query all'interno di tutti i documenti dell'archivio
+    (.txt, .html, .json, .xml), includendo nome file, ID, titolo e corpo del testo.
+    Non usa embedding né chunk: conta le occorrenze testuali e ordina i risultati
+    per rilevanza. È quindi più prevedibile del RAG, ma non comprende sinonimi o
+    concetti espressi con parole diverse.
+
+    COME FUNZIONA
+    - Suddivide la query in parole chiave tramite espressione regolare, scartando
+      i termini di una sola lettera.
+    - Conta il numero complessivo di occorrenze per ogni documento.
+    - Assegna un bonus di +10 ai documenti del dossier Lazzaro (G1, G2, LX5, ARCH),
+      così prevalgono sulle voci enciclopediche generiche.
+    - Esclude le voci WIKI-* a meno che la query non citi esplicitamente "wiki",
+      "wikipedia" o "enciclopedico".
+    - Ordina per rilevanza decrescente e applica il limite richiesto.
+
+    ARGOMENTI
+    - query: termine, nome, codice o frase da cercare (es. "Nora Ferri", "RV753").
+    - limite: numero massimo di risultati da restituire (default 8).
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok: esito dell'operazione;
+    - query: query originale;
+    - trovati: numero totale di documenti con almeno un riscontro;
+    - risultati: lista di dizionari con file, id, titolo, formato, fase, estratto
+      (primi 220 caratteri), rilevanza e flag "sospetto" (prompt injection rilevata).
+
+    QUANDO USARLO
+    Solo se i documenti pertinenti non sono già presenti nel contesto fornito e
+    occorre una ricerca testuale mirata su nomi, codici, orari o frasi esatte.
+
+    QUANDO NON USARLO
+    Non usarlo se le fonti necessarie sono già nel blocco fonti, né per domande
+    concettuali o semantiche: in quei casi è più adatto `recupera_rag`.
     """
     risultati = cerca_in_fonti(query, cerca_in_archivio=True)
     return {
@@ -464,8 +516,54 @@ def cerca_fonti(query: str, limite: int = 8) -> dict[str, Any]:
 
 def recupera_rag(domanda: str, top_k: int = 8) -> dict[str, Any]:
     """
-    Esegue il recupero RAG (Retrieval-Augmented Generation) sull'intero archivio sepolto
-    (1.023 documenti in formato .txt, .html, .json, .xml) restituendo i file e i blocchi più pertinenti.
+    Recupero RAG ibrido sull'intero archivio sepolto.
+
+    COSA FA
+    Cerca i documenti e i blocchi più pertinenti alla domanda in tutti i file
+    .txt, .html, .json e .xml di dati/, new_dati/ e dati/archivio/, comprese le
+    voci enciclopediche WIKI-* e i reperti ARCH-*.
+
+    COME FUNZIONA
+    - Divide ogni documento in blocchi da 450 caratteri con passo 340 (110
+      caratteri di sovrapposizione) e antepone a ogni blocco l'intestazione
+      "[ID] Titolo (nome_file)" per non perdere l'identità del documento.
+    - Costruisce un indice invertito con pesi IDF/BM25 e, se è disponibile un
+      modello SentenceTransformer, calcola anche embedding densi salvati nella
+      cache .rag_embeddings_cache.npz.
+    - Tokenizzazione morfologica avanzata con stemming in italiano e matching lessicale.
+    - Assegna un forte bonus ai documenti citati esplicitamente tramite ID o
+      nome file (es. G2-01, ARCH-3097, documento_0928).
+    - Esclude le voci WIKI-* quando la domanda trova riscontri solidi nel
+      dossier primario, a meno che l'utente non chieda Wikipedia o un argomento
+      enciclopedico.
+    - Collassa le copie inoltrate dello stesso bollettino, che non sono
+      conferme indipendenti, salvo richiesta esplicita di copie o duplicati.
+    - Aggiunge documenti collegati tramite multi-hop dinamico sulle entità-ponte
+      e calcola i collegamenti tra le fonti.
+    - Neutralizza i documenti ostili che simulano istruzioni all'assistente,
+      a meno che la domanda non lo citi esplicitamente.
+      esplicitamente o non riguardi manomissioni, attacchi o sospetti.
+
+    ARGOMENTI
+    - domanda: domanda o concetto da cercare nell'archivio.
+    - top_k: numero massimo di documenti da recuperare (default 8).
+
+    RESTITUISCE
+    Un dizionario con:
+    - totale_archivio e totale_blocchi_indicizzati;
+    - file_recuperati: elenco dei nomi file selezionati;
+    - dettagli_file: ID, titolo, formato, fase, provenienza ed estratto;
+    - blocchi_recuperati: chunk più rilevanti con punteggio "score";
+    - collegamenti e percorso_collegamento: eventuali catene multi-hop.
+
+    QUANDO USARLO
+    Quando la risposta richiede fatti o dettagli non presenti nel contesto e
+    occorre interrogare l'archivio esterno o sepolto.
+
+    QUANDO NON USARLO
+    Non usarlo se le fonti necessarie sono già nel blocco fonti. La prima
+    chiamata può essere più lenta perché costruisce l'indice RAG; le successive
+    usano la cache in memoria.
     """
     esito = scegli_fonti_dettagliato(domanda, top_k=top_k)
     return {
@@ -483,9 +581,45 @@ def recupera_rag(domanda: str, top_k: int = 8) -> dict[str, Any]:
 
 def collega_documenti(domanda: str) -> dict[str, Any]:
     """
-    Collega i documenti recuperati dal RAG mostrando le entità condivise (codici, nomi, orari)
-    e, se la domanda cita due entità, il percorso più breve che le collega.
-    USARE SE l'utente chiede di collegare, confrontare o ricostruire una catena tra documenti.
+    Collega i documenti tramite entità condivise e ricostruisce catene investigative.
+
+    COSA FA
+    Recupera i documenti più pertinenti alla domanda (top_k=10), estrae da ogni
+    testo le entità-ponte (codici come RV753 o CN-58, nomi propri come "Nora
+    Ferri", acronimi e orari) e individua i documenti che condividono la stessa
+    entità. Se la domanda cita due entità, cerca il percorso più breve che le
+    collega.
+
+    COME FUNZIONA
+    - `scegli_fonti_dettagliato(domanda, top_k=10)` seleziona il corpus iniziale.
+    - `analizza_collegamenti()` costruisce un indice inverso entità -> documenti,
+      escludendo le parole troppo generiche (es. "documento", "registro",
+      "settore") che non dimostrano un collegamento reale.
+    - Le entità più specifiche (es. una pratica RV753) vengono esplorate prima
+      di quelle onnipresenti (es. "Lazzaro"), così il percorso spiega il nesso
+      invece di limitarsi a un tema comune.
+    - Per ogni passaggio estrae una frase di prova che contiene l'entità-ponte,
+      utilizzabile come citazione verificabile.
+
+    ARGOMENTI
+    - domanda: domanda contenente le entità da collegare (es. "Quali documenti
+      collegano Nora Ferri al contenitore LUME?").
+
+    RESTITUISCE
+    Un dizionario con:
+    - file_recuperati: documenti selezionati dal RAG;
+    - collegamenti: coppie di documenti con le entità condivise;
+    - percorso: catena di passaggi tra le due entità citate, con file, ID,
+      entità-ponte e frase di prova;
+    - testo: versione formattata e citabile dei collegamenti.
+
+    QUANDO USARLO
+    Quando l'utente chiede esplicitamente di collegare, confrontare o
+    ricostruire una catena tra persone, pratiche, contenitori o documenti.
+
+    QUANDO NON USARLO
+    Non usarlo se la catena è già mostrata nel blocco collegamenti del contesto
+    o se la domanda riguarda un singolo documento.
     """
     esito = scegli_fonti_dettagliato(domanda, top_k=10)
     analisi = modulo_collegamenti.analizza_collegamenti(domanda, esito["fonti"])
@@ -501,8 +635,45 @@ def collega_documenti(domanda: str) -> dict[str, Any]:
 
 def analizza_evidenze(domanda: str) -> dict[str, Any]:
     """
-    Analizza un segnale di evacuazione (copie inoltrate vs misure dirette, conferme indipendenti) e/o
-    ricostruisce una catena di documenti (corriere -> pratica -> lotto -> armadio e settore) sull'archivio unito.
+    Analisi deterministica di segnali di evacuazione e catene di consegna.
+
+    COSA FA
+    Non è un analizzatore generico: è un tool specializzato nel pacchetto
+    "imprevisti" del Giorno 3. Riconosce due famiglie di domande e produce una
+    risposta già formattata e citabile:
+    1. segnali di evacuazione (es. EV-541, ripetitori Salice e Pietra, circuito
+       CN-58), distinguendo misure dirette, copie inoltrate e conferme
+       realmente indipendenti;
+    2. catene di consegna e custodia (corriere, custodia schermata, ricambio,
+       lotto, armadio, pratica), ricostruendo il percorso tra i documenti.
+
+    COME FUNZIONA
+    - Per i segnali, `analizza_conferme_segnale()` separa le misure dirette
+      dalle copie e verifica quante conferme indipendenti esistono davvero.
+    - Per le consegne, `ricostruisci_catena()` segue fino a 4 "salti" tra
+      documenti usando codici e pratiche come entità-ponte (es. corriere ->
+      pratica -> lotto -> armadio -> settore).
+    - Se un dato è dichiarato assente dalle fonti, applica l'astensione
+      controllata: "Non documentato nelle fonti disponibili", citando la frase
+      più vicina e senza inventare informazioni.
+
+    ARGOMENTI
+    - domanda: domanda dell'utente, con giorno operativo, codice del segnale o
+      riferimento al corriere/lotto se presenti.
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok: True se la domanda è pertinente, False altrimenti;
+    - domanda: domanda originale;
+    - analisi: testo già formattato con la ricostruzione e le citazioni.
+
+    QUANDO USARLO
+    Solo per domande su segnali di evacuazione, ripetitori, circuiti, conferme
+    indipendenti, consegne, custodie, lotti, armadi o pratiche.
+
+    QUANDO NON USARLO
+    Mai per convenevoli, domande generiche sul dossier o quesiti che non
+    riguardano segnali, misure e consegne: in quei casi restituisce ok=False.
     """
     risposta = risposta_imprevisti(domanda)
     if risposta is None:
@@ -512,9 +683,39 @@ def analizza_evidenze(domanda: str) -> dict[str, Any]:
 
 def leggi_fonte(nome_file: str) -> dict[str, Any]:
     """
-    Restituisce il testo completo e i dettagli di un documento specifico
-    (es. 'G1-01.txt', 'documento_0057.html', 'documento_0389.xml', 'ARCH-3097', 'WIKI-2828').
-    USARE SOLO SE il testo integrale del file manca dal contesto già fornito.
+    Lettura del testo integrale di un documento specifico.
+
+    COSA FA
+    Cerca un documento nell'archivio completo tramite nome file, nome senza
+    estensione o ID estratto dai metadati, e ne restituisce il contenuto
+    integrale insieme ai metadati principali.
+
+    COME FUNZIONA
+    - Carica tutti i documenti con `carica_archivio_completo()`.
+    - Costruisce tre mappe di ricerca: nome file in minuscolo, nome senza
+      estensione e ID normalizzato (trattini e underscore equivalenti).
+    - Accetta quindi forme come "G1-01.txt", "G1-01", "documento_0057.html",
+      "ARCH-3097" o "WIKI-2828".
+    - La ricerca è esatta: non è fuzzy e non è semantica.
+
+    ARGOMENTI
+    - nome_file: nome del file o ID del documento da leggere.
+
+    RESTITUISCE
+    In caso di successo un dizionario con:
+    - ok, file, id, titolo, formato, fase e testo completo.
+    In caso di errore:
+    - ok=False, messaggio di errore e file_disponibili (elenco dei documenti
+      del dossier).
+
+    QUANDO USARLO
+    Quando serve il testo integrale di un file specifico e quel testo non è già
+    presente nel contesto fornito.
+
+    QUANDO NON USARLO
+    Non usarlo se il documento è già interamente presente nelle fonti, né per
+    cercare "un documento che parla di...": per la ricerca usare `cerca_fonti`
+    o `recupera_rag`.
     """
     fonti_complete = carica_archivio_completo()
     mappa_nome: dict[str, tuple[str, str]] = {}
@@ -555,8 +756,31 @@ def leggi_fonte(nome_file: str) -> dict[str, Any]:
 
 def elenca_fonti() -> dict[str, Any]:
     """
-    Elenca tutti i documenti attualmente disponibili nel dossier con metadati riassuntivi.
-    USARE SOLO SE l'utente chiede esplicitamente il censimento o elenco completo dei file in archivio.
+    Censimento dei documenti del dossier con metadati riassuntivi.
+
+    COSA FA
+    Elenca tutti i documenti caricati da `carica_fonti()`, cioè i file di dati/
+    e new_dati/ (G1, G2, LX5) e i reperti ARCH-* del dossier Lazzaro presenti in
+    dati/archivio/. Di default non include le 1.000 voci enciclopediche WIKI-*.
+
+    COME FUNZIONA
+    Per ogni documento estrae ID, titolo, formato e fase tramite
+    `estrai_metadati_fonte()`, calcola la lunghezza del testo e prepara
+    un'anteprima dei primi 120 caratteri del corpo.
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok: esito dell'operazione;
+    - totale: numero di documenti elencati;
+    - fonti: lista di dizionari con file, id, titolo, anteprima e caratteri.
+
+    QUANDO USARLO
+    Solo se l'utente chiede esplicitamente il censimento o l'elenco completo dei
+    file del dossier.
+
+    QUANDO NON USARLO
+    Non usarlo per leggere il contenuto di un documento (usare `leggi_fonte`) né
+    per cercare un'informazione specifica (usare `cerca_fonti` o `recupera_rag`).
     """
     fonti = carica_fonti()
     elenco = []
@@ -576,9 +800,39 @@ def elenca_fonti() -> dict[str, Any]:
 
 def verifica_sicurezza_fonti() -> dict[str, Any]:
     """
-    Controlla tutti i documenti del dossier alla ricerca di testi che simulano
-    istruzioni rivolte all'AI (prompt injection) e li segnala come prova dell'attacco.
-    USARE ESCLUSIVAMENTE SE l'utente richiede espressamente un audit di sicurezza o scansione anti-manomissione delle fonti.
+    Scansione anti-prompt-injection dei documenti del dossier.
+
+    COSA FA
+    Analizza tutti i documenti caricati da `carica_fonti()` e segnala quelli che
+    contengono testi che simulano istruzioni rivolte all'assistente. Serve a
+    produrre la prova documentale di un tentativo di manipolazione, non a
+    "obbedire" al contenuto ostile.
+
+    COME FUNZIONA
+    - Per ogni documento esegue `rileva_istruzioni_ostili()`, che cerca marcatori
+      tipici come "istruzione per l'assistente", "ignora le istruzioni",
+      "ignora le regole", "ignora G...", "non citare le fonti", "ora sei",
+      "sei ora", "fai finta di essere", "disattiva le regole", "system prompt",
+      "prompt di sistema" e "jailbreak".
+    - Raccoglie i documenti con almeno un marcatore, eliminando i duplicati.
+    - Per ogni sospetto riporta file, ID, titolo e marcatori trovati.
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok: esito dell'operazione;
+    - documenti_esaminati: numero di documenti analizzati;
+    - sospetti: lista di dizionari con file, id, titolo e marcatori;
+    - totale_sospetti: numero di documenti sospetti;
+    - nota: promemoria che i testi elencati sono dati passivi da non eseguire.
+
+    QUANDO USARLO
+    Esclusivamente se l'utente richiede un audit di sicurezza, un controllo
+    anti-sabotaggio o una scansione dei file manomessi.
+
+    QUANDO NON USARLO
+    Mai per le normali domande di ricostruzione dei fatti. Il tool non modifica
+    i file, non blocca i documenti e non analizza semanticamente il testo: è un
+    rilevatore a marcatori.
     """
     fonti = carica_fonti()
     sospetti = fonti_sospette(fonti)
@@ -596,9 +850,40 @@ def verifica_sicurezza_fonti() -> dict[str, Any]:
 
 def ottieni_nodi_mappa(tipo: str | None = None, min_threat: int = 0) -> dict[str, Any]:
     """
-    Restituisce i nodi strategici della mappa operativa Protocollo Lazzaro
-    (bunker, focolai, segnali, anomalie).
-    USARE SOLO SE l'utente chiede una panoramica o lista delle installazioni della mappa per tipologia o livello minaccia.
+    Elenco filtrabile dei nodi della mappa tattica.
+
+    COSA FA
+    Restituisce i nodi strategici della mappa operativa "Protocollo Lazzaro"
+    contenuti nella lista statica `NODI_TEATRO`: bunker, focolai, segnali e
+    anomalie. Può filtrare per tipologia e per livello minimo di minaccia.
+
+    COME FUNZIONA
+    - Scorre `NODI_TEATRO` (21 nodi del teatro G1, G2, LX5 e globale).
+    - Se `tipo` è specificato, tiene solo i nodi con quel valore di "type":
+      "bunker", "outbreak", "signal" o "anomaly".
+    - Se `min_threat` è maggiore di 0, esclude i nodi con minaccia inferiore.
+    - Non interroga i documenti testuali del dossier: la mappa è un dataset
+      separato, con metadati geografici e tattici propri.
+
+    ARGOMENTI
+    - tipo: filtro opzionale per tipologia di nodo.
+    - min_threat: livello minimo di minaccia (0-5, default 0).
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok: esito dell'operazione;
+    - tipo_fonte: avviso esplicito che si tratta di "SCHEDA_MAPPA_TATTICA",
+      distinta dai documenti .txt del dossier;
+    - totale, filtro_tipo e min_threat;
+    - nodi: lista completa dei nodi con id, code, name, place, region, lat, lon,
+      type, status, threat, survivors, contact, source, reliability, tags e desc.
+
+    QUANDO USARLO
+    Solo se l'utente chiede una panoramica o un elenco filtrato delle
+    installazioni della mappa per tipologia o livello di minaccia.
+
+    QUANDO NON USARLO
+    Non usarlo per percorsi generici, città o domande di geografia ordinaria.
     """
     nodi_filtrati = []
     tipo_filtro = tipo.strip().lower() if tipo else None
@@ -622,9 +907,39 @@ def ottieni_nodi_mappa(tipo: str | None = None, min_threat: int = 0) -> dict[str
 
 def ottieni_dettaglio_nodo(id_o_codice: str) -> dict[str, Any]:
     """
-    Restituisce l'analisi di intelligence dettagliata di un nodo della mappa
-    (es. 'laz01', 'ferri', 'echo', 'berlino', 'LAZ-01').
-    USARE SOLO SE l'utente chiede coordinate, status, superstiti o scheda tecnica di un nodo della mappa.
+    Scheda di intelligence di un singolo nodo della mappa.
+
+    COSA FA
+    Cerca un nodo in `NODI_TEATRO` e ne restituisce la scheda completa. La
+    ricerca è case-insensitive e accetta quattro forme di identificazione:
+    - id (es. "laz01", "ferri", "sanmauro");
+    - code (es. "LAZ-01", "ECO-07", "LAB-SM");
+    - name (es. "La Centrale", "Ultima Voce");
+    - place (es. "Ravenna", "Berlino").
+
+    COME FUNZIONA
+    Scorre la lista statica dei nodi e confronta la chiave normalizzata con i
+    campi id, code, name e place. È un lookup esatto: non effettua ricerca
+    fuzzy, semantica o per parole parziali.
+
+    ARGOMENTI
+    - id_o_codice: ID, codice, nome o luogo del nodo.
+
+    RESTITUISCE
+    In caso di successo:
+    - ok=True, tipo_fonte e nodo (scheda completa con coordinate, status,
+      minaccia, superstiti, contatto, affidabilità, tag e descrizione).
+    In caso di errore:
+    - ok=False, messaggio di errore e nodi_noti (elenco di ID e nomi
+      disponibili).
+
+    QUANDO USARLO
+    Solo se l'utente chiede coordinate, status, superstiti, livello di minaccia
+    o la scheda tecnica di un nodo specifico della mappa.
+
+    QUANDO NON USARLO
+    Non usarlo se le informazioni sul luogo sono già descritte nei documenti
+    del contesto: i dati della mappa non vanno attribuiti al dossier testuale.
     """
     chiave = id_o_codice.strip().lower()
     for nodo in NODI_TEATRO:
@@ -649,8 +964,38 @@ def ottieni_dettaglio_nodo(id_o_codice: str) -> dict[str, Any]:
 
 def cerca_cronologia(termine: str) -> dict[str, Any]:
     """
-    Cerca tra le domande e risposte registrate nel database SQLite locale.
-    USARE SOLO SE l'utente chiede di cercare in conversazioni o sessioni precedenti.
+    Ricerca testuale nelle conversazioni salvate nel database SQLite.
+
+    COSA FA
+    Cerca una parola o frase nelle domande e nelle risposte registrate nella
+    tabella `cronologia_chat` del database locale (default
+    Backend/cronologia.db), recuperando anche i metadati di instradamento.
+
+    COME FUNZIONA
+    - Esegue una query SQL con LIKE sul termine in minuscolo, sia sul campo
+      `domanda` sia sul campo `risposta`.
+    - Fa un LEFT JOIN con `instradamento_chat` per recuperare motore, modello
+      usato, complessità, motivo del routing e durata.
+    - Ordina i risultati per id decrescente, quindi dal messaggio più recente.
+    - Converte il campo `fonti` da stringa JSON a lista Python.
+
+    ARGOMENTI
+    - termine: parola chiave o frase da cercare nelle sessioni precedenti.
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok: esito dell'operazione;
+    - termine: termine cercato;
+    - trovati: numero di record trovati;
+    - cronologia: lista di messaggi con id, domanda, risposta, fonti,
+      created_at e metadati di instradamento.
+
+    QUANDO USARLO
+    Solo se l'utente fa riferimento esplicito a conversazioni pregresse
+    memorizzate ("Cosa avevamo stabilito ieri?", "Cerca nelle vecchie sessioni").
+
+    QUANDO NON USARLO
+    Mai per analizzare i documenti del dossier o la sessione corrente.
     """
     risultati = cerca_in_cronologia(termine)
     return {
@@ -663,8 +1008,39 @@ def cerca_cronologia(termine: str) -> dict[str, Any]:
 
 def statistiche_missione() -> dict[str, Any]:
     """
-    Restituisce un quadro di sintesi sullo stato della missione, fonti, archivio RAG e database.
-    USARE SOLO SE l'utente chiede metriche numeriche o conteggi quantitativi globali della missione.
+    Metriche globali e riepilogo quantitativo della missione.
+
+    COSA FA
+    Fornisce un quadro numerico complessivo su dossier, archivio, indice RAG,
+    mappa tattica e database delle conversazioni.
+
+    COME FUNZIONA
+    - `carica_fonti()` conta i documenti del dossier e ne restituisce i nomi.
+    - `carica_archivio_completo()` conta tutti i file dell'archivio, incluse le
+      voci WIKI-* e i reperti ARCH-*.
+    - `costruisci_indice_rag()` restituisce il numero di blocchi indicizzati.
+    - `leggi_cronologia()` conta i record salvati nel database SQLite.
+    - Calcola inoltre il numero di nodi della mappa e la ripartizione per tipo:
+      bunker, outbreak, signal e anomaly.
+    Attenzione: la prima chiamata può essere più lenta perché costruisce
+    l'indice RAG e, se disponibile, calcola gli embedding.
+
+    RESTITUISCE
+    Un dizionario con:
+    - ok e missione;
+    - fonti_dossier e file_dossier;
+    - archivio_totale_file;
+    - blocchi_rag_indicizzati;
+    - nodi_teatro_mappa;
+    - record_sqlite_chat;
+    - tipi_nodi: conteggio per bunker, outbreak, signal e anomaly.
+
+    QUANDO USARLO
+    Solo se l'utente chiede metriche numeriche, conteggi quantitativi o un
+    riepilogo globale della missione.
+
+    QUANDO NON USARLO
+    Mai per convenevoli o quesiti puntuali sui documenti.
     """
     fonti = carica_fonti()
     archivio = carica_archivio_completo()
@@ -711,7 +1087,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "cerca_fonti",
-            "description": "Cerca parole chiave o testimonianze nel dossier. USARE SOLO SE i documenti pertinenti non sono già presenti nel testo fornito. NON usare se hai già le fonti nel contesto.",
+            "description": (
+                "Cerca letteralmente parole chiave, nomi, codici o frasi nei documenti del dossier e "
+                "dell'archivio (.txt, .html, .json, .xml). Conta le occorrenze, dà priorità ai documenti "
+                "Lazzaro, esclude le voci WIKI-* salvo richiesta esplicita e restituisce file, ID, titolo, "
+                "estratto, rilevanza e flag sospetto. USARE SOLO SE i documenti pertinenti non sono già nel "
+                "contesto e serve una ricerca testuale mirata; per domande concettuali usare recupera_rag."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -721,7 +1103,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                     },
                     "limite": {
                         "type": "integer",
-                        "description": "Numero massimo di riscontri da restituire (default 5).",
+                        "description": "Numero massimo di riscontri da restituire (default 8).",
                     },
                 },
                 "required": ["query"],
@@ -732,7 +1114,15 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "analizza_evidenze",
-            "description": "Per domande su un segnale di evacuazione (es. EV-541: ripetitore, circuito, conferme indipendenti) o su una consegna (corriere, pratica, lotto, armadio e settore): separa copie inoltrate e misure dirette e collega più documenti dell'archivio unito, citando ID e nome file.",
+            "description": (
+                "Analisi deterministica e specializzata per il pacchetto imprevisti. Riconosce due famiglie "
+                "di domande: (1) segnali di evacuazione (es. EV-541, ripetitori Salice e Pietra, circuito CN-58), "
+                "distinguendo misure dirette, copie inoltrate e conferme realmente indipendenti; (2) catene di "
+                "consegna e custodia (corriere, custodia schermata, ricambio, lotto, armadio, pratica), "
+                "ricostruendo fino a 4 passaggi tra documenti tramite entità-ponte. Restituisce una risposta "
+                "già formattata con citazioni e, se un dato è assente, dichiara l'astensione. Restituisce "
+                "ok=False se la domanda non riguarda segnali o consegne. USARE SOLO per questi temi."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -749,7 +1139,15 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "recupera_rag",
-            "description": "Esegue il recupero RAG su tutti i 1.023 file dell'archivio (.txt, .html, .json, .xml) restituendo i documenti e i blocchi più rilevanti. USARE SOLO SE occorre cercare un argomento specifico nell'archivio esterno.",
+            "description": (
+                "Recupero RAG ibrido sull'intero archivio sepolto (.txt, .html, .json, .xml): chunk da 450 "
+                "caratteri con sovrapposizione, indice IDF/BM25 e, se disponibile, embedding SentenceTransformer. "
+                "Utilizza matching morfologico con stemming, premia gli ID citati esplicitamente, esclude le voci "
+                "WIKI-* quando il dossier primario è pertinente, collassa le copie inoltrate e aggiunge documenti "
+                "collegati tramite multi-hop dinamico. Restituisce file e blocchi più rilevanti con punteggi, dettagli, "
+                "collegamenti ed eventuale percorso. USARE SOLO SE occorre cercare un argomento specifico "
+                "nell'archivio esterno; non usarlo se le fonti necessarie sono già nel contesto."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -770,7 +1168,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "collega_documenti",
-            "description": "Collega i documenti recuperati dal RAG tramite le entità condivise (codici come RV753/M562, nomi come Nora Ferri, orari) e ricostruisce il percorso tra due entità citate nella domanda. USARE SE l'utente chiede di collegare, confrontare o ricostruire una catena tra documenti.",
+            "description": (
+                "Collega i documenti recuperati dal RAG tramite entità condivise (codici come RV753 o CN-58, "
+                "nomi come Nora Ferri, acronimi e orari) e, se la domanda cita due entità, cerca il percorso più "
+                "breve che le collega, con una frase di prova per ogni passaggio. Restituisce file recuperati, "
+                "collegamenti, percorso e un testo formattato e citabile. USARE SE l'utente chiede di collegare, "
+                "confrontare o ricostruire una catena tra documenti; non usarlo se la catena è già nel contesto."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -787,7 +1191,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "leggi_fonte",
-            "description": "Recupera il testo integrale di un file specifico (.txt, .html, .json, .xml) per nome o ID (es. 'G1-02.txt', 'documento_0057.html', 'ARCH-3097'). USARE SOLO SE il testo integrale del file manca dal contesto fornito.",
+            "description": (
+                "Restituisce il testo integrale e i metadati di un documento specifico (.txt, .html, .json, "
+                ".xml) cercandolo per nome file, nome senza estensione o ID (es. 'G1-02.txt', "
+                "'documento_0057.html', 'ARCH-3097'). La ricerca è esatta, non fuzzy né semantica. USARE SOLO "
+                "SE il testo integrale del file manca dal contesto fornito; se non lo trova restituisce errore "
+                "ed elenco dei file disponibili."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -804,7 +1214,12 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "elenca_fonti",
-            "description": "Elenca tutti i file del dossier. USARE SOLO SE l'utente chiede esplicitamente l'elenco completo o il censimento dei file in archivio.",
+            "description": (
+                "Elenca tutti i documenti del dossier (file G1, G2, LX5 e reperti ARCH-*) con ID, titolo, "
+                "anteprima dei primi 120 caratteri e numero di caratteri. Non include le 1.000 voci WIKI-* e non "
+                "restituisce il testo completo. USARE SOLO SE l'utente chiede esplicitamente l'elenco completo o "
+                "il censimento dei file in archivio."
+            ),
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -813,8 +1228,12 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "function": {
             "name": "verifica_sicurezza_fonti",
             "description": (
-                "Verifica la presenza di documenti manomessi o ostili con prompt injection. "
-                "USARE ESCLUSIVAMENTE SE l'utente richiede espressamente un audit di sicurezza o scansione anti-manomissione delle fonti."
+                "Verifica la presenza di documenti manomessi o ostili con prompt injection. Analizza tutti i "
+                "documenti del dossier cercando marcatori come 'istruzione per l'assistente', 'ignora le "
+                "istruzioni', 'ignora le regole', 'non citare le fonti', 'ora sei', 'system prompt' e "
+                "'jailbreak'. Restituisce numero di documenti esaminati, elenco dei sospetti con ID, titolo e "
+                "marcatori, totale e una nota di sicurezza. USARE ESCLUSIVAMENTE SE l'utente richiede "
+                "espressamente un audit di sicurezza o una scansione anti-manomissione delle fonti."
             ),
             "parameters": {"type": "object", "properties": {}},
         },
@@ -823,7 +1242,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "ottieni_nodi_mappa",
-            "description": "Restituisce i nodi tattici della mappa (bunker, focolai, segnali, anomalie). USARE SOLO SE l'utente chiede una lista o panoramica delle installazioni della mappa per tipologia o livello minaccia.",
+            "description": (
+                "Restituisce i nodi della mappa tattica (bunker, focolai, segnali, anomalie) dalla lista statica "
+                "NODI_TEATRO, filtrabili per tipo e livello minimo di minaccia. Ogni nodo include coordinate, "
+                "status, superstiti, contatto, affidabilità, tag e descrizione. Il campo tipo_fonte ricorda che "
+                "sono metadati della mappa, distinti dai documenti .txt del dossier. USARE SOLO SE l'utente chiede "
+                "una lista o panoramica delle installazioni per tipologia o minaccia; non per geografia generica."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -844,7 +1269,14 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "ottieni_dettaglio_nodo",
-            "description": "Recupera la scheda di intelligence su un nodo specifico della mappa (es. 'laz01', 'ferri', 'echo', 'sanmauro'). USARE SOLO SE l'utente chiede coordinate, status, superstiti o intelligence specifica di quell'installazione.",
+            "description": (
+                "Recupera la scheda di intelligence completa di un nodo specifico della mappa, cercandolo per "
+                "id, codice, nome o luogo (es. 'laz01', 'LAZ-01', 'La Centrale', 'ferri', 'echo', 'sanmauro'). "
+                "La ricerca è esatta e case-insensitive. Restituisce coordinate, status, minaccia, superstiti, "
+                "contatto, affidabilità, tag e descrizione; se non trova il nodo restituisce errore ed elenco dei "
+                "nodi noti. USARE SOLO SE l'utente chiede coordinate, status, superstiti o intelligence specifica "
+                "di quell'installazione."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -861,7 +1293,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "cerca_cronologia",
-            "description": "Cerca conversazioni passate nel database SQLite. USARE SOLO SE l'utente chiede di recuperare decisioni, domande o risposte di sessioni precedenti.",
+            "description": (
+                "Cerca una parola o frase nelle domande e nelle risposte salvate nel database SQLite locale, "
+                "con LIKE su entrambi i campi, dal messaggio più recente. Restituisce i record con domanda, "
+                "risposta, fonti, data e metadati di instradamento (motore, modello, complessità, motivo, durata). "
+                "USARE SOLO SE l'utente chiede di recuperare decisioni, domande o risposte di sessioni precedenti; "
+                "non usarlo per il dossier né per la sessione corrente."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -878,7 +1316,13 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "statistiche_missione",
-            "description": "Restituisce metriche numeriche e riassunto globale della missione. USARE SOLO SE l'utente chiede statistiche o conteggi quantitativi globali.",
+            "description": (
+                "Restituisce metriche numeriche e riepilogo globale della missione: numero di documenti del "
+                "dossier e loro nomi, file totali dell'archivio, blocchi RAG indicizzati, nodi della mappa, record "
+                "SQLite delle chat e ripartizione dei nodi per tipo (bunker, outbreak, signal, anomaly). La prima "
+                "chiamata può essere più lenta perché costruisce l'indice RAG. USARE SOLO SE l'utente chiede "
+                "statistiche, conteggi quantitativi o un riepilogo globale."
+            ),
             "parameters": {"type": "object", "properties": {}},
         },
     },

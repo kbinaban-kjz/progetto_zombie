@@ -301,17 +301,17 @@ def _chiede_tempo(domanda: str) -> bool:
 
 
 def _bonus_campo_semantico(domanda: str, frase: str) -> float:
-    """Premia la frase che appartiene allo stesso campo semantico della domanda."""
+    """Premia la frase che appartiene allo stesso campo semantico lessicale della domanda."""
     q = domanda.lower()
     f = frase.lower()
     bonus = 0.0
     campi = {
-        ("focol", "contag", "epidem", "allarm", "scoppi"): ("focolaio", "allarme", "contagio", "scoppiato", "san mauro"),
-        ("rifug", "protezion"): ("rifugi", "rifugio", "protezione", "contagio"),
-        ("guast", "ripetitor", "segnale", "circuit"): ("guasto", "ripetitore", "segnale", "circuito"),
-        ("fermar", "opposizion", "sabotagg"): ("fermare", "opposizione", "sabotaggio", "verbale"),
-        ("material", "recuper", "lume", "deposit"): ("materiale", "recupero", "lume", "deposito", "pratica"),
-        ("autorizz", "access", "firma"): ("autorizzazione", "accessi", "firmato", "ordine"),
+        ("focol", "contag", "epidem", "allarm", "scoppi"): ("focolaio", "allarme", "contagio", "scoppiato", "emergenza"),
+        ("rifug", "protezion", "ripar"): ("rifugi", "rifugio", "protezione", "sicurezza"),
+        ("guast", "ripetitor", "segnale", "circuit", "anomal"): ("guasto", "ripetitore", "segnale", "circuito", "anomalia"),
+        ("fermar", "opposizion", "sabotagg", "ostacol"): ("fermare", "opposizione", "sabotaggio", "verbale", "blocco"),
+        ("material", "recuper", "stoccagg", "deposit"): ("materiale", "recupero", "deposito", "stoccaggio", "magazzino"),
+        ("autorizz", "access", "firma", "approv"): ("autorizzazione", "accessi", "firmato", "ordine", "permesso"),
     }
     for chiavi_q, parole_frase in campi.items():
         if any(k in q for k in chiavi_q) and any(p in f for p in parole_frase):
@@ -384,6 +384,9 @@ def _punteggio_frase(domanda: str, frase: str) -> float:
     if re.search(r"\b(?:chi|quale persona|persona|nome|autore|responsabile)\b", domanda, re.IGNORECASE):
         if re.search(r"\b[A-Z][a-zàèéìòù]+\s+[A-Z][a-zàèéìòù]+\b", frase):
             score += 2.0
+    # Se contiene un codice alfanumerico specifico, aumenta la rilevanza probatoria
+    if re.search(r"(?<![\w-])([A-Za-z]{1,5}[-_]?\d{2,6})(?![\w-])", frase):
+        score += 1.5
     if len(frase) < 20:
         score -= 0.5
     if len(frase) > 420:
@@ -679,22 +682,21 @@ def risposta_locale_da_fonti(
                 nota = "[SICUREZZA] Documento segnalato come testo che simula istruzioni: riportato come dato.\n"
             return avviso + nota + _rendi(scelti)
 
-    # 4a. Domanda senza prove sul database degli accessi / autorizzazione valida (citato in ARCH-5721 ma assente dall'archivio)
-    if not attacco_utente and (
-        "database degli accessi" in q
-        or (
-            re.search(r"\bautorizz\w*|permess\w*|chi ha firmato|firmatario", q)
-            and any(w in q for w in ("lume", "rv753", "accessi", "trasferiment", "chi", "qual"))
-        )
-    ):
-        return (
-            avviso
-            + "Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero "
-            "[ARCH-5721] (documento_0389.xml) indica di consultare la planimetria per il settore e il database "
-            "degli accessi per l'autorizzazione ancora valida relativa alla pratica RV753 (contenitore LUME presso "
-            "il deposito Forte Cenere), ma il database degli accessi e il nome di chi ha autorizzato non sono "
-            "presenti tra i file dell'archivio."
-        )
+    # 4a. Domande su autorizzazione/firmatario/database degli accessi: estrazione dinamica dalla fonte pertinente
+    if not attacco_utente and re.search(r"\b(?:chi\s+(?:ha\s+)?(?:firmato|autorizzato|ordinato|approvato)|firmatario|database degli accessi)\b", q):
+        for doc_cand in indice_documenti:
+            testo_cand = str(doc_cand.get("testo", ""))
+            titolo_cand = str(doc_cand.get("titolo", ""))
+            id_cand = str(doc_cand.get("id", ""))
+            file_cand = str(doc_cand.get("file", ""))
+            if any(w in q for w in ("autorizz", "access", "firm", "pratica", "database")) and any(w in testo_cand.lower() for w in ("autorizz", "access", "database")):
+                m_frase = re.search(r"([^.]*(?:database|autorizzazione|consultare)[^.]*\.)", testo_cand, re.IGNORECASE)
+                frase_estratta = m_frase.group(1).strip() if m_frase else testo_cand.strip()
+                return (
+                    avviso
+                    + f"Non documentato nelle fonti disponibili: il documento {titolo_cand} [{id_cand}] ({file_cand}) "
+                    f"indica: «{frase_estratta}», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio."
+                )
 
     # 4a-bis. Nessuna colpa senza prova: domande su manomissioni/sabotaggi/colpevoli.
     # Se nessun documento attribuisce il fatto a una persona, non si sceglie un colpevole
@@ -705,7 +707,12 @@ def risposta_locale_da_fonti(
         q,
     ):
         regola = next(
-            (u for u in indice_documenti if str(u["id"]).upper() == "G2-07"),
+            (
+                u
+                for u in indice_documenti
+                if any(k in str(u.get("testo", "")).lower() for k in ("non attribuire colpe", "regola dell'indagine", "presunzione"))
+                or any(k in str(u.get("titolo", "")).lower() for k in ("regola", "linea guida", "protocollo"))
+            ),
             None,
         )
         fonte_regola = (
@@ -781,18 +788,26 @@ def risposta_locale_da_fonti(
     # 6. Recupero generico dei documenti pertinenti (con continuità su domande ellittiche brevi)
     chiavi_q = _parole_chiave(q)
     chiede_link = _chiede_collegamenti(q)
-    limite_doc = 5 if chiede_link else (
-        4 if any(w in q for w in ("rifug", "material", "recuper", "rv753", "lume", "deposito", "settore", "pratica", "cenere", "darsena")) else 2
-    )
+    limite_doc = 5 if chiede_link else 4
     if re.search(r"\bperch\w*", q):
-        limite_doc = max(limite_doc, 3)
-    scelti = _estrai_pertinenti(
-        chiavi_q,
-        indice_documenti,
-        limite=limite_doc,
-        priorita=file_prioritari,
-        soglia_relativa=0.25 if chiede_link else 0.6,
-    )
+        limite_doc = max(limite_doc, 4)
+
+    # Se il RAG ha già restituito i file prioritari pertinenti, usa quell'ordinamento
+    scelti: list[dict[str, object]] = []
+    if file_prioritari:
+        mappa_ind = {str(u.get("file")): u for u in indice_documenti}
+        for f in file_prioritari[:limite_doc]:
+            if f in mappa_ind:
+                scelti.append(mappa_ind[f])
+
+    if not scelti:
+        scelti = _estrai_pertinenti(
+            chiavi_q,
+            indice_documenti,
+            limite=limite_doc,
+            priorita=file_prioritari,
+            soglia_relativa=0.25 if chiede_link else 0.6,
+        )
     if not scelti and memoria and len(chiavi_q) <= 1:
         ultima_domanda = str(memoria[-1].get("domanda") or "").lower()
         scelti = _estrai_pertinenti(
@@ -802,42 +817,25 @@ def risposta_locale_da_fonti(
             priorita=file_prioritari,
         )
     if scelti:
-        # Catena dell'archivio: se la domanda riguarda il materiale di recupero/LUME, completa
-        # il quadro con i reperti collegati (pratica, trasferimento, planimetria).
-        ids_scelti = {str(u["id"]).upper() for u in scelti}
-        if ids_scelti & {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and any(
-            w in q for w in ("material", "recuper", "lume", "rv753", "deposito", "settore", "planimetria", "pratica")
-        ):
-            for u in indice_documenti:
-                if str(u["id"]).upper() in {"ARCH-3097", "ARCH-5721", "ARCH-6408", "ARCH-8254"} and u not in scelti:
-                    scelti.append(u)
-            if re.search(r"\bdove\b", q, re.IGNORECASE):
-                # Per una domanda di luogo conta la catena fisica: trasferimento -> planimetria
-                # -> eventuale pista falsa. Esclude le schede LX5 estranee recuperate dal RAG.
-                catena = {"ARCH-5721": 0, "ARCH-6408": 1, "ARCH-3097": 2, "ARCH-8254": 3}
-                scelti = [u for u in scelti if str(u["id"]).upper() in catena]
-                scelti.sort(key=lambda u: catena.get(str(u["id"]).upper(), 99))
-
-        # Se la domanda chiede un collegamento, recupera anche i documenti che condividono
-        # un'entità-ponte con i documenti già scelti (es. Nora Ferri -> RV753 -> LUME).
-        if chiede_link or any(w in q for w in ("material", "recuper", "lume", "rv753", "deposito", "pratica")):
-            fonti_scelte = [
-                (str(u["file"]), str(u.get("testo") or ""))
-                for u in scelti
-                if u.get("file") and u.get("testo")
-            ]
-            percorso = modulo_collegamenti.percorso_collegamento(q, fonti_scelte)
-            if percorso:
-                file_gia = {str(u.get("file")) for u in scelti}
-                for passo in percorso.get("passi", []):
-                    f_ponte = passo.get("file")
-                    if not f_ponte or f_ponte in file_gia:
-                        continue
-                    for u in indice_documenti:
-                        if str(u.get("file")) == f_ponte:
-                            scelti.append(u)
-                            file_gia.add(f_ponte)
-                            break
+        # Se la domanda chiede un collegamento o cita entità correlate, recupera i documenti
+        # del percorso più breve calcolato con BFS sull'indice
+        fonti_scelte = [
+            (str(u["file"]), str(u.get("testo") or ""))
+            for u in scelti
+            if u.get("file") and u.get("testo")
+        ]
+        percorso = modulo_collegamenti.percorso_collegamento(q, fonti_scelte)
+        if percorso:
+            file_gia = {str(u.get("file")) for u in scelti}
+            for passo in percorso.get("passi", []):
+                f_ponte = passo.get("file")
+                if not f_ponte or f_ponte in file_gia:
+                    continue
+                for u in indice_documenti:
+                    if str(u.get("file")) == f_ponte:
+                        scelti.append(u)
+                        file_gia.add(f_ponte)
+                        break
         risposta = _sintesi_documenti(
             q,
             scelti,
