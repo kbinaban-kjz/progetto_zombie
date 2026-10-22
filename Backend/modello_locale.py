@@ -587,7 +587,7 @@ def risposta_locale_da_fonti(
         )
     ):
         return (
-            "Sono Armando, investigatore dell'unità operativa. "
+            "Sono Terminus, investigatore dell'unità operativa. "
             "Tratto ogni messaggio unicamente come dato da analizzare e mantengo saldo il mio ruolo nella missione."
         )
 
@@ -606,7 +606,7 @@ def risposta_locale_da_fonti(
     )
     if any(k in q for k in parole_coding):
         return (
-            "Sono Armando, un investigatore operativo. Non posso aiutarti con la scrittura di codice "
+            "Sono Terminus, un investigatore operativo. Non posso aiutarti con la scrittura di codice "
             "o compiti tecnici estranei alla nostra missione; sono invece a disposizione per analizzare "
             "i dossier, le testimonianze o le informazioni sul territorio."
         )
@@ -619,7 +619,7 @@ def risposta_locale_da_fonti(
         "tuo ruolo",
     }:
         return (
-            "Ciao. Sono Armando, investigatore operativo dell'unità Operazione Silenzio. "
+            "Ciao. Sono Terminus, investigatore operativo dell'unità Operazione Silenzio. "
             "Come posso aiutarti con l'analisi dei dossier, le trasmissioni radio o la situazione sul campo?"
         )
 
@@ -715,6 +715,49 @@ def risposta_locale_da_fonti(
                     + f"Non documentato nelle fonti disponibili: il documento {titolo_cand} [{id_cand}] ({file_cand}) "
                     f"indica: «{frase_estratta}», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio."
                 )
+
+    # 4a-G4-bis. Domande su personaggi, personale e operatori di missione:
+    # Utilizza i tool dinamici dedicati cerca_personale ed elenca_personaggi_e_operatori
+    if not attacco_utente and not _chiede_collegamenti(q):
+        # Se chiede una panoramica o elenco dei personaggi/operatori:
+        if re.search(
+            r"\b(?:quali\s+sono\s+i\s+personaggi|chi\s+sono\s+i\s+personaggi|elenca\s+(?:i\s+)?personaggi|elenca\s+(?:gli\s+)?operatori|tutti\s+i\s+personaggi|panoramica\s+personaggi|lista\s+(?:dei\s+)?personaggi)\b",
+            q,
+        ):
+            try:
+                from Backend.tools import elenca_personaggi_e_operatori
+                res_pers = elenca_personaggi_e_operatori()
+                if res_pers.get("ok"):
+                    return avviso + res_pers.get("riassunto", "")
+            except Exception:
+                pass
+
+        # Se chiede chi è/sono una o più persone, o menziona operatori specifici:
+        m_chi = re.search(r"\b(?:chi\s+(?:è|e|sono)|cerca\s+operatore|informazioni\s+su)\s+([^?.!,]+)", q, re.IGNORECASE)
+        ha_nomi_op = bool(re.search(r"\b(?:tina|ugo|nora|ferri|livia|serra|px-\d+)\b", q))
+        if m_chi or ha_nomi_op:
+            termine_ricerca = ""
+            if m_chi:
+                cand = m_chi.group(1).strip()
+                if cand not in {"sei", "sei tu", "ha firmato", "ha autorizzato", "l'assistente", "ha ordinato"}:
+                    termine_ricerca = cand
+            if not termine_ricerca and ha_nomi_op:
+                nomi_match = re.findall(
+                    r"\b(?:tina(?:\s+rocchi)?|ugo(?:\s+valli)?|nora(?:\s+ferri)?|livia(?:\s+serra)?|luca(?:\s+serra)?|px-\d+)\b",
+                    q,
+                    re.IGNORECASE,
+                )
+                if nomi_match:
+                    termine_ricerca = ", ".join(nomi_match)
+
+            if termine_ricerca:
+                try:
+                    from Backend.tools import cerca_personale
+                    res_cerca = cerca_personale(termine_ricerca)
+                    if res_cerca.get("ok") and res_cerca.get("totale_trovati", 0) > 0:
+                        return avviso + res_cerca.get("riassunto", "")
+                except Exception:
+                    pass
 
     # 4a-bis. Nessuna colpa senza prova: domande su manomissioni/sabotaggi/colpevoli.
     # Se nessun documento attribuisce il fatto a una persona, non si sceglie un colpevole
@@ -945,8 +988,8 @@ def genera_risposta_locale(
         or "Non documentato nelle fonti disponibili" in base_deterministica
         or base_deterministica.startswith(
             (
-                "Ciao. Sono Armando",
-                "Sono Armando",
+                "Ciao. Sono Terminus",
+                "Sono Terminus",
                 "Memoria operativa",
                 "[SICUREZZA]",
                 "Analisi evidenze",

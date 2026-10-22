@@ -851,7 +851,7 @@ def scegli_fonti_dettagliato(
     def blocco_ammesso(mb: dict[str, Any]) -> bool:
         if mb.get("is_primario", True):
             return True
-        return chiede_wikipedia or not ha_match_primario_solido
+        return bool(chiede_wikipedia)
 
     def calcola_punteggi(tokens_extra: Sequence[str], is_feedback: bool = False) -> list[tuple[float, int]]:
         """Punteggio lessicale + semantico sui blocchi ammessi (una sola implementazione)."""

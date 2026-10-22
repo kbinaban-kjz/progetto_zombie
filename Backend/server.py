@@ -17,6 +17,7 @@ Responsabilità:
 
 import json
 import os
+import re
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 from typing import Any
@@ -52,7 +53,7 @@ try:
         risolvi_cartella_dati,
         scegli_fonti_dettagliato,
     )
-    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO, interroga_database
+    from Backend.tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO, interroga_database, interroga_archivio_recuperato_sql
     from Backend.schema_inspector import estrai_schema_database, leggi_dati_tabella
     from Backend.modello_locale import is_modello_caricato
     from Backend.router import genera_risposta_ibrida
@@ -89,7 +90,7 @@ except ImportError:
         risolvi_cartella_dati,
         scegli_fonti_dettagliato,
     )
-    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO, interroga_database
+    from tools import TOOLS_OPENAI_SCHEMA, STRUMENTI_REGISTRATI, esegui_tool, NODI_TEATRO, interroga_database, interroga_archivio_recuperato_sql
     from schema_inspector import estrai_schema_database, leggi_dati_tabella
     from modello_locale import is_modello_caricato
     from router import genera_risposta_ibrida
@@ -267,22 +268,25 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
                 }
             )
 
-        # API: Schema dinamico e Diagramma ER del database accessi.sqlite
+        # API: Schema dinamico e Diagramma ER dei database SQLite (accessi.sqlite & archivio_recuperato.sqlite)
         if path in {"/api/database/schema", "/api/schema/accessi", "/api/accessi/schema", "/api/er-diagram"}:
-            schema_db = estrai_schema_database()
+            query_params = parse_qs(urlparse(self.path).query)
+            db_param = (query_params.get("db", [""])[0] or query_params.get("database", [""])[0]).strip()
+            schema_db = estrai_schema_database(db_target=db_param or "all")
             return self._send_json(schema_db, status=200 if schema_db.get("ok") else 500)
 
-        # API: Ispezione dati riga di una tabella di accessi.sqlite
+        # API: Ispezione dati riga di una tabella (accessi.sqlite o archivio_recuperato.sqlite)
         if path == "/api/database/table":
             query_params = parse_qs(urlparse(self.path).query)
             nome_tab = (query_params.get("name", [""])[0] or query_params.get("tabella", [""])[0]).strip()
+            db_param = (query_params.get("db", [""])[0] or query_params.get("database", [""])[0]).strip()
             limite_val = query_params.get("limit", ["50"])[0]
             offset_val = query_params.get("offset", ["0"])[0]
             limite = int(limite_val) if limite_val.isdigit() else 50
             offset = int(offset_val) if offset_val.isdigit() else 0
             if not nome_tab:
                 return self._send_json({"ok": False, "error": "Parametro 'name' mancante."}, status=400)
-            dati = leggi_dati_tabella(nome_tab, limite=limite, offset=offset)
+            dati = leggi_dati_tabella(nome_tab, limite=limite, offset=offset, db_target=db_param or None)
             return self._send_json(dati, status=200 if dati.get("ok") else 400)
 
         # Sicurezza file statici: consenti solo risorse dentro /Frontend/
@@ -328,18 +332,38 @@ class InvestigatoreHTTPHandler(SimpleHTTPRequestHandler):
             esito = esegui_tool(nome_tool, argomenti)
             return self._send_json(esito)
 
-        # API: Query diretta di sola lettura su accessi.sqlite per l'ispettore ER
+        # API: Query diretta di sola lettura su accessi.sqlite o archivio_recuperato.sqlite
         if path in {"/api/database/query", "/api/accessi/query"}:
             query_sql = (payload.get("query") or payload.get("sql") or "").strip()
+            db_param = (payload.get("database") or payload.get("db") or "").strip().lower()
             if not query_sql:
                 return self._send_json({"ok": False, "error": "Query SQL mancante."}, status=400)
-            res = interroga_database(query_sql)
+
+            tabelle_rec = {"e04", "e10", "m05", "m12", "r02", "r03", "r06", "r07", "r08", "r09", "r11", "r13", "r14", "r15"}
+            parole_query = set(re.findall(r"\b[a-zA-Z0-9_]+\b", query_sql.lower()))
+            usa_recuperato = (
+                "archivio_recuperato" in db_param
+                or "recuperato" in db_param
+                or bool(parole_query & tabelle_rec)
+            )
+
+            if usa_recuperato:
+                res = interroga_archivio_recuperato_sql(query_sql)
+            else:
+                res = interroga_database(query_sql)
+                if ("errore" in res or not res.get("ok", True)) and bool(parole_query & tabelle_rec):
+                    res = interroga_archivio_recuperato_sql(query_sql)
+
             if "errore" in res:
                 return self._send_json({"ok": False, "error": res["errore"]}, status=400)
+            if not res.get("ok", True):
+                return self._send_json({"ok": False, "error": res.get("errore") or res.get("error", "Errore esecuzione query")}, status=400)
+
             return self._send_json(
                 {
                     "ok": True,
                     "query": query_sql,
+                    "database": "archivio_recuperato.sqlite" if usa_recuperato else "accessi.sqlite",
                     "colonne": res.get("colonne", []),
                     "righe": res.get("righe", []),
                     "altre_righe": res.get("altre_righe", False),

@@ -196,7 +196,7 @@ def formatta_memoria_testo(
         domanda = (r.get("domanda") or "").strip()
         risposta = (r.get("risposta") or "").strip()
         if domanda or risposta:
-            blocchi.append(f"- Utente: {domanda}\n- Armando: {risposta}")
+            blocchi.append(f"- Utente: {domanda}\n- Terminus: {risposta}")
 
     return "\n".join(blocchi)
 

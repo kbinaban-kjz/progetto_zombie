@@ -33,6 +33,8 @@ try:
         cerca_in_csv,
         interroga_archivio_recuperato_sql,
         risolvi_missione_varco,
+        cerca_personale,
+        elenca_personaggi_e_operatori,
     )
 except ImportError:
     from config import DOMANDA_ESEMPIO, COMANDO_USCITA, stato_chiavi_api
@@ -56,6 +58,8 @@ except ImportError:
         cerca_in_csv,
         interroga_archivio_recuperato_sql,
         risolvi_missione_varco,
+        cerca_personale,
+        elenca_personaggi_e_operatori,
     )
 
 
@@ -71,6 +75,8 @@ def stampa_guida_comandi() -> None:
     print("  /rag <domanda>  : Recupera i pezzi e i file dall'archivio tramite RAG")
     print("  /catena <testo> : Analisi evidenze (copie vs misure dirette) e catena multi-documento")
     print("  /sql <domanda>  : Esegue l'agente SQL mostrando QUERY, RISULTATO e SPIEGAZIONE")
+    print("  /personale <n>  : Cerca operatori, tecnici e figure nei database e dossier (es. /personale Tina e Ugo)")
+    print("  /personaggi     : Censimento dinamico completo del personale e delle figure operative")
     print("  /csv [sottocmd] : Accesso tabelle CSV e archivio recuperato (/csv elenca, /csv leggi, /csv cerca, /csv sql, /csv varco)")
     print("  /clear-history  : Rimuove tutta la cronologia salvata nel database SQLite")
     print(f"  {COMANDO_USCITA}            : Esci dal programma\n")
@@ -143,7 +149,7 @@ def avvia_cli() -> int:
                     r_breve = (r['risposta'][:80] + '...') if len(r['risposta']) > 80 else r['risposta']
                     print(f"  {idx}. [ID {r['id']}] {r.get('created_at', '')}")
                     print(f"     Utente : {d_breve}")
-                    print(f"     Armando: {r_breve}")
+                    print(f"     Terminus: {r_breve}")
             continue
 
         if cmd_lower in {"/clear-history", "/pulisci-cronologia", "/elimina-cronologia", "/reset-cronologia"}:
@@ -235,6 +241,21 @@ def avvia_cli() -> int:
                     print(f"  {json.dumps(esito, ensure_ascii=False, indent=2)}")
                 else:
                     print("\n" + agente_sql(param))
+            continue
+
+        if cmd_lower.startswith("/personale") or cmd_lower.startswith("/cerca_personale"):
+            parti = domanda.split(maxsplit=1)
+            termine = parti[1].strip() if len(parti) > 1 else ""
+            if not termine:
+                print("Uso: /personale <nome, cognome o matricola> (es. /personale Tina e Ugo, /personale Nora Ferri)")
+            else:
+                esito = cerca_personale(termine)
+                print("\n" + esito.get("riassunto", ""))
+            continue
+
+        if cmd_lower.startswith("/personaggi"):
+            esito = elenca_personaggi_e_operatori()
+            print("\n" + esito.get("riassunto", ""))
             continue
 
         if cmd_lower.startswith("/csv"):

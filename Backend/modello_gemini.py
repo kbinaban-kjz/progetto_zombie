@@ -51,6 +51,8 @@ try:
         cerca_in_csv,
         interroga_archivio_recuperato_sql,
         risolvi_missione_varco,
+        cerca_personale,
+        elenca_personaggi_e_operatori,
     )
     from Backend.prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 except ImportError:
@@ -86,6 +88,8 @@ except ImportError:
         cerca_in_csv,
         interroga_archivio_recuperato_sql,
         risolvi_missione_varco,
+        cerca_personale,
+        elenca_personaggi_e_operatori,
     )
     from prompts import costruisci_istruzioni_con_fonti, formatta_messaggio_cloud
 
@@ -313,6 +317,8 @@ def genera_risposta(
                 cerca_in_csv,
                 interroga_archivio_recuperato_sql,
                 risolvi_missione_varco,
+                cerca_personale,
+                elenca_personaggi_e_operatori,
             ]
 
         # Costruzione cronologia messaggi per SDK google-genai (ultimi 10 scambi)

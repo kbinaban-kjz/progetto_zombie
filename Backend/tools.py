@@ -26,12 +26,15 @@ argomenti da JSON e intercetta gli errori senza interrompere il flusso dell'appl
 
 import csv
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 try:
     from Backend.config import (
+        ROOT_DIR,
+        DATI_DIR,
         ACCESSI_DB_PATH,
         DATA_MISSIONE_G4,
         risolvi_accessi_db,
@@ -55,6 +58,8 @@ try:
     )
 except ImportError:
     from config import (
+        ROOT_DIR,
+        DATI_DIR,
         ACCESSI_DB_PATH,
         DATA_MISSIONE_G4,
         risolvi_accessi_db,
@@ -1102,7 +1107,7 @@ I dati richiesti per la ricerca arrivano dai dossier. Se mancano, chiedili all�
 
 def interroga_database(query: str, database: str | Path | None = None) -> dict[str, Any]:
     """
-    Tool di sola lettura sul database di esercitazione (accessi.sqlite).
+    Tool di sola lettura sui database di esercitazione (accessi.sqlite e archivio_recuperato.sqlite).
     Implementazione protetta esattamente come da specifica Tool_SQL.ipynb:
     - Apre in modalità read-only (URI ?mode=ro).
     - Impone PRAGMA query_only = ON.
@@ -1114,7 +1119,27 @@ def interroga_database(query: str, database: str | Path | None = None) -> dict[s
     if not isinstance(query, str) or not query.strip():
         return {"errore": "Scrivi una query SQL."}
 
-    path = risolvi_accessi_db() if database is None else Path(database).resolve()
+    tabelle_rec = {"e04", "e10", "m05", "m12", "r02", "r03", "r06", "r07", "r08", "r09", "r11", "r13", "r14", "r15"}
+    db_str = str(database).lower() if database is not None else ""
+    parole_query = set(re.findall(r"\b[a-zA-Z0-9_]+\b", query.lower()))
+
+    if "archivio_recuperato" in db_str or "recuperato" in db_str or (db_str not in {"accessi", "accessi.sqlite"} and bool(parole_query & tabelle_rec)):
+        return interroga_archivio_recuperato_sql(query)
+
+    if database is None or db_str in {"accessi", "accessi.sqlite"}:
+        path = risolvi_accessi_db()
+    else:
+        path = Path(database).resolve()
+        if not path.is_file():
+            if Path(f"{database}.sqlite").is_file():
+                path = Path(f"{database}.sqlite").resolve()
+            elif (ROOT_DIR / f"{database}.sqlite").is_file():
+                path = ROOT_DIR / f"{database}.sqlite"
+            elif (ROOT_DIR / "New Information 2" / f"{database}.sqlite").is_file():
+                path = ROOT_DIR / "New Information 2" / f"{database}.sqlite"
+            else:
+                return {"errore": "Carica il database della tua squadra."}
+
     if not path.is_file():
         return {"errore": "Carica il database della tua squadra."}
 
@@ -1863,11 +1888,380 @@ def risolvi_missione_varco() -> dict[str, Any]:
         con.close()
 
 
+def cerca_personale(termine: str) -> dict[str, Any]:
+    """
+    Cerca operatori, tecnici, personaggi e personale operativo in tutti i database e dossier del sistema.
+
+    COSA FA
+    Effettua una ricerca incrociata e dinamica senza hardcoding su:
+    1. Database archivio_recuperato.sqlite (tabelle r03, r11, m12, r06, e04):
+       - Identifica operatori per nome, cognome o matricola (es. "Tina", "Ugo", "Tina Rocchi", "Ugo Valli", "PX-803574").
+       - Recupera squadra di appartenenza (r11 tramite m12), abilitazioni/ruoli (r06: es. SANITARIO, SICUREZZA),
+         e stato sospensioni disciplinari o sanitarie (e04) attive alla data della missione.
+    2. Database accessi.sqlite (Giorno 4 — Operazione Varco):
+       - Cerca operatori per nome (es. "Nora Ferri", "Operatore 098").
+       - Recupera codici di accesso, pratiche (es. RV753), depositi (es. Forte Cenere D6), stato e scadenza.
+    3. Documenti e dossier primari di missione (dati/):
+       - Cerca citazioni e contesti operativi nei file di testo ufficiali (es. G1, G2, LX5),
+         estraendo ruoli sul campo e mansioni (es. Livia Serra tesserino T547, Luca Serra tesserino T583, Nora Ferri).
+
+    ARGOMENTI
+    - termine: nome, cognome, matricola o parola chiave (supporta ricerche multiple separate da 'e', virgole o punti e virgola).
+
+    RESTITUISCE
+    Dizionario con:
+    - ok: True/False
+    - termine: stringa cercata
+    - totale_trovati: numero totale di riscontri
+    - operatori_archivio_recuperato: lista dettagliata degli operatori trovati con matricola, squadra, ruolo e sospensioni
+    - operatori_accessi: lista degli operatori trovati in accessi.sqlite con i relativi permessi e depositi
+    - riscontri_dossier: passaggi e citazioni pertinenti dai dossier primari
+    - riassunto: testo formattato e chiaro pronto per la risposta o per la consultazione investigativa.
+    """
+    if not isinstance(termine, str) or not termine.strip():
+        return {
+            "ok": False,
+            "errore": "Specificare un nome, cognome, matricola o parola chiave da cercare.",
+            "termine": str(termine),
+            "totale_trovati": 0,
+            "operatori_archivio_recuperato": [],
+            "operatori_accessi": [],
+            "riscontri_dossier": [],
+            "riassunto": "Nessun termine di ricerca specificato.",
+        }
+
+    q_raw = termine.strip()
+    parti_raw = re.split(r"[,;]|\s+e\s+|\s+and\s+", q_raw, flags=re.IGNORECASE)
+    termini = [p.strip() for p in parti_raw if len(p.strip()) >= 2]
+    if not termini:
+        termini = [q_raw]
+
+    operatori_rec: list[dict[str, Any]] = []
+    operatori_acc: list[dict[str, Any]] = []
+    riscontri_dossier: list[dict[str, Any]] = []
+
+    # 1. archivio_recuperato.sqlite
+    path_rec = risolvi_archivio_recuperato_db()
+    if path_rec.is_file():
+        try:
+            con_rec = sqlite3.connect(path_rec.as_uri() + "?mode=ro", uri=True)
+            cur = con_rec.cursor()
+            visti_rec_id = set()
+
+            for t in termini:
+                pat = f"%{t}%"
+                cur.execute(
+                    """
+                    SELECT o.k0, o.v1, o.v2
+                    FROM r03 o
+                    WHERE o.v1 LIKE ? OR o.v2 LIKE ?
+                    """,
+                    (pat, pat),
+                )
+                for op_id, op_nome, op_mat in cur.fetchall():
+                    if op_id in visti_rec_id:
+                        continue
+                    visti_rec_id.add(op_id)
+
+                    # Squadra
+                    cur.execute(
+                        """
+                        SELECT s.v1, m.ts_a, m.ts_b
+                        FROM m12 m
+                        JOIN r11 s ON m.k2 = s.k0
+                        WHERE m.k1 = ?
+                        """,
+                        (op_id,),
+                    )
+                    squadre = [{"squadra": r[0], "da": r[1], "a": r[2]} for r in cur.fetchall()]
+
+                    # Abilitazioni
+                    cur.execute(
+                        """
+                        SELECT DISTINCT v1 FROM r06 WHERE k1 = ?
+                        """,
+                        (op_id,),
+                    )
+                    abilitazioni = [r[0] for r in cur.fetchall()]
+
+                    # Sospensioni
+                    cur.execute(
+                        """
+                        SELECT v1, ts_a, ts_b FROM e04 WHERE k1 = ?
+                        """,
+                        (op_id,),
+                    )
+                    sospensioni = [{"motivo": r[0], "da": r[1], "a": r[2]} for r in cur.fetchall()]
+
+                    sospeso_missione = any(
+                        (s["da"] <= DATA_MISSIONE_VARCO and (not s["a"] or s["a"] >= DATA_MISSIONE_VARCO))
+                        for s in sospensioni
+                    )
+
+                    operatori_rec.append(
+                        {
+                            "id": op_id,
+                            "nome": op_nome,
+                            "matricola": op_mat,
+                            "squadre": list(dict.fromkeys([s["squadra"] for s in squadre])),
+                            "abilitazioni": list(dict.fromkeys(abilitazioni)),
+                            "sospensioni": list(dict.fromkeys([s["motivo"] for s in sospensioni])),
+                            "attivo_alla_missione": not sospeso_missione,
+                        }
+                    )
+            con_rec.close()
+        except Exception:
+            pass
+
+    # 2. accessi.sqlite
+    path_acc = risolvi_accessi_db()
+    if path_acc.is_file():
+        try:
+            con_acc = sqlite3.connect(path_acc.as_uri() + "?mode=ro", uri=True)
+            cur = con_acc.cursor()
+            for t in termini:
+                pat = f"%{t}%"
+                cur.execute(
+                    """
+                    SELECT a.id, o.nome, d.nome, d.settore, a.pratica, a.codice, a.stato, a.valido_fino
+                    FROM accessi a
+                    JOIN operatori o ON a.operatore_id = o.id
+                    JOIN depositi d ON a.deposito_id = d.id
+                    WHERE o.nome LIKE ? OR a.pratica LIKE ? OR a.codice LIKE ?
+                    """,
+                    (pat, pat, pat),
+                )
+                for r in cur.fetchall():
+                    operatori_acc.append(
+                        {
+                            "accesso_id": r[0],
+                            "operatore": r[1],
+                            "deposito": r[2],
+                            "settore": r[3],
+                            "pratica": r[4],
+                            "codice": r[5],
+                            "stato": r[6],
+                            "valido_fino": r[7],
+                        }
+                    )
+            con_acc.close()
+        except Exception:
+            pass
+
+    # 3. Dossier primari
+    dossier_dir = ROOT_DIR / "dati"
+    if not dossier_dir.is_dir():
+        dossier_dir = Path("dati")
+    if dossier_dir.is_dir():
+        for f in sorted(dossier_dir.glob("*.txt")):
+            txt = f.read_text(encoding="utf-8", errors="ignore")
+            for t in termini:
+                if len(t) >= 3 and re.search(r"\b" + re.escape(t) + r"\b", txt, flags=re.IGNORECASE):
+                    righe = [
+                        line.strip()
+                        for line in txt.splitlines()
+                        if re.search(r"\b" + re.escape(t) + r"\b", line, flags=re.IGNORECASE)
+                    ]
+                    riscontri_dossier.append(
+                        {
+                            "file": f.name,
+                            "termine": t,
+                            "estratti": righe[:3],
+                        }
+                    )
+
+    totale = len(operatori_rec) + len(operatori_acc) + len(riscontri_dossier)
+
+    # Costruzione riassunto investigativo chiaro ed esaustivo
+    linee_riassunto: list[str] = []
+    if operatori_rec:
+        linee_riassunto.append("OPERATORI REGISTRATI (Archivio Recuperato):")
+        for op in operatori_rec:
+            sq_str = ", ".join(op["squadre"]) if op["squadre"] else "Nessuna squadra assegnata"
+            ab_str = ", ".join(op["abilitazioni"]) if op["abilitazioni"] else "Nessuna abilitazione specifica"
+            sosp_str = (
+                f"Sospensioni: {', '.join(op['sospensioni'])}"
+                if op["sospensioni"]
+                else "Nessuna sospensione (ATTIVO)"
+            )
+            linee_riassunto.append(
+                f"- {op['nome']} (Matricola: {op['matricola']}, ID: {op['id']}): "
+                f"Squadra: {sq_str} | Ruolo/Abilitazione: {ab_str} | "
+                f"Stato per la missione ({DATA_MISSIONE_VARCO}): {'IDONEO' if op['attivo_alla_missione'] else 'SOSPESO'} ({sosp_str})"
+            )
+
+    if operatori_acc:
+        linee_riassunto.append("PERMESSI ED ACCESSI REGISTRATI (accessi.sqlite):")
+        for acc in operatori_acc[:10]:
+            linee_riassunto.append(
+                f"- {acc['operatore']}: Deposito {acc['deposito']} (Settore {acc['settore']}), "
+                f"Pratica {acc['pratica']}, Codice {acc['codice']} "
+                f"[{acc['stato']}, valido fino al {acc['valido_fino']}]"
+            )
+
+    if riscontri_dossier:
+        linee_riassunto.append("RIFERIMENTI NEI DOSSIER PRIMARI:")
+        for d in riscontri_dossier[:10]:
+            linee_riassunto.append(
+                f"- {d['file']} (menzione '{d['termine']}'): {d['estratti'][0] if d['estratti'] else ''}"
+            )
+
+    if not linee_riassunto:
+        riassunto = f"Nessun riscontro trovato per '{termine}' nei database e nei dossier di missione."
+    else:
+        riassunto = "\n".join(linee_riassunto)
+
+    return {
+        "ok": True,
+        "termine": termine,
+        "totale_trovati": totale,
+        "operatori_archivio_recuperato": operatori_rec,
+        "operatori_accessi": operatori_acc,
+        "riscontri_dossier": riscontri_dossier,
+        "riassunto": riassunto,
+    }
+
+
+def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
+    """
+    Elenca dinamicamente i personaggi chiave, operatori e figure operative rilevati nei database e nei dossier.
+
+    COSA FA
+    Interroga dinamicamente senza alcun hardcoding:
+    - I personaggi e tecnici citati nei dossier primari (dati/): es. Nora Ferri, Livia Serra, Luca Serra.
+    - Gli operatori con permessi speciali registrati in accessi.sqlite (es. operatori con accessi attivi a depositi sensibili).
+    - La squadra autorizzata e gli operatori chiave di archivio_recuperato.sqlite per la missione Varco V-59 (es. Tina Rocchi, Ugo Valli).
+
+    ARGOMENTI
+    - fonte: "tutte" (default), "archivio_recuperato", "accessi", oppure "dossier".
+
+    RESTITUISCE
+    Dizionario strutturato con l'elenco delle figure operative distinte per contesto e un riassunto testuale esplicativo.
+    """
+    fonte_norm = (fonte or "tutte").strip().lower()
+    risultati: dict[str, Any] = {
+        "ok": True,
+        "fonte_richiesta": fonte_norm,
+        "figure_dossier": [],
+        "squadra_missione_varco": {},
+        "totale_operatori_archivio": 0,
+        "operatori_accessi_nominativi": [],
+        "riassunto": "",
+    }
+
+    # 1. Dossier primari
+    if fonte_norm in ("tutte", "dossier", "primario"):
+        dossier_persone: dict[str, dict[str, Any]] = {}
+        luoghi_esclusi = {
+            "San Paolo", "San Mauro", "Forte Cenere", "Darsena Vuota", "Porto Sigillato",
+            "Corridoio Nord", "Muro 7", "Muro Sette", "Canale Infiltrato", "Ultima Voce",
+            "Stazione Echo", "Ripetitore Pietra", "Ripetitore Salice", "Settore D6", "Settore A1",
+            "Zona 0", "Ceppo LZ-7", "Silo 12", "Porto Haku", "Rotta Sud", "Rifugio Dago",
+        }
+        dossier_dir = ROOT_DIR / "dati"
+        if not dossier_dir.is_dir():
+            dossier_dir = Path("dati")
+        if dossier_dir.is_dir():
+            for f in sorted(dossier_dir.glob("*.txt")):
+                txt = f.read_text(encoding="utf-8", errors="ignore")
+                for match in re.finditer(r"\b([A-Z][a-z]+ [A-Z][a-z]+)\b", txt):
+                    nome = match.group(1)
+                    if nome in luoghi_esclusi or any(loc in nome for loc in ("San ", "Ripetitore", "Settore", "Porto", "Muro")):
+                        continue
+                    if nome not in dossier_persone:
+                        dossier_persone[nome] = {"nome": nome, "dossier": set(), "menzioni": []}
+                    dossier_persone[nome]["dossier"].add(f.name)
+                    for line in txt.splitlines():
+                        if nome in line and len(dossier_persone[nome]["menzioni"]) < 2:
+                            dossier_persone[nome]["menzioni"].append(line.strip())
+
+            for nome, dati in dossier_persone.items():
+                risultati["figure_dossier"].append({
+                    "nome": nome,
+                    "file_citazioni": sorted(dati["dossier"]),
+                    "dettagli": dati["menzioni"],
+                })
+
+    # 2. Squadra autorizzata e conteggio operatori archivio_recuperato.sqlite
+    if fonte_norm in ("tutte", "archivio_recuperato", "archivio", "recuperato"):
+        try:
+            esito_varco = risolvi_missione_varco()
+            if esito_varco.get("ok"):
+                risultati["squadra_missione_varco"] = {
+                    "squadra": esito_varco.get("squadra_autorizzata", {}).get("nome_squadra"),
+                    "operatore_sanitario": esito_varco.get("operatori_autorizzati", {}).get("sanitario"),
+                    "operatore_sicurezza": esito_varco.get("operatori_autorizzati", {}).get("sicurezza"),
+                    "varco": "V-59 (Archivio Erebo)",
+                    "data_orario": DATA_MISSIONE_VARCO,
+                }
+        except Exception:
+            pass
+
+        path_rec = risolvi_archivio_recuperato_db()
+        if path_rec.is_file():
+            try:
+                con = sqlite3.connect(path_rec.as_uri() + "?mode=ro", uri=True)
+                cur = con.cursor()
+                risultati["totale_operatori_archivio"] = cur.execute("SELECT COUNT(*) FROM r03").fetchone()[0]
+                con.close()
+            except Exception:
+                pass
+
+    # 3. Operatori nominativi in accessi.sqlite
+    if fonte_norm in ("tutte", "accessi", "accessi.sqlite"):
+        path_acc = risolvi_accessi_db()
+        if path_acc.is_file():
+            try:
+                con = sqlite3.connect(path_acc.as_uri() + "?mode=ro", uri=True)
+                cur = con.cursor()
+                cur.execute("""
+                    SELECT o.id, o.nome, COUNT(a.id) as n_accessi
+                    FROM operatori o
+                    LEFT JOIN accessi a ON o.id = a.operatore_id
+                    WHERE o.nome NOT LIKE 'Operatore %'
+                    GROUP BY o.id, o.nome
+                """)
+                for r in cur.fetchall():
+                    risultati["operatori_accessi_nominativi"].append({
+                        "id": r[0],
+                        "nome": r[1],
+                        "numero_accessi_registrati": r[2],
+                    })
+                con.close()
+            except Exception:
+                pass
+
+    # Riassunto
+    linee: list[str] = ["CENSIMENTO DINAMICO DEL PERSONALE E DEI PERSONAGGI:"]
+    if risultati["squadra_missione_varco"]:
+        v = risultati["squadra_missione_varco"]
+        san = v.get("operatore_sanitario") or {}
+        sic = v.get("operatore_sicurezza") or {}
+        linee.append(f"1. Squadra autorizzata Varco {v.get('varco')} al {v.get('data_orario')}: {v.get('squadra')}")
+        linee.append(f"   - Operatore Sanitario: {san.get('nome')} (Matricola {san.get('matricola')})")
+        linee.append(f"   - Operatore Sicurezza: {sic.get('nome')} (Matricola {sic.get('matricola')})")
+    if risultati["totale_operatori_archivio"]:
+        linee.append(f"2. Archivio recuperato (tabella r03): totale di {risultati['totale_operatori_archivio']} operatori registrati.")
+    if risultati["operatori_accessi_nominativi"]:
+        linee.append("3. Database accessi (accessi.sqlite):")
+        for op in risultati["operatori_accessi_nominativi"]:
+            linee.append(f"   - {op['nome']} (ID: {op['id']}, {op['numero_accessi_registrati']} permessi di deposito registrati)")
+    if risultati["figure_dossier"]:
+        linee.append("4. Figure e tecnici citati nei dossier primari:")
+        for fig in risultati["figure_dossier"]:
+            linee.append(f"   - {fig['nome']} (Dossier: {', '.join(fig['file_citazioni'])}): {fig['dettagli'][0] if fig['dettagli'] else ''}")
+
+    risultati["riassunto"] = "\n".join(linee)
+    return risultati
+
+
 # ==============================================================================
 # REGISTRO STRUMENTI E SCHEMI PER OPENAI FUNCTION CALLING
 # ==============================================================================
 
 STRUMENTI_REGISTRATI: dict[str, Any] = {
+    "cerca_personale": cerca_personale,
+    "elenca_personaggi_e_operatori": elenca_personaggi_e_operatori,
     "cerca_fonti": cerca_fonti,
     "recupera_rag": recupera_rag,
     "collega_documenti": collega_documenti,
@@ -2261,6 +2655,48 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 "i terminali operativi con relative chiavi, i candidati esclusi con motivazioni e l'informazione mancante."
             ),
             "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cerca_personale",
+            "description": (
+                "Cerca operatori, tecnici, personaggi e personale operativo in tutti i database e dossier del sistema "
+                "(archivio_recuperato.sqlite, accessi.sqlite e dossier primari in dati/). "
+                "Restituisce squadra di appartenenza, abilitazione (sanitario/sicurezza), matricola, sospensioni "
+                "e passaggi dai dossier. Supporta nomi singoli o multipli (es. 'Tina e Ugo', 'Nora Ferri', 'PX-803574')."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "termine": {
+                        "type": "string",
+                        "description": "Nome, cognome, matricola o codice persona da cercare (es. 'Tina', 'Ugo', 'Tina e Ugo', 'Nora Ferri').",
+                    }
+                },
+                "required": ["termine"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "elenca_personaggi_e_operatori",
+            "description": (
+                "Elenca dinamicamente i personaggi chiave, le figure operative e gli operatori censiti nei database "
+                "e nei dossier primari. Fornisce la squadra autorizzata al Varco V-59, il censimento di archivio_recuperato "
+                "(r03), gli operatori con permessi in accessi.sqlite e i tecnici citati nei dossier (es. Nora Ferri, Livia Serra, Luca Serra)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fonte": {
+                        "type": "string",
+                        "description": "Ambito da consultare: 'tutte' (default), 'archivio_recuperato', 'accessi' o 'dossier'.",
+                    }
+                },
+            },
         },
     },
 ]
