@@ -227,6 +227,29 @@
     "desc": "Magazzino e deposito perimetrale situato lungo il settore costiero adriatico."
   },
   {
+    "id": "torrealta",
+    "code": "PRS-05",
+    "name": "Presidio Torre Alta",
+    "place": "Torre Alta",
+    "region": "Appennino / Presidio Sicuro, IT",
+    "lat": 44.22,
+    "lon": 11.75,
+    "type": "bunker",
+    "status": "PRESIDIO OPERATIVO",
+    "threat": 1,
+    "survivors": "Personale Medico",
+    "contact": "CONFERMA UMANA",
+    "source": "G5-03",
+    "reliability": 95,
+    "tags": [
+      "NORA FERRI",
+      "DESTINAZIONE LUME",
+      "GIORNO 5",
+      "PRESIDIO SANITARIO"
+    ],
+    "desc": "Presidio operativo indicato da Nora Ferri nel messaggio [G5-03] come destinazione sicura per il trattamento LUME, per salvarlo dall'ordine di distruzione automatica impartito dal sistema ECO."
+  },
+  {
     "id": "genova",
     "code": "GEN-07",
     "name": "Porto Sigillato",

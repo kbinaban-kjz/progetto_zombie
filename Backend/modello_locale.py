@@ -838,29 +838,27 @@ def risposta_locale_da_fonti(
         if analisi_imprevisti:
             return avviso + analisi_imprevisti
 
-    # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Imprevisti -> LX5, Giorno 3 -> ARCH)
+    # 4b. Richieste mirate sulla fase (Giorno 1 -> G1, Giorno 2 -> G2, Giorno 5 -> G5, Imprevisti -> LX5, Giorno 3 -> ARCH)
     if not attacco_utente:
         fase: tuple[str, list[dict[str, object]]] | None = None
-        if "giorno 1" in q or "g1" in q.split():
-            fase = (
-                "Atti e testimonianze del Giorno 1 [G1]:",
-                [u for u in indice_documenti if str(u["file"]).lower().startswith("g1")][:5],
-            )
-        elif "giorno 2" in q or "g2" in q.split():
-            fase = (
-                "Atti e testimonianze del Giorno 2 [G2]:",
-                [u for u in indice_documenti if str(u["file"]).lower().startswith("g2")][:5],
-            )
-        elif "imprevist" in q or "lx5" in q.split():
-            fase = (
-                "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:",
-                [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:5],
-            )
-        elif "giorno 3" in q or "g3" in q.split() or "esumazione" in q or "archivio sepolto" in q:
-            fase = (
-                "Reperti dell'Archivio Sepolto — Giorno 3 [ARCH]:",
-                [u for u in indice_documenti if str(u["id"]).upper().startswith("ARCH-")][:5],
-            )
+        m_g_req = re.search(r"\b(?:giorno\s*0?(\d+)|g(\d+))\b", q)
+        if m_g_req:
+            num = m_g_req.group(1) or m_g_req.group(2)
+            prefix = f"g{num}"
+            docs_g = [u for u in indice_documenti if str(u.get("file", "")).lower().startswith(prefix) or str(u.get("id", "")).lower().startswith(prefix)]
+            if docs_g:
+                fase = (f"Atti e testimonianze del Giorno {num} [G{num}]:", docs_g[:5])
+        if not fase:
+            if "imprevist" in q or "lx5" in q.split():
+                fase = (
+                    "Rapporti sugli Imprevisti dell'Unità 5 [LX5]:",
+                    [u for u in indice_documenti if str(u["file"]).lower().startswith("lx5")][:5],
+                )
+            elif "giorno 3" in q or "g3" in q.split() or "esumazione" in q or "archivio sepolto" in q:
+                fase = (
+                    "Reperti dell'Archivio Sepolto — Giorno 3 [ARCH]:",
+                    [u for u in indice_documenti if str(u["id"]).upper().startswith("ARCH-")][:5],
+                )
         if fase and fase[1]:
             titolo, scelti_fase = fase
             if _chiede_collegamenti(q) or re.search(r"riassum\w*|sintesi|punti", q):
@@ -983,7 +981,7 @@ def _risposta_neurale_valida(risposta_neurale: str, base_deterministica: str, at
     id_resp = {
         m.upper().replace("_", "-")
         for m in re.findall(
-            r"(?:\[)?(G[12]-\d{2}|LX5[-_]\d{4}|ARCH[-_]\d+|WIKI[-_]\d+)(?:\])?",
+            r"(?:\[)?(G\d+-\d{2}|LX5[-_]\d{4}|ARCH[-_]\d+|WIKI[-_]\d+)(?:\])?",
             risposta_neurale,
             re.IGNORECASE,
         )

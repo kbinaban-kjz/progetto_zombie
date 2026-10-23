@@ -13,8 +13,9 @@ BACKEND_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BACKEND_DIR.parent
 ENV_PATH = ROOT_DIR / ".env"
 DATI_DIR = ROOT_DIR / "dati" if (ROOT_DIR / "dati").is_dir() else ROOT_DIR / "data"
-# Documenti aggiunti giorno per giorno (es. new_dati/ per il Giorno 2)
+# Documenti aggiunti giorno per giorno (es. new_dati/ per il Giorno 2, dati_4/ per il Giorno 5)
 NUOVI_DATI_DIR = ROOT_DIR / "new_dati"
+DATI_4_DIR = ROOT_DIR / "dati_4"
 # Archivio digitale di emergenza (Giorno 3 — Operazione Esumazione: .txt, .html, .json, .xml)
 ARCHIVIO_DIR = DATI_DIR / "archivio" if (DATI_DIR / "archivio").is_dir() else ROOT_DIR / "archivio"
 # Pacchetto "imprevisti" del Giorno 3 (500 documenti LX5_*.txt): va unito all'archivio per il RAG
@@ -64,6 +65,49 @@ carica_env()
 def valore_env(nome: str, default: str | None = None) -> str | None:
     """Restituisce il valore di una variabile d'ambiente (da os.environ o da .env)."""
     return os.environ.get(nome) or carica_env().get(nome) or default
+
+
+def risolvi_cartelle_dati_disponibili() -> list[Path]:
+    """
+    Rileva dinamicamente tutte le cartelle dati presenti nel workspace senza hardcoding:
+    - Cartelle standard (dati/, new_dati/, dati_4/)
+    - Qualsiasi cartella nella root che inizi per 'dati' o 'data' e contenga documenti operativi
+    - Percorsi configurati da variabili d'ambiente (DATI_DIR, DATI_4_DIR, ecc.)
+    """
+    trovate: list[Path] = []
+
+    # 1. Candidati espliciti/d'ambiente
+    candidati_base = [
+        valore_env("DATI_DIR"),
+        valore_env("DATI_4_DIR"),
+        str(DATI_DIR),
+        str(NUOVI_DATI_DIR),
+        str(DATI_4_DIR),
+        str(ROOT_DIR / "data"),
+    ]
+    for c in candidati_base:
+        if c:
+            p = Path(c).resolve()
+            if p.is_dir() and p not in trovate:
+                trovate.append(p)
+
+    # 2. Rilevamento dinamico su ROOT_DIR (qualsiasi cartella dati* o new_dati*)
+    try:
+        for p in ROOT_DIR.iterdir():
+            if p.is_dir() and not p.name.startswith((".", "_", "~")):
+                nome_low = p.name.lower()
+                if (nome_low.startswith("dati") or nome_low.startswith("data") or "dati" in nome_low) and p.resolve() not in trovate:
+                    if p.name in ("archivio", "dati_imprevisti_gg3"):
+                        continue
+                    try:
+                        if any(f.is_file() and f.suffix.lower() in ESTENSIONI_SUPPORTATE for f in p.iterdir()):
+                            trovate.append(p.resolve())
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
+    return trovate
 
 # Configurazione Database SQLite (Cronologia conversazioni)
 DB_PATH = Path(valore_env("SQLITE_DB_PATH", str(BACKEND_DIR / "cronologia.db")))

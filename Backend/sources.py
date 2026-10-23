@@ -31,6 +31,8 @@ try:
         IMPREVISTI_DIR,
         MODELLO_EMBEDDING_RAG,
         NUOVI_DATI_DIR,
+        DATI_4_DIR,
+        risolvi_cartelle_dati_disponibili,
         ROOT_DIR,
     )
 except ImportError:
@@ -42,6 +44,8 @@ except ImportError:
         IMPREVISTI_DIR,
         MODELLO_EMBEDDING_RAG,
         NUOVI_DATI_DIR,
+        DATI_4_DIR,
+        risolvi_cartelle_dati_disponibili,
         ROOT_DIR,
     )
 
@@ -232,11 +236,17 @@ def read_document(path: str | Path) -> str:
 # ==============================================================================
 def risolvi_cartelle_dati(includi_archivio: bool = False) -> list[Path]:
     """
-    Restituisce le cartelle del dossier (dati/, new_dati/ ed eventualmente l'archivio unito:
-    dati/archivio/ + dati/dati_imprevisti_gg3/).
+    Restituisce dinamicamente le cartelle del dossier (dati/, new_dati/, dati_4/ ed
+    eventualmente l'archivio unito: dati/archivio/ + dati/dati_imprevisti_gg3/).
+    Rileva automaticamente qualsiasi cartella dati presente o configurata senza hardcoding.
     """
     cartelle: list[Path] = []
-    candidate: list[Path] = [DATI_DIR, NUOVI_DATI_DIR, ROOT_DIR / "dati", ROOT_DIR / "data"]
+    candidate: list[Path] = []
+    try:
+        candidate.extend(risolvi_cartelle_dati_disponibili())
+    except Exception:
+        candidate.extend([DATI_DIR, NUOVI_DATI_DIR, DATI_4_DIR, ROOT_DIR / "dati", ROOT_DIR / "data"])
+
     if includi_archivio:
         candidate.extend(
             [ARCHIVIO_DIR, DATI_DIR / "archivio", ROOT_DIR / "archivio", IMPREVISTI_DIR]
@@ -441,11 +451,10 @@ def estrai_metadati_fonte(nome: str, testo: str) -> dict[str, str]:
 
     id_upper = doc_id.upper()
     nome_lower = (nome or doc_id).lower()
-    if nome_lower.startswith("g1") or id_upper.startswith("G1"):
-        fase = "Giorno 1"
-    elif nome_lower.startswith("g2") or id_upper.startswith("G2"):
-        fase = "Giorno 2"
-    elif nome_lower.startswith("lx5") or id_upper.startswith("LX5"):
+    m_g = re.match(r"^G(\d+)", id_upper) or re.match(r"^g(\d+)", nome_lower)
+    if m_g:
+        fase = f"Giorno {m_g.group(1)}"
+    elif nome_lower.startswith("lx") or id_upper.startswith("LX"):
         fase = "Imprevisti"
     elif id_upper.startswith("ARCH"):
         fase = "Giorno 3 (Archivio)"
@@ -818,7 +827,7 @@ def scegli_fonti_dettagliato(
     includi_multi_hop: bool = True,
 ) -> dict[str, Any]:
     """
-    Esegue il recupero RAG sull'intero archivio (1.023 file in .txt, .html, .json, .xml)
+    Esegue il recupero RAG sull'intero archivio (file in .txt, .html, .json, .xml)
     e restituisce sia le coppie (nome_file, testo) per il modello, sia i metadati dettagliati
     dei file e blocchi recuperati (con punteggio e motivo del recupero).
     """

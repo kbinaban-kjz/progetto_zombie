@@ -1,0 +1,4 @@
+ID G5-01
+Ultimo ordine della centrale
+
+Il deposito Forte Cenere è stato individuato. Portate il contenitore recuperato al forno di smaltimento. La centrale chiama questa procedura «sanificazione». Non aprite il registro di servizio.

@@ -25,6 +25,7 @@ from typing import Any, Sequence
 # ESTRAZIONE ENTITÀ
 # ==============================================================================
 _RE_CODICE = re.compile(r"(?<![\w-])([A-Za-z]{1,5}[-_]?\d{2,6}(?:[-_]\d+)?)(?![\w-])")
+_RE_SETTORE = re.compile(r"\bsettore\s+([A-Za-z]\d)\b", re.IGNORECASE)
 _RE_NOME_COMPOSTO = re.compile(r"\b([A-Z][a-zàèéìòù]+(?:\s+[A-Z][a-zàèéìòù]+)+)\b")
 _RE_PAROLA_MAIUSCOLA = re.compile(r"\b([A-Z][a-zàèéìòù]{2,})\b")
 _RE_ACRONIMO = re.compile(r"\b([A-Z]{3,10})\b")
@@ -62,6 +63,7 @@ _PAROLE_NON_ENTITA = {
     "archivio", "wiki", "wikipedia", "ricevuta", "collocazione", "officina",
     "forte", "punto", "raccolta", "invio", "alimentazione", "presente",
     "assente", "riuscito", "fallito", "nuove", "nuovi", "dati", "dato",
+    "portate", "portatelo", "fermate", "inviatelo", "aprite",
 }
 
 _ACRONIMI_NON_ENTITA = {
@@ -90,6 +92,10 @@ def estrai_entita(testo: str) -> dict[str, set[str]]:
         # Esclude parole comuni scambiate per codici (es. "DI2") e anni isolati.
         if any(c.isdigit() for c in cod):
             codici.add(_normalizza_entita(cod))
+
+    for m in _RE_SETTORE.finditer(testo or ""):
+        codici.add(_normalizza_entita(f"settore {m.group(1).upper()}"))
+        codici.add(_normalizza_entita(m.group(1).upper()))
 
     nomi: set[str] = set()
     for m in _RE_NOME_COMPOSTO.finditer(testo or ""):

@@ -55,7 +55,7 @@ Trovata autorizzazione valida nel registro accessi. Il codice di autorizzazione 
 
 --- Prova 2: Pratica inesistente (nessun codice inventato) ---
 QUERY
-SELECT a.codice FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri' AND d.nome = 'Forte Cenere' AND a.pratica = 'PX9999' AND a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'
+SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND accessi.pratica = 'PX9999' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
 RISULTATO
 {"colonne": ["codice"], "righe": [], "altre_righe": false}
 SPIEGAZIONE
@@ -85,7 +85,7 @@ Trovata autorizzazione valida nel registro accessi relativa alla pratica PX0398.
 == G. RISPONDITORE INVESTIGATORE (ROUTER + CHAT) ==
 Risposta Investigatore:
 QUERY
-SELECT a.codice FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri' AND d.nome = 'Forte Cenere' AND d.settore = 'D6' AND a.pratica = 'RV753' AND a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'
+SELECT accessi.codice FROM accessi JOIN operatori ON accessi.operatore_id = operatori.id JOIN depositi ON accessi.deposito_id = depositi.id WHERE operatori.nome = 'Nora Ferri' AND depositi.nome = 'Forte Cenere' AND depositi.settore = 'D6' AND accessi.pratica = 'RV753' AND accessi.stato = 'attivo' AND accessi.valido_fino >= '2031-10-12 06:00'
 RISULTATO
 {"colonne": ["codice"], "righe": [["057284"]], "altre_righe": false}
 SPIEGAZIONE
