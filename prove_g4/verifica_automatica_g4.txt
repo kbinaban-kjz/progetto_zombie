@@ -85,11 +85,11 @@ Trovata autorizzazione valida nel registro accessi relativa alla pratica PX0398.
 == G. RISPONDITORE INVESTIGATORE (ROUTER + CHAT) ==
 Risposta Investigatore:
 QUERY
-SELECT a.id, o.nome AS persona, d.nome AS deposito, d.settore AS settore, a.pratica, a.codice, a.stato, a.valido_fino FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri' AND d.nome = 'Forte Cenere' AND d.settore = 'D6' AND a.pratica = 'RV753' AND a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'
+SELECT a.codice FROM accessi a JOIN operatori o ON a.operatore_id = o.id JOIN depositi d ON a.deposito_id = d.id WHERE o.nome = 'Nora Ferri' AND d.nome = 'Forte Cenere' AND d.settore = 'D6' AND a.pratica = 'RV753' AND a.stato = 'attivo' AND a.valido_fino >= '2031-10-12 06:00'
 RISULTATO
-{"colonne": ["id", "persona", "deposito", "settore", "pratica", "codice", "stato", "valido_fino"], "righe": [[83, "Nora Ferri", "Forte Cenere", "D6", "RV753", "057284", "attivo", "2031-10-12 23:59"]], "altre_righe": false}
+{"colonne": ["codice"], "righe": [["057284"]], "altre_righe": false}
 SPIEGAZIONE
-Trovata autorizzazione valida nel registro accessi per Nora Ferri presso il deposito Forte Cenere (settore D6) relativa alla pratica RV753. Il codice di autorizzazione è: 057284 (stato: attivo, valido fino al: 2031-10-12 23:59). Lo zero iniziale è conservato.
+Trovata autorizzazione valida nel registro accessi. Il codice di autorizzazione è: 057284. Lo zero iniziale è conservato.
 [OK] L'Investigatore risponde con il codice '057284'
 [OK] L'Investigatore conserva lo zero iniziale
 

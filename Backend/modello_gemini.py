@@ -402,7 +402,7 @@ def genera_risposta(
                                 parts=[types.Part.from_text(text=domanda)],
                             ),
                             risultato.candidates[0].content,
-                            types.Content(role="tool", parts=parti_risposte),
+                            types.Content(role="user", parts=parti_risposte),
                         ],
                         config=types.GenerateContentConfig(
                             system_instruction=istruzioni_sistema,

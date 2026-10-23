@@ -511,10 +511,13 @@ def _sintesi_documenti(
         overlap = len(chiavi_domanda & _radici_testuali(frase))
         # Per le domande dirette (non "collega/confronta") una frase che condivide solo
         # un verbo generico non basta: evita risposte fuori tema come «fermare le partenze».
-        if righe and not chiede_link and not chiede_luogo and punteggio < 2.4:
-            continue
-        if righe and not chiede_link and not chiede_luogo and len(chiavi_domanda) >= 2 and overlap < 2:
-            continue
+        if not chiede_link and not chiede_luogo:
+            if chiavi_domanda and overlap == 0:
+                continue
+            if righe and punteggio < 2.4:
+                continue
+            if righe and len(chiavi_domanda) >= 2 and overlap < 2:
+                continue
         visti.add(nome)
         documento_scelti.append(doc)
         tag_file = f" ({nome})" if nome.lower().startswith("documento_") else ""
@@ -771,6 +774,32 @@ def risposta_locale_da_fonti(
                         return avviso + res_cerca.get("riassunto", "")
                 except Exception:
                     pass
+
+        # Se chiede informazioni su canali, terminali o varchi delle tabelle recuperate:
+        m_tech = re.search(r"\b(?:cos['\u2019]è|cosa\s+(?:è|e)|informazioni\s+su|dettagli\s+su)\s+(?:il\s+|lo\s+|la\s+|l['\u2019])?((?:canale|terminale|varco)\s+[a-zA-Z0-9_-]+)", q, re.IGNORECASE)
+        if m_tech:
+            termine_tech = m_tech.group(1).strip()
+            try:
+                from Backend.tools import cerca_in_csv
+                res_csv = cerca_in_csv(termine_tech)
+                if res_csv.get("ok") and res_csv.get("totale_riscontri", 0) > 0:
+                    item = res_csv["risultati"][0]
+                    tab = item.get("tabella", "")
+                    dati = item.get("dati", {})
+                    if tab == "r09":
+                        return (
+                            avviso
+                            + f"{dati.get('v1', termine_tech)} è un canale di trasmissione operativo registrato nella tabella {tab} (terminali) "
+                            f"dell'archivio recuperato, associato al terminale ID {dati.get('k0')} (varco ID {dati.get('k1')}, stato: {dati.get('v2')})."
+                        )
+                    elif tab == "r07":
+                        return (
+                            avviso
+                            + f"Il varco {dati.get('v1', termine_tech)} (ID {dati.get('k0')}) è un varco fisico dell'archivio recuperato "
+                            f"collegato alla sede archivio ID {dati.get('k1')} (tabella {tab})."
+                        )
+            except Exception:
+                pass
 
     # 4a-bis. Nessuna colpa senza prova: domande su manomissioni/sabotaggi/colpevoli.
     # Se nessun documento attribuisce il fatto a una persona, non si sceglie un colpevole
