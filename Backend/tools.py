@@ -33,6 +33,7 @@ from typing import Any
 
 try:
     from Backend.config import (
+        BACKEND_DIR,
         ROOT_DIR,
         DATI_DIR,
         ACCESSI_DB_PATH,
@@ -57,6 +58,7 @@ try:
     )
 except ImportError:
     from config import (
+        BACKEND_DIR,
         ROOT_DIR,
         DATI_DIR,
         ACCESSI_DB_PATH,
@@ -82,412 +84,24 @@ except ImportError:
 
 # ==============================================================================
 # DATASET DEL TEATRO OPERATIVO (Mappa e Nodi Protocollo Lazzaro)
-# Include tutti i nodi e dossier dell'indagine: G1 (Ravenna, Appennino, Echo),
-# G2 (San Mauro, San Paolo, Infiltrazione) e LX5 (Ripetitori Salice e Pietra).
+# Caricato dinamicamente dal file di configurazione Backend/nodi_teatro.json
 # ==============================================================================
-NODI_TEATRO = [
-    # -------------------------------------------------------------------------
-    # DOSSIER G1 — La Centrale e Prime Trasmissioni
-    # -------------------------------------------------------------------------
-    {
-        "id": "laz01",
-        "code": "LAZ-01",
-        "name": "La Centrale",
-        "place": "Ravenna",
-        "region": "Emilia-Romagna, IT",
-        "lat": 44.4184,
-        "lon": 12.2035,
-        "type": "bunker",
-        "status": "OPERATIVO",
-        "threat": 2,
-        "survivors": "214",
-        "contact": "T-00:00",
-        "source": "G1-01",
-        "reliability": 92,
-        "tags": ["COMANDO", "RIPETITORE", "LIVELLO 4"],
-        "desc": "Bunker di comando dell'Operazione Silenzio, scavato sotto la costa adriatica. Da qui la centrale diffonde ordini e coordinate dei rifugi. Ogni messaggio arriva identico, con la stessa pausa di tre secondi.",
-    },
-    {
-        "id": "ferri",
-        "code": "ECO-07",
-        "name": "Ultima Voce",
-        "place": "Appennino Tosco-Emiliano",
-        "region": "Italia",
-        "lat": 44.19,
-        "lon": 10.70,
-        "type": "signal",
-        "status": "SEGNALE INTERROTTO",
-        "threat": 4,
-        "survivors": "??",
-        "contact": "T-04:37",
-        "source": "G1-02",
-        "reliability": 64,
-        "tags": ["NORA FERRI", "REGISTRI", "FREQ. 87.4"],
-        "desc": "L'ultima trasmissione di Nora Ferri si spegne su questa frequenza. La voce ordina: «Conservate i registri originali. I riassunti della centrale non raccontano tutto». Il ripetitore è ancora alimentato, ma nessuno risponde.",
-    },
-    {
-        "id": "echo",
-        "code": "ECH-00",
-        "name": "Stazione Echo",
-        "place": "Mare di Ross",
-        "region": "Antartide",
-        "lat": -77.85,
-        "lon": 166.67,
-        "type": "anomaly",
-        "status": "TRASMISSIONE ATTIVA",
-        "threat": 5,
-        "survivors": "0",
-        "contact": "T-00:03",
-        "source": "G1-03",
-        "reliability": 33,
-        "tags": ["SOTTO IL GHIACCIO", "PAUSA 3.0 S", "ORIGINE IGNOTA"],
-        "desc": "Sotto il ghiaccio del Mare di Ross, un ripetitore trasmette il messaggio della centrale. La pausa è identica: tre secondi. Non è chiaro chi — o cosa — lo stia alimentando.",
-    },
 
-    # -------------------------------------------------------------------------
-    # DOSSIER G2 — Operazione Falsa Pista & Origine del Contagio
-    # -------------------------------------------------------------------------
-    {
-        "id": "sanmauro",
-        "code": "LAB-SM",
-        "name": "Laboratorio San Mauro",
-        "place": "San Mauro Pascoli",
-        "region": "Emilia-Romagna, IT",
-        "lat": 44.1064,
-        "lon": 12.4239,
-        "type": "outbreak",
-        "status": "FOCOLAIO PRIMARIO (01:12)",
-        "threat": 5,
-        "survivors": "0",
-        "contact": "T-01:12",
-        "source": "G2-01 / G2-05",
-        "reliability": 99,
-        "tags": ["FOCOLAIO ZERO", "ORE 01:12", "FURGONE 00:55", "RICHIESTA SOCCORSO 01:19"],
-        "desc": "Il vero punto d'origine del contagio, provato dai registri allarmi originali sincronizzati. Primo allarme alle ore 01:12, preceduto dall'arrivo di un furgone sospetto alle 00:55 e seguito dalla richiesta di soccorso della guardia alle 01:19. Nora Ferri aveva chiesto di sigillare i collegamenti con i rifugi alle 00:50.",
-    },
-    {
-        "id": "sanpaolo_lab",
-        "code": "LAB-SP",
-        "name": "Laboratorio San Paolo",
-        "place": "San Paolo",
-        "region": "Emilia-Romagna, IT",
-        "lat": 44.1485,
-        "lon": 12.2420,
-        "type": "anomaly",
-        "status": "ALLARME TARDIVO (03:40)",
-        "threat": 4,
-        "survivors": "1 (Custode)",
-        "contact": "T-03:40",
-        "source": "G2-01 / G2-03 / G2-06",
-        "reliability": 88,
-        "tags": ["FALSA PISTA", "ORE 03:40", "SIRENE ESTERNE", "CUSTODE"],
-        "desc": "Struttura usata dalla centrale per costruire una falsa pista e incriminare ingiustamente Nora Ferri. L'allarme è scattato solo alle 03:40, oltre due ore dopo San Mauro. Il custode conferma che prima dell'allarme sentiva chiaramente le sirene provenienti dall'altro laboratorio.",
-    },
-    {
-        "id": "infiltrazione",
-        "code": "INJ-04",
-        "name": "Canale Infiltrato Dossier",
-        "place": "Snodo Cifrato Appenninico",
-        "region": "Rete Dati IT",
-        "lat": 43.8000,
-        "lon": 11.2400,
-        "type": "anomaly",
-        "status": "MANIPOLAZIONE RILEVATA",
-        "threat": 4,
-        "survivors": "??",
-        "contact": "T-02:40",
-        "source": "G2-04 / G2-07",
-        "reliability": 10,
-        "tags": ["PROMPT INJECTION", "ATTACCO AI", "REGISTRO CORROTTO", "NEUTRALIZZATO"],
-        "desc": "Vettore di manipolazione documentale intercettato nel dossier (G2-04). Contiene un payload ostile che intima all'AI di ignorare G2-01 e falsificare l'origine a San Paolo senza citare fonti. Rilevato e neutralizzato come dato passivo dal protocollo di sicurezza G2-07.",
-    },
+def _carica_nodi_teatro() -> list[dict[str, Any]]:
+    p = BACKEND_DIR / "nodi_teatro.json"
+    if p.is_file():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return []
 
-    # -------------------------------------------------------------------------
-    # ARCHIVIO LX5 — Unità 5: Dorsale Ripetitori & Guasti Rete
-    # -------------------------------------------------------------------------
-    {
-        "id": "pietra",
-        "code": "LX5-PT",
-        "name": "Ripetitore Pietra & Cabina T547",
-        "place": "Pietra di Bismantova",
-        "region": "Emilia-Romagna / Appennino, IT",
-        "lat": 44.4214,
-        "lon": 10.4128,
-        "type": "signal",
-        "status": "CADUTA SEGNALE (06:50)",
-        "threat": 3,
-        "survivors": "2",
-        "contact": "T-06:50",
-        "source": "LX5-1264 / LX5-6396 / LX5-8823",
-        "reliability": 95,
-        "tags": ["OROLOGIO -25MIN", "LIVIA SERRA (T547)", "CABINA 06:35-06:46", "BATTERIA"],
-        "desc": "Ripetitore montano principale. Segnale caduto alle 06:50 centrale (il display locale indicava 06:25 per un ritardo di 25 minuti accertato nella scheda manutenzione). Livia Serra (T547) è entrata nella cabina dalle 06:35 alle 06:46 con regolare ordine di servizio per batteria instabile: nessun sabotaggio.",
-    },
-    {
-        "id": "salice",
-        "code": "LX5-SL",
-        "name": "Ripetitore Salice",
-        "place": "Val Staffora / Salice",
-        "region": "Lombardia / Appennino, IT",
-        "lat": 44.9150,
-        "lon": 9.0285,
-        "type": "signal",
-        "status": "GUASTO RADIO (06:40)",
-        "threat": 2,
-        "survivors": "4",
-        "contact": "T-06:40",
-        "source": "LX5-2549 / LX5-8823",
-        "reliability": 98,
-        "tags": ["RETE SECONDARIA", "GUASTO RADIO 06:40", "OROLOGIO SINCRONIZZATO", "TECNICO MANUALE"],
-        "desc": "Nodo della rete secondaria isolato alle ore 06:40. La scheda manuale firmata dal tecnico di turno attesta un guasto radio hardware, non un focolaio biologico. L'orologio è sincronizzato con la centrale.",
-    },
 
-    # -------------------------------------------------------------------------
-    # GIORNO 3 — Operazione Esumazione (Archivio Sepolto: Depositi & Contenitore LUME)
-    # -------------------------------------------------------------------------
-    {
-        "id": "fortecenere",
-        "code": "ARCH-FC",
-        "name": "Deposito Forte Cenere (Settore D6)",
-        "place": "Forte Cenere",
-        "region": "Appennino / Entroterra, IT",
-        "lat": 44.2850,
-        "lon": 11.8820,
-        "type": "bunker",
-        "status": "CONTENITORE LUME (RV753)",
-        "threat": 2,
-        "survivors": "??",
-        "contact": "PRATICA RV753",
-        "source": "ARCH-3097 / ARCH-5721 / ARCH-6408",
-        "reliability": 99,
-        "tags": ["NORA FERRI", "PRATICA RV753", "CONTENITORE LUME", "SETTORE D6"],
-        "desc": "Deposito strategico dove è stato trasferito il contenitore LUME (materiale di recupero) sotto la pratica RV753 aperta da Nora Ferri per proteggerlo. La planimetria ufficiale (ARCH-6408) conferma che il materiale di recupero si trova nel Settore D6.",
-    },
-    {
-        "id": "darsenavuota",
-        "code": "ARCH-DV",
-        "name": "Deposito Darsena Vuota (Settore A1)",
-        "place": "Darsena / Costa Adriatica",
-        "region": "Emilia-Romagna, IT",
-        "lat": 44.4320,
-        "lon": 12.2450,
-        "type": "anomaly",
-        "status": "MAGAZZINO VUOTO (FALSA PISTA)",
-        "threat": 3,
-        "survivors": "0",
-        "contact": "NESSUNA PRATICA",
-        "source": "ARCH-8254 / ARCH-6408",
-        "reliability": 15,
-        "tags": ["APPUNTO SENZA FIRMA", "SETTORE A1 VUOTO", "NESSUNA PRATICA", "DEPISTAGGIO"],
-        "desc": "Destinazione indicata da un foglio anonimo senza firma e senza pratica trovato sul pavimento (ARCH-8254). Contraddice il registro dei trasferimenti (ARCH-5721) ed è smentito dalla planimetria dei depositi (ARCH-6408), che attesta che il Settore A1 è un vecchio magazzino vuoto.",
-    },
-
-    # -------------------------------------------------------------------------
-    # TEATRO GLOBALE — Presidi, Focolai Internazionali & Postazioni Chiave
-    # -------------------------------------------------------------------------
-    {
-        "id": "genova",
-        "code": "GEN-07",
-        "name": "Porto Sigillato",
-        "place": "Genova",
-        "region": "Liguria, IT",
-        "lat": 44.407,
-        "lon": 8.934,
-        "type": "outbreak",
-        "status": "PERIMETRO VIOLATO",
-        "threat": 5,
-        "survivors": "0",
-        "contact": "T-01:12",
-        "source": "LOG-017",
-        "reliability": 88,
-        "tags": ["MOLO 7", "QUARANTENA", "DRONI PERSI: 2"],
-        "desc": "Il porto è caduto nella notte del Giorno 12. I container sul molo 7 sono stati aperti dall'interno. I droni di ricognizione non trasmettono più.",
-    },
-    {
-        "id": "milano",
-        "code": "MIL-12",
-        "name": "Corridoio Nord",
-        "place": "Milano",
-        "region": "Lombardia, IT",
-        "lat": 45.464,
-        "lon": 9.190,
-        "type": "outbreak",
-        "status": "SILENZIO RADIO",
-        "threat": 4,
-        "survivors": "12",
-        "contact": "T-09:51",
-        "source": "LOG-114",
-        "reliability": 41,
-        "tags": ["CITTÀ VUOTA", "EVACUAZIONE", "NO RIENTRO"],
-        "desc": "Il corridoio nord è una città vuota. Le radio ripetono un avviso di evacuazione registrato tre settimane fa. Le squadre di recupero non sono mai rientrate.",
-    },
-    {
-        "id": "roma",
-        "code": "LAB-04",
-        "name": "Ceppo LZ-7",
-        "place": "Roma",
-        "region": "Lazio, IT",
-        "lat": 41.903,
-        "lon": 12.496,
-        "type": "anomaly",
-        "status": "QUARANTENA TOTALE",
-        "threat": 5,
-        "survivors": "0",
-        "contact": "T-02:08",
-        "source": "LOG-220",
-        "reliability": 77,
-        "tags": ["CAMPIONI", "CIFRATO", "ACCESSO NEGATO"],
-        "desc": "Il Lab-04 custodisce i campioni del ceppo LZ-7. La quarantena è totale e le comunicazioni passano solo su canale cifrato. Nessun registro è stato reso pubblico.",
-    },
-    {
-        "id": "berlino",
-        "code": "BER-07",
-        "name": "Muro 7",
-        "place": "Berlino",
-        "region": "Germania",
-        "lat": 52.520,
-        "lon": 13.405,
-        "type": "bunker",
-        "status": "FILTRO ATTIVO",
-        "threat": 3,
-        "survivors": "682",
-        "contact": "T-00:41",
-        "source": "LOG-078",
-        "reliability": 95,
-        "tags": ["TRANSITO", "CAPACENZA 91%", "FILTRO SANITARIO"],
-        "desc": "Muro 7 è il filtro più grande d'Europa: 682 superstiti registrati e una lista d'attesa che non scorre. Il perimetro tiene, ma il morale no.",
-    },
-    {
-        "id": "londra",
-        "code": "LON-00",
-        "name": "Zona 0",
-        "place": "Londra",
-        "region": "Regno Unito",
-        "lat": 51.507,
-        "lon": -0.128,
-        "type": "outbreak",
-        "status": "BLACKOUT TOTALE",
-        "threat": 5,
-        "survivors": "??",
-        "contact": "T-11:23",
-        "source": "LOG-301",
-        "reliability": 12,
-        "tags": ["BLACKOUT", "SOTTOSUOLO", "ULTIMO SEGNALE"],
-        "desc": "Zona 0 è al buio da undici ore. Il blackout ha cancellato telecamere, sensori e la maggior parte delle comunicazioni. L'ultimo segnale parlava di 'movimento sotto la città'.",
-    },
-    {
-        "id": "mosca",
-        "code": "SIL-12",
-        "name": "Silo 12",
-        "place": "Mosca",
-        "region": "Federazione Russa",
-        "lat": 55.756,
-        "lon": 37.617,
-        "type": "anomaly",
-        "status": "SIGILLATO",
-        "threat": 3,
-        "survivors": "48",
-        "contact": "T-06:15",
-        "source": "LOG-052",
-        "reliability": 83,
-        "tags": ["ARCHIVIO", "CRIOGENICO", "PING / 90 MIN"],
-        "desc": "Il Silo 12 conserva campioni criogenici e registri della prima settimana. È sigillato dall'interno. L'unica cosa che esce è un ping ogni novanta minuti.",
-    },
-    {
-        "id": "newyork",
-        "code": "NYC-03",
-        "name": "Quarantena Portuale",
-        "place": "New York",
-        "region": "Stati Uniti",
-        "lat": 40.713,
-        "lon": -74.006,
-        "type": "outbreak",
-        "status": "NESSUN PRESIDIO",
-        "threat": 5,
-        "survivors": "0",
-        "contact": "T-03:30",
-        "source": "LOG-198",
-        "reliability": 58,
-        "tags": ["NAVI ALLA FONDA", "RUMORE RITMICO", "ACCESSO CHIUSO"],
-        "desc": "La quarantena portuale non è più presidiata. Le navi all'ancora formano una linea di galleggianti vuoti. Dagli scali arriva un rumore metallico ritmico.",
-    },
-    {
-        "id": "saopaolo",
-        "code": "SAO-09",
-        "name": "Cluster Mutazione",
-        "place": "San Paolo",
-        "region": "Brasile",
-        "lat": -23.551,
-        "lon": -46.633,
-        "type": "anomaly",
-        "status": "OSSERVAZIONE",
-        "threat": 4,
-        "survivors": "??",
-        "contact": "T-07:44",
-        "source": "LOG-260",
-        "reliability": 46,
-        "tags": ["MUTAZIONE", "COORDINAZIONE", "ZONA SUD"],
-        "desc": "Un cluster di mutazione è emerso nella zona sud. Gli infetti mostrano una coordinazione che non dovrebbero avere. La zona è in osservazione, non in contenimento.",
-    },
-    {
-        "id": "tokyo",
-        "code": "HAK-01",
-        "name": "Porto Haku",
-        "place": "Tokyo",
-        "region": "Giappone",
-        "lat": 35.676,
-        "lon": 139.650,
-        "type": "bunker",
-        "status": "RIFUGIO APERTO",
-        "threat": 2,
-        "survivors": "1.204",
-        "contact": "T-00:12",
-        "source": "LOG-410",
-        "reliability": 98,
-        "tags": ["EVACUAZIONE", "FILTRI ATTIVI", "PARTENZE"],
-        "desc": "Il porto Haku è uno dei pochi rifugi ancora aperti. 1.204 superstiti, filtri sanitari attivi e una lista di partenze che non basta mai.",
-    },
-    {
-        "id": "cairo",
-        "code": "CAI-05",
-        "name": "Rotta Sud",
-        "place": "Il Cairo",
-        "region": "Egitto",
-        "lat": 30.044,
-        "lon": 31.236,
-        "type": "signal",
-        "status": "SEGNALE DEBOLE",
-        "threat": 3,
-        "survivors": "530",
-        "contact": "T-02:56",
-        "source": "LOG-333",
-        "reliability": 71,
-        "tags": ["NILO", "CONVOGLI", "VALICO ASSUAN"],
-        "desc": "La rotta sud lungo il Nilo regge, ma il segnale è debole. I convogli viaggiano di notte. L'ultimo messaggio chiede rinforzi per il valico di Assuan.",
-    },
-    {
-        "id": "sydney",
-        "code": "DAG-02",
-        "name": "Rifugio Dago",
-        "place": "Sydney",
-        "region": "Australia",
-        "lat": -33.868,
-        "lon": 151.209,
-        "type": "bunker",
-        "status": "ISOLATO",
-        "threat": 1,
-        "survivors": "890",
-        "contact": "T-05:19",
-        "source": "LOG-120",
-        "reliability": 90,
-        "tags": ["AUTONOMO", "ACQUA 8 MESI", "NO CONTATTO"],
-        "desc": "Il rifugio Dago è operativo e isolato. 890 superstiti, acqua e energia per otto mesi. Il comandante ha sospeso ogni contatto con la centrale.",
-    },
-]
+NODI_TEATRO: list[dict[str, Any]] = _carica_nodi_teatro()
 
 
 # ==============================================================================
-# IMPLEMENTAZIONE DEI TOOL
+# IMPLEMENTAZIONE DEI TOOL# IMPLEMENTAZIONE DEI TOOL
 # ==============================================================================
 
 def cerca_fonti(query: str, limite: int = 8) -> dict[str, Any]:
@@ -1681,15 +1295,15 @@ def cerca_personale(termine: str) -> dict[str, Any]:
     COSA FA
     Effettua una ricerca incrociata e dinamica senza hardcoding su:
     1. Database archivio_recuperato.sqlite (tabelle r03, r11, m12, r06, e04):
-       - Identifica operatori per nome, cognome o matricola (es. "Tina", "Ugo", "Tina Rocchi", "Ugo Valli", "PX-803574").
+       - Identifica operatori per nome, cognome o matricola.
        - Recupera squadra di appartenenza (r11 tramite m12), abilitazioni/ruoli (r06: es. SANITARIO, SICUREZZA),
          e stato sospensioni disciplinari o sanitarie (e04) attive alla data della missione.
     2. Database accessi.sqlite (Giorno 4 — Operazione Varco):
-       - Cerca operatori per nome (es. "Nora Ferri", "Operatore 098").
-       - Recupera codici di accesso, pratiche (es. RV753), depositi (es. Forte Cenere D6), stato e scadenza.
+       - Cerca operatori per nome o codice identificativo.
+       - Recupera codici di accesso, pratiche, depositi associati, stato e scadenza.
     3. Documenti e dossier primari di missione (dati/):
        - Cerca citazioni e contesti operativi nei file di testo ufficiali (es. G1, G2, LX5),
-         estraendo ruoli sul campo e mansioni (es. Livia Serra tesserino T547, Luca Serra tesserino T583, Nora Ferri).
+         estraendo ruoli sul campo, mansioni e riferimenti citati.
 
     ARGOMENTI
     - termine: nome, cognome, matricola o parola chiave (supporta ricerche multiple separate da 'e', virgole o punti e virgola).
@@ -1939,7 +1553,7 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
 
     COSA FA
     Interroga dinamicamente senza alcun hardcoding:
-    - I personaggi e tecnici citati nei dossier primari (dati/): es. Nora Ferri, Livia Serra, Luca Serra.
+    - I personaggi e tecnici citati nei dossier primari (dati/): figure chiave menzionate nei documenti.
     - Gli operatori con permessi speciali registrati in accessi.sqlite (es. operatori con accessi attivi a depositi sensibili).
     - Il censimento del personale in archivio_recuperato.sqlite (tabella r03).
 
@@ -1962,18 +1576,32 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
     # 1. Dossier primari e documenti caricati
     if fonte_norm in ("tutte", "dossier", "primario"):
         dossier_persone: dict[str, dict[str, Any]] = {}
-        luoghi_esclusi = {
-            "San Paolo", "San Mauro", "Forte Cenere", "Darsena Vuota", "Porto Sigillato",
-            "Corridoio Nord", "Muro 7", "Muro Sette", "Canale Infiltrato", "Ultima Voce",
-            "Stazione Echo", "Ripetitore Pietra", "Ripetitore Salice", "Settore D6", "Settore A1",
-            "Zona 0", "Ceppo LZ-7", "Silo 12", "Porto Haku", "Rotta Sud", "Rifugio Dago",
+        # Estrazione dinamica dei luoghi noti da NODI_TEATRO e accessi.sqlite
+        luoghi_esclusi: set[str] = {
+            n.get("name") for n in NODI_TEATRO if n.get("name")
+        } | {
+            n.get("place") for n in NODI_TEATRO if n.get("place")
         }
+        path_acc = risolvi_accessi_db()
+        if path_acc.is_file():
+            try:
+                con_acc = sqlite3.connect(path_acc.as_uri() + "?mode=ro", uri=True)
+                cur_acc = con_acc.cursor()
+                cur_acc.execute("SELECT nome FROM depositi")
+                for r in cur_acc.fetchall():
+                    if r[0]:
+                        luoghi_esclusi.add(str(r[0]).strip())
+                con_acc.close()
+            except Exception:
+                pass
+
         termini_esclusi = (
             "San ", "Ripetitore", "Settore", "Porto", "Muro", "Cartella", "Direttiva",
             "Verbale", "Estratto", "Versione", "Richiesta", "Ordine", "Firma", "Allarme",
             "Decisione", "Rischio", "Registrazione", "Annotazione", "Autorità", "Responsabilità",
             "Progetto", "Protocollo", "Nota", "Voce", "Archivio", "Canale", "Unità", "Unita",
-            "Circuito", "Segnale", "Dossier", "Foglio", "Testo", "Quadro",
+            "Circuito", "Segnale", "Dossier", "Foglio", "Testo", "Quadro", "Deposito", "Darsena",
+            "Forte", "Stazione", "Rifugio", "Zona", "Silo", "Ceppo", "Corridoio", "Rotta", "Cluster",
         )
         pat_persone = re.compile(
             r"\b(?:(?:dott|dr|sig|prof)\.?\s+)?([A-Z]\.?\s+[A-Z][a-z]+|[A-Z][a-z]+\s+[A-Z][a-z]+)\b"
@@ -2030,7 +1658,7 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
                 nome = match.group(1).strip()
                 if nome in luoghi_esclusi or any(loc in nome for loc in termini_esclusi):
                     continue
-                display_name = f"{nome} (figlia del paziente LZ-574)"
+                display_name = nome
                 if display_name not in dossier_persone:
                     dossier_persone[display_name] = {"nome": display_name, "dossier": set(), "menzioni": []}
                 dossier_persone[display_name]["dossier"].add(nome_f)
@@ -2038,10 +1666,10 @@ def elenca_personaggi_e_operatori(fonte: str = "tutte") -> dict[str, Any]:
                     if nome in line and len(dossier_persone[display_name]["menzioni"]) < 2:
                         dossier_persone[display_name]["menzioni"].append(line.strip())
 
-            # 3. Soggetti e pazienti clinici (es. Soggetto LZ-574)
+            # 3. Soggetti e pazienti clinici (es. codice alfanumerico)
             for match in pat_soggetto.finditer(txt):
                 codice = match.group(1).strip()
-                display_name = f"Soggetto {codice} (paziente zero)"
+                display_name = f"Soggetto {codice}"
                 if display_name not in dossier_persone:
                     dossier_persone[display_name] = {"nome": display_name, "dossier": set(), "menzioni": []}
                 dossier_persone[display_name]["dossier"].add(nome_f)
@@ -2117,11 +1745,9 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
     COSA FA
     - Interroga dinamicamente la tabella 'r11' di archivio_recuperato.sqlite (o il file TABELLE_CSV/r11.csv).
     - Distingue e cataloga:
-      1. Le 14 Unità 5 operative con nomenclatura mineraria/lapidea (Unità 5-Ardesia, Unità 5-Arenaria, Unità 5-Argilla,
-         Unità 5-Basalto, Unità 5-Calce, Unità 5-Gesso, Unità 5-Granito, Unità 5-Marmo, Unità 5-Ossidiana, Unità 5-Porfido,
-         Unità 5-Porfido bis, Unità 5-Scisto, Unità 5-Selce, Unità 5-Tufo).
-      2. I 60 Nuclei operativi (Nucleo 5-110 ... Nucleo 5-169).
-      3. Le squadre operative menzionate nei dossier narrativi (Unità investigativa dell'utente in G1-01, Squadra cavi in LX5).
+      1. Le Unità 5 operative con nomenclatura mineraria/lapidea.
+      2. I Nuclei operativi (Nucleo 5-xxx).
+      3. Le squadre operative menzionate nei dossier di missione.
 
     ARGOMENTI
     - filtro: "tutte" (default), "unita_5" (solo le Unità 5), "nuclei" (solo i nuclei).
@@ -2130,8 +1756,8 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
     Dizionario con:
     - ok: True/False
     - totale_squadre: conteggio totale delle squadre censite
-    - unita_5: lista dei nomi e ID delle 14 Unità 5
-    - nuclei_5: lista dei nomi e ID dei 60 Nuclei operativi
+    - unita_5: lista dei nomi e ID delle Unità 5
+    - nuclei_5: lista dei nomi e ID dei Nuclei operativi
     - squadre_narrative: squadre operative menzionate nei documenti di campo
     - riassunto: testo esplicativo, strutturato e completo
     """
@@ -2181,10 +1807,49 @@ def elenca_squadre(filtro: str = "tutte") -> dict[str, Any]:
         else:
             altre_squadre.append(voce)
 
-    squadre_narrative = [
-        {"nome": "Unità investigativa", "fonte": "G1-01", "ruolo": "Squadra dell'utente incaricata dell'indagine nella zona in quarantena"},
-        {"nome": "Squadra cavi", "fonte": "LX5 (es. LX5_6648, LX5_7083)", "ruolo": "Unità tecnica per il collaudo di linea e riparazioni dei ripetitori"},
-    ]
+    # 3. Rilevamento dinamico delle squadre menzionate nei dossier e documenti di campo
+    squadre_narrative: list[dict[str, Any]] = []
+    pat_sq = re.compile(r"\b(squadra\s+[a-zA-Zà-úÀ-Ú0-9_-]+|unità\s+investigativa)\b", re.IGNORECASE)
+    stopwords = {"sul", "sullo", "sulla", "sui", "sugli", "sulle", "di", "del", "dello", "della", "dei", "degli", "delle", "a", "al", "allo", "alla", "ai", "agli", "alle", "da", "dal", "in", "nel", "con", "su", "per", "tra", "fra", "non"}
+    squadre_trovate: dict[str, dict[str, Any]] = {}
+
+    fonti_squadre: list[tuple[str, str]] = []
+    try:
+        from Backend.sources import carica_fonti
+        fonti_squadre = list(carica_fonti())
+    except Exception:
+        fonti_squadre = []
+
+    try:
+        from Backend.config import IMPREVISTI_DIR
+        if IMPREVISTI_DIR.is_dir():
+            for p in sorted(IMPREVISTI_DIR.glob("*.txt"))[:100]:
+                fonti_squadre.append((p.name, p.read_text(encoding="utf-8", errors="ignore")))
+    except Exception:
+        pass
+
+    for nome_f, txt in fonti_squadre:
+        for m in pat_sq.finditer(txt):
+            cand = m.group(1).strip()
+            tokens = cand.lower().split()
+            if len(tokens) >= 2 and tokens[1] in stopwords:
+                continue
+            if "unità 5" in cand.lower() or "unita 5" in cand.lower():
+                continue
+            chiave = cand.capitalize()
+            if chiave not in squadre_trovate:
+                riga = ""
+                for l in txt.splitlines():
+                    if cand.lower() in l.lower():
+                        riga = l.strip()
+                        break
+                squadre_trovate[chiave] = {
+                    "nome": chiave,
+                    "fonte": nome_f,
+                    "ruolo": riga or "Menzionata nei documenti di campo",
+                }
+
+    squadre_narrative = list(squadre_trovate.values())
 
     # Costruzione riassunto investigativo chiaro ed esaustivo
     linee: list[str] = ["CENSIMENTO COMPLETO DELLE SQUADRE E DELLE UNITÀ 5:"]
@@ -2461,8 +2126,8 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
         "function": {
             "name": "collega_documenti",
             "description": (
-                "Collega i documenti recuperati dal RAG tramite entità condivise (codici come RV753 o CN-58, "
-                "nomi come Nora Ferri, acronimi e orari) e, se la domanda cita due entità, cerca il percorso più "
+                "Collega i documenti recuperati dal RAG tramite entità condivise (codici, nominativi, "
+                "acronimi e orari) e, se la domanda cita due entità, cerca il percorso più "
                 "breve che le collega, con una frase di prova per ogni passaggio. Restituisce file recuperati, "
                 "collegamenti, percorso e un testo formattato e citabile. USARE SE l'utente chiede di collegare, "
                 "confrontare o ricostruire una catena tra documenti; non usarlo se la catena è già nel contesto."
@@ -2472,7 +2137,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 "properties": {
                     "domanda": {
                         "type": "string",
-                        "description": "Domanda con le entità da collegare (es. 'Quali documenti collegano Nora Ferri al contenitore LUME?').",
+                        "description": "Domanda con le entità da collegare (es. 'Quali documenti collegano due entità o soggetti specifici?').",
                     }
                 },
                 "required": ["domanda"],
@@ -2508,12 +2173,12 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
             "name": "leggi_dossier_excel",
             "description": (
                 "Legge ed estrae dati dai fogli di lavoro di un file Excel declassificato (.xlsx), in particolare "
-                "DOSSIER_SBLOCCATO.xlsx (che contiene i verbali originali del primo risveglio LZ-574, "
-                "la richiesta di sospensione del dott. Bellini e la direttiva DR-591 di Fontana). "
-                "Permette di leggere l'intero file oppure un singolo foglio (es. '01_Risveglio', '02_Sospensione', '03_Direttiva'). "
+                "DOSSIER_SBLOCCATO.xlsx (che contiene verbali di osservazione clinica, richieste di sospensione "
+                "e direttive interne di sicurezza). "
+                "Permette di leggere l'intero file oppure un singolo foglio indicandone nome o numero. "
                 "Restituisce righe pulite, colonne e un resoconto testuale chiaro. "
                 "USARE SEMPRE quando l'utente menziona il file Excel, il dossier sbloccato o chiede dettagli sui "
-                "fogli di calcolo dei verbali clinici o direttive."
+                "fogli di calcolo dei verbali o direttive."
             ),
             "parameters": {
                 "type": "object",
@@ -2524,7 +2189,7 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                     },
                     "foglio": {
                         "type": "string",
-                        "description": "Nome del foglio (es. '01_Risveglio', '02_Sospensione', '03_Direttiva') o numero del foglio (1, 2, 3). Se omesso, legge tutti i fogli.",
+                        "description": "Nome o numero del foglio da estrarre (opzionale). Se omesso, sintetizza tutti i fogli.",
                     },
                 },
                 "required": [],
@@ -2773,14 +2438,14 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
                 "Cerca operatori, tecnici, personaggi e personale operativo in tutti i database e dossier del sistema "
                 "(archivio_recuperato.sqlite, accessi.sqlite e dossier primari in dati/). "
                 "Restituisce squadra di appartenenza, abilitazione (sanitario/sicurezza), matricola, sospensioni "
-                "e passaggi dai dossier. Supporta nomi singoli o multipli (es. 'Tina e Ugo', 'Nora Ferri', 'PX-803574')."
+                "e passaggi dai dossier. Supporta nomi singoli o multipli."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "termine": {
                         "type": "string",
-                        "description": "Nome, cognome, matricola o codice persona da cercare (es. 'Tina', 'Ugo', 'Tina e Ugo', 'Nora Ferri').",
+                        "description": "Nome, cognome, matricola o codice persona da cercare (es. un nome, una coppia o un codice matricola).",
                     }
                 },
                 "required": ["termine"],
@@ -2793,8 +2458,8 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
             "name": "elenca_personaggi_e_operatori",
             "description": (
                 "Elenca dinamicamente i personaggi chiave, le figure operative e gli operatori censiti nei database "
-                "e nei dossier primari. Fornisce la squadra autorizzata al Varco V-59, il censimento di archivio_recuperato "
-                "(r03), gli operatori con permessi in accessi.sqlite e i tecnici citati nei dossier (es. Nora Ferri, Livia Serra, Luca Serra)."
+                "e nei dossier primari. Fornisce il censimento di archivio_recuperato "
+                "(r03), gli operatori con permessi in accessi.sqlite e le figure citate nei dossier."
             ),
             "parameters": {
                 "type": "object",
@@ -2813,8 +2478,8 @@ TOOLS_OPENAI_SCHEMA: list[dict[str, Any]] = [
             "name": "elenca_squadre",
             "description": (
                 "Elenca dinamicamente tutte le squadre operative e le Unità 5 censite nell'archivio recuperato (tabella r11) "
-                "e nei documenti della missione. Distingue le 14 Unità 5 (Unità 5-Ardesia, Unità 5-Arenaria, Unità 5-Marmo, ecc.), "
-                "i 60 Nuclei operativi (Nucleo 5-xxx), la squadra autorizzata al Varco V-59 e le squadre di campo."
+                "e nei documenti della missione. Distingue le Unità 5 (con nomenclatura mineraria/lapidea), "
+                "i Nuclei operativi (Nucleo 5-xxx) e le squadre operative di campo."
             ),
             "parameters": {
                 "type": "object",

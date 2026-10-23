@@ -102,7 +102,7 @@ PASSI DELLA CATENA (domande successive e brani usati):
 [OK] Nessun passo usa Officina Cenotafio / settore Z9 / armadio 1 (lotto K519 del corriere Eco)
 
 DOMANDA: Recuperate un canale di evacuazione e localizzate un ricambio radio.
-File recuperati dal RAG: LX5_1221.txt, LX5_1229.txt, LX5_1854.txt, LX5_2083.txt, LX5_2328.txt, LX5_2444.txt, LX5_2794.txt, LX5_2929.txt, LX5_2398.txt, LX5_1749.txt
+File recuperati dal RAG: LX5_1221.txt, LX5_1229.txt, LX5_1854.txt, LX5_2083.txt, LX5_2328.txt, LX5_2444.txt, LX5_2794.txt, LX5_2929.txt, LX5_1749.txt, LX5_2398.txt
 Risposta:
   Analisi evidenze per il segnale EV-541:
   • Da usare: Ripetitore Pietra, circuito CN-58.
@@ -146,7 +146,7 @@ Risposta:
 [OK] Ancora corretta: Dove è scoppiato il primo focolaio e a che ora?...
 
 DOMANDA: Qual è l'autorizzazione ancora valida nel database degli accessi per il contenitore LUME?
-File recuperati dal RAG: documento_0389.xml, documento_0523.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt, DOSSIER_SBLOCCATO.xlsx, LX5_1264.txt, LX5_1062.txt, LX5_1151.txt, LX5_1889.txt, documento_0421.json, documento_0057.html, DOSSIER_SBLOCCATO_01_Risveglio.txt, DOSSIER_SBLOCCATO_02_Sospensione.txt, G2-03.txt, G2-04.txt
+File recuperati dal RAG: documento_0389.xml, documento_0523.txt, DOSSIER_SBLOCCATO_03_Direttiva.txt, DOSSIER_SBLOCCATO.xlsx, LX5_1264.txt, LX5_1062.txt, LX5_1151.txt, LX5_1889.txt, documento_0421.json, documento_0057.html, DOSSIER_SBLOCCATO_02_Sospensione.txt, DOSSIER_SBLOCCATO_01_Risveglio.txt, G2-03.txt, G2-04.txt
 Risposta:
   Non documentato nelle fonti disponibili: il documento Trasferimento del materiale di recupero [ARCH-5721] (documento_0389.xml) indica: «Consultare la planimetria per il settore e il database degli accessi per l’autorizzazione ancora valida.», ma il firmatario e l'autorizzazione nominativa non sono presenti tra i file dell'archivio.
 [OK] Ancora corretta: Qual è l'autorizzazione ancora valida nel database degli accessi per i...
