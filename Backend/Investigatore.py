@@ -6,7 +6,7 @@ Questo modulo connette e coordina l'architettura a responsabilità singola:
 - database.py       -> Persistenza SQLite (cronologia_chat, instradamento_chat).
 - sources.py        -> Caricamento e formattazione dei documenti del dossier (dati/*.txt).
 - tools.py          -> Strumenti invocabili dall'AI e dall'investigatore (fonti, mappa, nodi, stats).
-- modello_locale.py -> Modello Qwen2.5-0.5B-Instruct locale con fallback deterministico.
+- modello_locale.py -> Modello locale (config.MODELLO_LOCALE) con fallback deterministico.
 - modello_gemini.py -> Client Google Gemini (google-genai / REST) con fallback automatico e tools.
 - modello_openai.py -> Client per modelli cloud OpenAI e NVIDIA NIM con fallback automatico.
 - router.py         -> Classificazione di complessità e instradamento ibrido Locale vs Cloud.

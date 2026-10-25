@@ -172,7 +172,8 @@ TABELLE_CSV_DIR = risolvi_tabelle_csv_dir()
 ARCHIVIO_RECUPERATO_DB_PATH = risolvi_archivio_recuperato_db()
 
 # Modello Locale (Investigatore.py)
-MODELLO_LOCALE = "Qwen/Qwen2.5-0.5B-Instruct"
+# Cambia modello locale da .env (MODELLO_LOCALE=...) senza toccare il codice
+MODELLO_LOCALE = valore_env("MODELLO_LOCALE", "Qwen/Qwen2.5-1.5B-Instruct")
 
 # Modelli Cloud (Google Gemini)
 MODELLO_GEMINI_DEFAULT = valore_env("GEMINI_MODEL", "gemini-flash-lite-latest")
@@ -181,7 +182,6 @@ MODELLI_GEMINI_RISERVA = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
     "gemini-flash-latest",
-    "gemini-2.0-flash",
 ]
 
 # Modelli Cloud (OpenAI / NVIDIA NIM)
@@ -196,8 +196,59 @@ MODELLI_NVIDIA_RISERVA = [
     "nvidia/nemotron-3-super-120b-a12b",
     "nvidia/nemotron-4-340b-instruct",
     "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "nvidia/nemotron-3-ultra-550b-a55b",
 ]
+
+
+def elenco_modelli_nvidia() -> list[str]:
+    """
+    Catalogo dei modelli NVIDIA esposto al frontend (GET /api/status -> "modelli_nvidia").
+    Ordine: modello di default (NVIDIA_MODEL), poi quelli extra definiti nel .env
+    (NVIDIA_MODELS_EXTRA, separati da virgola), infine i modelli di riserva. Senza duplicati.
+    Per aggiungere un modello basta toccare il .env o MODELLI_NVIDIA_RISERVA: il frontend non va modificato.
+    """
+    extra = [m.strip() for m in (valore_env("NVIDIA_MODELS_EXTRA") or "").split(",") if m.strip()]
+    elenco: list[str] = []
+    for nome in [MODELLO_NVIDIA_DEFAULT, *extra, *MODELLI_NVIDIA_RISERVA]:
+        if nome and nome not in elenco:
+            elenco.append(nome)
+    return elenco
+
+
 MODELLO_OPENAI_DEFAULT = valore_env("OPENAI_MODEL", "gpt-4o-mini")
+
+# Cataloghi mostrati nel menu "Modello Cloud" del frontend (GET /api/status).
+# Per aggiungerne altri senza toccare il codice: GEMINI_MODELS_EXTRA / OPENAI_MODELS_EXTRA nel .env (separati da virgola).
+MODELLI_GEMINI_DISPONIBILI = [
+    "gemini-3.8-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-pro-preview",
+]
+MODELLI_OPENAI_DISPONIBILI = [
+    "gpt-4o-mini",
+]
+
+
+def _catalogo_modelli(base: list[str], nome_env_extra: str, default: str | None) -> list[str]:
+    """Unisce lista base + modelli extra del .env + modello di default, senza duplicati e mantenendo l'ordine."""
+    extra = [m.strip() for m in (valore_env(nome_env_extra) or "").split(",") if m.strip()]
+    elenco: list[str] = []
+    for nome in [*base, *extra, default]:
+        if nome and nome not in elenco:
+            elenco.append(nome)
+    return elenco
+
+
+def elenco_modelli_gemini() -> list[str]:
+    return _catalogo_modelli(MODELLI_GEMINI_DISPONIBILI, "GEMINI_MODELS_EXTRA", MODELLO_GEMINI_DEFAULT)
+
+
+def elenco_modelli_openai() -> list[str]:
+    return _catalogo_modelli(MODELLI_OPENAI_DISPONIBILI, "OPENAI_MODELS_EXTRA", MODELLO_OPENAI_DEFAULT)
+
 
 # Timeout e impostazioni rete
 TIMEOUT_SECONDI = 30.0

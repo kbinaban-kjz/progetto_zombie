@@ -1,8 +1,8 @@
 """
-Backend/modello_locale.py — Motore di inferenza locale (Qwen2.5-0.5B-Instruct) e risponditore deterministico.
+Backend/modello_locale.py — Motore di inferenza locale (modello in MODELLO_LOCALE) e risponditore deterministico.
 
 Responsabilità:
-- Caricamento su GPU (Apple Silicon MPS / NVIDIA CUDA) o CPU del modello Qwen/Qwen2.5-0.5B-Instruct.
+- Caricamento su GPU (Apple Silicon MPS / NVIDIA CUDA) o CPU del modello configurato in MODELLO_LOCALE.
 - Generazione locale con template chat e formattazione rigorosa delle fonti.
 - Risponditore deterministico locale basato su estrazione di fatti se PyTorch/transformers non sono installati.
 """
@@ -51,7 +51,7 @@ def ottieni_dispositivo() -> str:
 
 def carica_modello_locale() -> bool:
     """
-    Carica il modello locale Qwen/Qwen2.5-0.5B-Instruct.
+    Carica il modello locale configurato in MODELLO_LOCALE.
     Rileva automaticamente acceleratori hardware (Apple Silicon MPS, CUDA) altrimenti usa CPU.
     """
     global _tokenizer_locale, _modello_locale, _dispositivo_locale, _modello_locale_tentato
@@ -951,7 +951,7 @@ def risposta_locale_da_fonti(
 
 def _risposta_neurale_valida(risposta_neurale: str, base_deterministica: str, attacco_utente: bool) -> bool:
     """
-    Guardrail post-generazione per Qwen2.5-0.5B-Instruct:
+    Guardrail post-generazione per il modello locale (MODELLO_LOCALE):
     Verifica che la risposta neurale non abbia perso le citazioni [ID], gli orari chiave
     o le clausole di sicurezza/astensione rispetto all'estrattore deterministico.
     """
@@ -963,7 +963,7 @@ def _risposta_neurale_valida(risposta_neurale: str, base_deterministica: str, at
     base_lower = base_deterministica.lower()
     resp_lower = risposta_neurale.lower()
 
-    # Se il risponditore deterministico rileva un dato assente o un'astensione, non permettere a 0.5B di inventare colpevoli
+    # Se il risponditore deterministico rileva un dato assente o un'astensione, non permettere al modello locale di inventare colpevoli
     clausole_astensione = (
         "non documentato",
         "non conosce la causa",
@@ -1005,11 +1005,11 @@ def genera_risposta_locale(
     file_prioritari: Sequence[str] | None = None,
 ) -> str:
     """
-    Esegue la generazione sul modello locale (Qwen2.5-0.5B-Instruct) con guardrail deterministico.
+    Esegue la generazione sul modello locale (MODELLO_LOCALE) con guardrail deterministico.
     - Calcola sempre la base verificata tramite `risposta_locale_da_fonti` (escludendo i documenti ostili).
     - Se il modello neuronale è disponibile, gli fornisce unicamente i passaggi pertinenti verificati
       e valida che l'output preservi citazioni [ID], orari, avvisi di sicurezza e clausole di astensione.
-    - In caso di allucinazione o perdita di citazioni del modello 0.5B, restituisce la base deterministica.
+    - In caso di allucinazione o perdita di citazioni del modello locale, restituisce la base deterministica.
     """
     if not domanda or not domanda.strip():
         raise ValueError("La domanda non può essere vuota.")
@@ -1042,7 +1042,7 @@ def genera_risposta_locale(
     if carica_modello_locale() and _tokenizer_locale is not None and _modello_locale is not None:
         import torch
 
-        # Passa al modello 0.5B solo i passaggi pertinenti già sanitizzati (mai i documenti ostili grezzi)
+        # Passa al modello locale solo i passaggi pertinenti già sanitizzati (mai i documenti ostili grezzi)
         messaggio_utente = formatta_messaggio_locale(base_deterministica, domanda, memoria=memoria)
         messaggi = [{"role": "system", "content": ISTRUZIONI}]
 

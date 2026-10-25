@@ -382,6 +382,8 @@ def genera_risposta_ibrida(
                 )
                 motore_usato = "nvidia" if usa_nvidia else "openai"
             except Exception as exc_oa:
+                # Prima l'errore veniva ignorato in silenzio: ora si vede perché il Cloud non ha risposto
+                print(f"(Avviso Cloud NVIDIA/OpenAI: {type(exc_oa).__name__}: {exc_oa}. Tentativo fallback...)")
                 if chiave_gem:
                     try:
                         risposta = modello_gemini.genera_risposta(
@@ -398,7 +400,8 @@ def genera_risposta_ibrida(
                             or MODELLO_GEMINI_DEFAULT
                         )
                         motore_usato = "gemini"
-                    except Exception:
+                    except Exception as exc_gem2:
+                        print(f"(Avviso Gemini (fallback dopo NVIDIA/OpenAI): {type(exc_gem2).__name__}: {exc_gem2})")
                         risposta = None
 
         # Fallback finale locale se nessun provider Cloud ha risposto

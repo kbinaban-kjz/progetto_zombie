@@ -431,6 +431,7 @@ def genera_risposta(
                 ultimo_errore = api_err
                 messaggio_err = str(api_err).upper()
                 codice = getattr(api_err, "code", None)
+                print(f"[Gemini] {modello_corrente} non ha risposto ({codice}): {str(api_err)[:300]}")
 
                 # Errori di autenticazione: non fare fallback, la chiave è errata
                 if codice in (401, 403) or "API_KEY_INVALID" in messaggio_err or "PERMISSION_DENIED" in messaggio_err:
@@ -456,6 +457,7 @@ def genera_risposta(
             except Exception as generico_err:
                 ultimo_errore = generico_err
                 err_str = str(generico_err)
+                print(f"[Gemini] {modello_corrente} fallito ({type(generico_err).__name__}): {err_str[:300]}")
                 if "ConnectError" in type(generico_err).__name__ or "timeout" in err_str.lower():
                     if indice == len(modelli) - 1:
                         raise GeminiConnectionError(
