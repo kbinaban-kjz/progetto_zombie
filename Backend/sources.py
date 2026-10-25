@@ -885,6 +885,9 @@ def scegli_fonti_dettagliato(
                         ha_match_primario_solido = True
                         break
 
+        if not ha_match_primario_solido:
+            chiede_wikipedia = True
+
     def blocco_ammesso(mb: dict[str, Any]) -> bool:
         if mb.get("is_primario", True):
             return True
